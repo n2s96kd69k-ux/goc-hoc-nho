@@ -92,23 +92,30 @@ export function toggleTask(id) {
   let dayComplete = false;
   let weekBonus = 0;
   if (nowDone) {
-    coins += REWARDS.TASK;
+    update((st) => {
+      const rec = dayRecord(t.date);
+      const earned = rec.taskCoins || 0;
+      coins = Math.min(REWARDS.TASK, Math.max(0, REWARDS.TASK_DAY_CAP - earned));
+      const task = st.tasks.find((x) => x.id === id);
+      if (task) task.coinGain = coins;
+      rec.taskCoins = earned + coins;
+    }, { type: 'task-toggle', id, done: nowDone });
     const after = dayProgress(t.date);
-    if (after.total > 0 && after.done === after.total && before.done !== before.total) {
-      coins += REWARDS.DAY_COMPLETE;
-      dayComplete = true;
-    }
-    addCoins(coins, 'task');
+    dayComplete = after.total > 0 && after.done === after.total && before.done !== before.total;
+    if (coins) addCoins(coins, 'task');
     weekBonus = checkWeekComplete(t.date);
     if (dayComplete) { sounds.fanfare(); mascot.react('celebrate'); }
     else { sounds.pop(); mascot.react('happy'); }
   } else {
-    coins -= REWARDS.TASK;
-    const after = dayProgress(t.date);
-    if (before.total > 0 && before.done === before.total && after.done !== after.total) {
-      coins -= REWARDS.DAY_COMPLETE;
-    }
-    addCoins(coins, 'task-undo');
+    coins = -(t.coinGain || 0);
+    update((st) => {
+      const task = st.tasks.find((x) => x.id === id);
+      const rec = dayRecord(t.date);
+      const back = task && task.coinGain ? task.coinGain : 0;
+      if (task) task.coinGain = 0;
+      rec.taskCoins = Math.max(0, (rec.taskCoins || 0) - back);
+    }, { type: 'task-toggle', id, done: nowDone });
+    if (coins) addCoins(coins, 'task-undo');
   }
   const { events } = recomputeStreak();
   return { done: nowDone, coins, dayComplete, weekBonus, streakEvents: events };

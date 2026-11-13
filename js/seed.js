@@ -110,7 +110,7 @@ export function createInitialState() {
     subjects: createDefaultSubjects(),
     tasks: createSeedTasks(),
     days: createSeedDays(),        // { 'YYYY-MM-DD': { minutes, pomodoros, mood, note } }
-    wallet: { coins: 500, totalEarned: 500 },
+    wallet: { coins: 50, totalEarned: 50 },
     streak: { current: 0, longest: 5, lastDate: null, rewarded: {} },
     room: starterRoom(),            // xem items.js — theme / owned / placed / presets
     mascot: { accessory: null, name: 'Mochi' },

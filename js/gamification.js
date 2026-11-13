@@ -4,9 +4,10 @@ import { getState, update } from './state.js';
 import { todayKey, addDays, toKey, startOfWeek, weekKeys } from './utils.js';
 
 export const REWARDS = {
-  TASK: 10,          // hoàn thành một nhiệm vụ
+  TASK: 5,           // hoàn thành một nhiệm vụ
+  TASK_DAY_CAP: 25,  // tối đa xu từ nhiệm vụ trong một ngày
   POMODORO: 25,      // một phiên tập trung 25' (tỉ lệ theo phút)
-  DAY_COMPLETE: 50,  // xong toàn bộ nhiệm vụ trong ngày
+  DAY_COMPLETE: 0,   // không thưởng thêm, đã tính trong mức trần ngày
   WEEK_COMPLETE: 100,// xong toàn bộ nhiệm vụ trong tuần (≥ 5 nhiệm vụ)
   STREAK_7: 50,
   STREAK_14: 100,

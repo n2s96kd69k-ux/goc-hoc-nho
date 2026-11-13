@@ -376,11 +376,13 @@ export function bindPlanner(root) {
     b.classList.add('animating');
     const res = toggleTask(b.dataset.toggle);
     if (res && res.done) {
-      floatCoins(res.coins, b);
+      if (res.coins) floatCoins(res.coins, b);
       if (res.dayComplete) {
         const card = b.closest('.day-card');
         sparkleAt(card ? card.querySelector('.ring') : b, 8);
-        toast(`Hôm nay giỏi lắm 🌷 +${res.coins} xu`, { icon: '✨' });
+        toast(res.coins ? `Hôm nay giỏi lắm 🌷 +${res.coins} xu` : 'Hôm nay giỏi lắm 🌷 Đã đủ 25 xu nhiệm vụ', { icon: '✨' });
+      } else if (!res.coins) {
+        toast('Hôm nay đã đủ 25 xu từ nhiệm vụ', { icon: '🪙' });
       } else {
         toast('Xong một việc rồi ✨', { icon: '✓' });
       }
