@@ -17,3 +17,15 @@
 .main, .sidebar, .week-grid, .day-card { overflow-anchor: none; }
 
 .side-switches { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+
+.uni-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.uni-card {
+  position: relative; width: 86px; display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 8px 6px; border-radius: 12px; border: 1px solid var(--line); background: #fff; cursor: pointer; text-align: center;
+}
+.uni-card input { position: absolute; opacity: 0; pointer-events: none; }
+.uni-card img { width: 48px; height: 48px; object-fit: contain; }
+.uni-card small { font-size: .68rem; font-weight: 700; line-height: 1.2; }
+.uni-card.active { border-color: var(--brown-dark); box-shadow: 0 0 0 2px var(--butter); }
+.goal-logo { width: 84px; height: 84px; object-fit: contain; }
+.goal-mini { width: 18px; height: 18px; object-fit: contain; vertical-align: -3px; }

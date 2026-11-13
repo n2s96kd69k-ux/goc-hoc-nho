@@ -21,6 +21,7 @@ import { timeOfDay } from './catBrain.js';
 import { renderStats } from './pages/stats.js';
 import { renderGoals } from './pages/goals.js';
 import { renderSettings } from './pages/settings.js';
+import { refreshUniversities } from './universities.js';
 
 const main = () => document.getElementById('main');
 
@@ -154,6 +155,7 @@ function boot() {
 
   startRouter();
   document.body.classList.add('ready');
+  refreshUniversities().then(() => renderSidebar()).catch(() => {});
 }
 
 boot();

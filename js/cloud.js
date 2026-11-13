@@ -39,6 +39,9 @@ try {
   console.warn('Không thể khởi tạo Firebase:', e);
 }
 
+export function firebaseApp() { return app; }
+export function firebaseDb() { return db; }
+
 export function getCurrentUser() {
   return currentUser;
 }
