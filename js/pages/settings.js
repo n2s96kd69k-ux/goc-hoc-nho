@@ -2,12 +2,13 @@
 import { getState, update, replaceState } from '../state.js';
 import { escapeHtml } from '../utils.js';
 import { exportToFile, parseImportFile, clearState } from '../storage.js';
-import { createInitialState } from '../seed.js';
+import { createBlankState } from '../seed.js';
 import { confirmDialog } from '../components/modal.js';
 import { toast } from '../components/toast.js';
 import { openSubjectForm } from './subjects.js';
 import { navigate } from '../router.js';
 import { setupDurations } from '../timer.js';
+import { recomputeStreak } from '../gamification.js';
 
 export function renderSettings(root) {
   const s = getState();
@@ -55,7 +56,7 @@ export function renderSettings(root) {
 
         <div class="paper danger-zone">
           <h4 class="side-title">🧹 Dọn dẹp</h4>
-          <p class="small muted">Xóa dữ liệu mẫu để bắt đầu từ trang giấy trắng, hoặc xóa toàn bộ để làm mới.</p>
+          <p class="small muted">Xóa các nhiệm vụ và ngày học mẫu. Việc bạn tự thêm, xu, môn học và phòng được giữ.</p>
           <div class="btn-row">
             <button type="button" class="btn btn-ghost" id="clear-sample">Xóa dữ liệu mẫu</button>
             <button type="button" class="btn btn-danger" id="clear-all">Xóa toàn bộ dữ liệu</button>
@@ -101,10 +102,28 @@ export function renderSettings(root) {
   };
 
   root.querySelector('#clear-sample').onclick = async () => {
-    const ok = await confirmDialog({ title: 'Xóa dữ liệu mẫu?', message: 'Các nhiệm vụ và lịch sử mẫu sẽ bị xóa. Môn học, xu, cài đặt được giữ lại.', okText: 'Xóa mẫu', danger: true });
+    const cur = getState();
+    const n = cur.tasks.filter((t) => t.sample).length;
+    const days = Object.values(cur.days).filter((d) => d && d.sample).length;
+    if (!n && !days) { toast('Không còn dữ liệu mẫu'); return; }
+    const ok = await confirmDialog({ title: 'Xóa dữ liệu mẫu?', message: `Xóa <strong>${n}</strong> nhiệm vụ mẫu và lịch sử mẫu. Nhiệm vụ bạn tự thêm, xu, môn học và phòng được giữ.`, okText: 'Xóa mẫu', danger: true });
     if (!ok) return;
-    update((st) => { st.tasks = []; st.days = {}; st.streak.current = 0; st.streak.longest = 0; st.settings.seeded = false; }, { type: 'replace' });
-    toast('Đã dọn sạch. Bắt đầu từ trang trắng nhé 🌷');
+    update((st) => {
+      const hadUserTask = st.tasks.some((t) => !t.sample);
+      st.tasks = st.tasks.filter((t) => !t.sample);
+      if (!hadUserTask) {
+        st.days = {};
+        st.streak.current = 0;
+        st.streak.longest = 0;
+      } else {
+        const kept = {};
+        for (const [k, d] of Object.entries(st.days)) if (!d || !d.sample) kept[k] = d;
+        st.days = kept;
+      }
+      st.settings.seeded = false;
+    }, { type: 'replace' });
+    recomputeStreak();
+    toast('Đã xóa dữ liệu mẫu 🌷');
   };
 
   root.querySelector('#clear-all').onclick = async () => {
@@ -112,9 +131,15 @@ export function renderSettings(root) {
     if (!ok1) return;
     const ok2 = await confirmDialog({ title: 'Chắc chắn chứ? (bước 2/2)', message: 'Hành động này không thể hoàn tác.', okText: 'Xóa hết', danger: true });
     if (!ok2) return;
+    const keep = getState();
+    const blank = createBlankState();
+    blank.settings = { ...keep.settings, seeded: false };
+    blank.subjects = keep.subjects;
+    blank.goal = keep.goal;
+    blank.mascot = { ...blank.mascot, name: keep.mascot.name };
     clearState();
-    replaceState(createInitialState());
-    toast('Đã làm mới toàn bộ');
+    replaceState(blank);
+    toast('Đã xóa toàn bộ dữ liệu');
     navigate('/');
   };
 }
