@@ -1,9 +1,9 @@
 // ===== WEEKLY PLANNER — nhân vật chính =====
 import { getState, update } from '../state.js';
 import { DAY_LABELS, DAY_SHORT, DAY_ICONS, DAY_COLORS, fromKey, toKey, addDays, weekKeys, weekRangeLabel, formatDM, todayKey, startOfWeek, minutesToText, escapeHtml, PRIORITIES } from '../utils.js';
-import { tasksOfDay, dayProgress, mainSubjectOfDay, toggleTask, applyFilter } from '../tasks.js';
+import { tasksOfDay, dayProgress, mainSubjectOfDay, toggleTask, applyFilter, getTask } from '../tasks.js';
 import { getSubject } from '../subjects.js';
-import { minutesOfDay, pomodorosOfDay } from '../statistics.js';
+import { minutesOfDay, pomodorosOfDay, dayStatus } from '../statistics.js';
 import { progressRing } from './progressRing.js';
 import { openTaskForm } from './taskForm.js';
 import { floatCoins, sparkleAt, streakPopup } from './reward.js';
@@ -22,14 +22,12 @@ export function plannerHTML() {
   const isThisWeek = keys.includes(t);
   const filter = s.ui.filter || 'all';
   const viewDay = keys.includes(s.ui.viewDay) ? s.ui.viewDay : (isThisWeek ? t : keys[0]);
-
   const filters = [
     { id: 'all', label: 'Tất cả' },
     ...s.subjects.map((sub) => ({ id: sub.id, label: `${sub.icon} ${sub.name}` })),
     { id: 'done', label: '✓ Hoàn thành' },
     { id: 'todo', label: '○ Chưa xong' },
   ];
-
   return `
     <section class="planner" id="planner">
       <div class="planner-head">
@@ -41,11 +39,9 @@ export function plannerHTML() {
         </div>
         <button class="btn btn-primary" type="button" id="add-task-btn">+ THÊM NHIỆM VỤ</button>
       </div>
-
       <div class="filter-row" role="tablist" aria-label="Bộ lọc">
         ${filters.map((f) => `<button type="button" class="chip ${filter === f.id ? 'active' : ''}" data-filter="${f.id}">${f.label}</button>`).join('')}
       </div>
-
       <div class="day-tabs" aria-label="Chọn ngày">
         ${keys.map((k, i) => {
           const p = dayProgress(k);
@@ -54,7 +50,6 @@ export function plannerHTML() {
           </button>`;
         }).join('')}
       </div>
-
       <div class="week-grid" id="week-grid" data-view-day="${viewDay}">
         ${keys.map((k, i) => dayCardHTML(k, i, filter, k === viewDay)).join('')}
       </div>
@@ -80,7 +75,6 @@ function dayCardHTML(key, i, filter, isActive) {
   if (isPast && !complete) cls.push('is-past');
   if (complete) cls.push('is-complete');
   if (isActive) cls.push('is-active');
-
   return `
     <article class="${cls.join(' ')}" data-day="${key}">
       <div class="tape"></div>
@@ -92,14 +86,11 @@ function dayCardHTML(key, i, filter, isActive) {
           <div class="day-date">${formatDM(key)}</div>
         </div>
       </header>
-
       <div class="day-progress">
         ${progressRing(prog.percent, { size: 78, stroke: 8, color: complete ? 'var(--matcha-dark)' : `var(--${DAY_COLORS[i]}-dark)` })}
         <div class="day-progress-text"><strong>${prog.done} / ${prog.total}</strong><span>nhiệm vụ</span></div>
       </div>
-
       ${main ? `<div class="day-subject" style="--sub:${main.color}">🎯 ${escapeHtml(main.name).toUpperCase()}</div>` : ''}
-
       <div class="day-tasks">
         ${all.length === 0 ? emptyDayHTML(key) : list.length === 0 ? '<p class="muted small">Không có nhiệm vụ khớp bộ lọc.</p>' : `
           <ul class="task-list">
@@ -109,7 +100,6 @@ function dayCardHTML(key, i, filter, isActive) {
           ${isExpanded && list.length > MAX_VISIBLE ? `<button type="button" class="link-btn" data-less="${key}">Thu gọn</button>` : ''}
         `}
       </div>
-
       <footer class="day-foot">
         <span title="Pomodoro">🍅 ${pomos} Pomodoro</span>
         <span title="Thời gian học">☕ ${minutesToText(minutes)}</span>
@@ -135,7 +125,7 @@ function taskItemHTML(t) {
 function emptyDayHTML(key) {
   return `
     <div class="empty-day">
-      <div class="empty-mascot">${mascotSVG(56)}</div>
+      <div class="empty-mascot">${mascotSVG(56, { state: 'sleepy' })}</div>
       <p>Chưa có kế hoạch ${key === todayKey() ? 'hôm nay' : 'ngày này'}.</p>
       <small>Nào, thêm một nhiệm vụ đầu tiên nhé?</small>
       <button type="button" class="btn btn-soft btn-sm" data-add="${key}">+ Thêm nhiệm vụ</button>
@@ -144,7 +134,6 @@ function emptyDayHTML(key) {
 
 export function bindPlanner(root) {
   const s = getState();
-
   root.querySelectorAll('[data-week]').forEach((b) => b.onclick = () => {
     const delta = Number(b.dataset.week);
     update((st) => {
@@ -155,14 +144,12 @@ export function bindPlanner(root) {
       syncCalendarToWeek();
     }, { type: 'view' });
   });
-
   root.querySelector('#add-task-btn').onclick = () => openTaskForm({ date: s.ui.viewDay || todayKey() });
   root.querySelectorAll('[data-add]').forEach((b) => b.onclick = () => openTaskForm({ date: b.dataset.add }));
   root.querySelectorAll('[data-edit]').forEach((b) => b.onclick = () => openTaskForm({ taskId: b.dataset.edit }));
   root.querySelectorAll('[data-filter]').forEach((b) => b.onclick = () => update((st) => { st.ui.filter = b.dataset.filter; }, { type: 'view' }));
   root.querySelectorAll('[data-more]').forEach((b) => b.onclick = () => { expanded.add(b.dataset.more); update(() => {}, { type: 'view' }); });
   root.querySelectorAll('[data-less]').forEach((b) => b.onclick = () => { expanded.delete(b.dataset.less); update(() => {}, { type: 'view' }); });
-
   root.querySelectorAll('[data-toggle]').forEach((b) => b.onclick = (e) => {
     e.stopPropagation();
     b.classList.add('animating');
@@ -179,9 +166,7 @@ export function bindPlanner(root) {
       res.streakEvents.forEach((ev) => setTimeout(() => streakPopup(ev.milestone, ev.coins), 500));
     }
   });
-
   root.querySelectorAll('[data-day].day-tab').forEach((b) => b.onclick = () => setViewDay(b.dataset.day));
-
   const grid = root.querySelector('#week-grid');
   let sx = 0, sy = 0, tracking = false;
   grid.addEventListener('touchstart', (e) => { sx = e.touches[0].clientX; sy = e.touches[0].clientY; tracking = true; }, { passive: true });
@@ -199,4 +184,122 @@ export function bindPlanner(root) {
 
 function setViewDay(key, dir) {
   update((st) => { st.ui.viewDay = key; }, { type: 'view', slide: dir });
+}
+
+export function patchTaskToggle(id) {
+  const task = getTask(id);
+  if (!task) return;
+  const done = !!task.done;
+  document.querySelectorAll(`[data-toggle="${id}"]`).forEach((btn) => {
+    btn.classList.toggle('checked', done);
+    btn.setAttribute('aria-pressed', String(done));
+    const li = btn.closest('.task');
+    if (li) li.classList.toggle('done', done);
+  });
+  document.querySelectorAll(`.day-card[data-day="${task.date}"]`).forEach((card) => updateDayCardProgress(card, task.date));
+  updateDayTab(task.date);
+  updateTodayBar(task.date);
+  updateSideProgress(task.date);
+  updateCalDot(task.date);
+}
+
+function updateDayCardProgress(card, key) {
+  const prog = dayProgress(key);
+  const complete = prog.total > 0 && prog.done === prog.total;
+  const strong = card.querySelector('.day-progress-text strong');
+  if (strong) strong.textContent = `${prog.done} / ${prog.total}`;
+  const label = card.querySelector('.ring-label');
+  if (label) label.textContent = `${prog.percent}%`;
+  const ring = card.querySelector('.ring-fill');
+  if (ring) {
+    const circ = parseFloat(ring.getAttribute('stroke-dasharray')) || 0;
+    ring.setAttribute('stroke-dashoffset', (circ - (circ * prog.percent) / 100).toFixed(2));
+    const tone = [...card.classList].find((cls) => cls.startsWith('tone-'));
+    ring.setAttribute('stroke', complete ? 'var(--matcha-dark)' : `var(--${tone ? tone.slice(5) : 'matcha'}-dark)`);
+  }
+  card.classList.toggle('is-complete', complete);
+  card.classList.toggle('is-past', key < todayKey() && !complete);
+  const sticker = card.querySelector('.sticker-done');
+  const todaySticker = card.querySelector('.sticker-today');
+  if (complete) {
+    if (todaySticker) todaySticker.remove();
+    if (!sticker) {
+      const s = document.createElement('span');
+      s.className = 'sticker-done';
+      s.textContent = '✨ HOÀN THÀNH';
+      card.appendChild(s);
+    }
+  } else if (sticker) {
+    sticker.remove();
+    if (key === todayKey() && !card.querySelector('.sticker-today')) {
+      const s = document.createElement('span');
+      s.className = 'sticker-today';
+      s.textContent = '☀️ Hôm nay';
+      card.appendChild(s);
+    }
+  }
+}
+
+function updateDayTab(key) {
+  const tab = document.querySelector(`.day-tab[data-day="${key}"]`);
+  if (!tab) return;
+  const prog = dayProgress(key);
+  const complete = prog.total > 0 && prog.done === prog.total;
+  const mark = tab.querySelector('.tab-done');
+  if (complete && !mark) {
+    const i = document.createElement('i');
+    i.className = 'tab-done';
+    i.textContent = '✓';
+    tab.appendChild(i);
+  } else if (!complete && mark) mark.remove();
+}
+
+function updateTodayBar(key) {
+  if (key !== todayKey()) return;
+  const prog = dayProgress(key);
+  const el = document.querySelector('.today-prog');
+  if (el) el.innerHTML = `${prog.done} / ${prog.total} nhiệm vụ · <strong>${prog.percent}%</strong>`;
+  const goal = document.querySelector('.today-goal');
+  if (!goal) return;
+  const next = tasksOfDay(key).find((x) => !x.done);
+  goal.textContent = next ? `Mục tiêu: ${next.title}` : (prog.total ? 'Hôm nay giỏi lắm 🌷 Đã xong hết!' : 'Chưa có kế hoạch hôm nay.');
+}
+
+function updateSideProgress(key) {
+  const prog = dayProgress(key);
+  const row = document.querySelector(`.mini-row[data-day="${key}"]`);
+  if (row) {
+    const fill = row.querySelector('.bar-fill');
+    const val = row.querySelector('.mini-val');
+    if (fill) {
+      fill.style.width = `${prog.percent}%`;
+      fill.style.background = prog.percent === 100 ? 'var(--matcha-dark)' : 'var(--peach-dark)';
+    }
+    if (val) val.textContent = prog.total ? `${prog.percent}%` : '–';
+  }
+  const keys = weekKeys(fromKey(getState().ui.viewWeek));
+  if (!keys.includes(key)) return;
+  let done = 0, total = 0;
+  for (const k of keys) {
+    const p = dayProgress(k);
+    done += p.done;
+    total += p.total;
+  }
+  const foot = document.querySelector('#side-progress .side-foot');
+  if (foot) foot.textContent = `${done}/${total} nhiệm vụ · ${total ? Math.round((done / total) * 100) : 0}%`;
+}
+
+function updateCalDot(key) {
+  const cell = document.querySelector(`.cal-cell[data-date="${key}"]`);
+  if (!cell) return;
+  const st = dayStatus(key);
+  cell.classList.remove('st-good', 'st-partial', 'st-missed', 'st-none', 'st-future');
+  if (st) cell.classList.add('st-' + st);
+  let dot = cell.querySelector('.cal-dot');
+  const show = st && st !== 'future' && st !== 'none';
+  if (show && !dot) {
+    dot = document.createElement('i');
+    dot.className = 'cal-dot';
+    cell.appendChild(dot);
+  } else if (!show && dot) dot.remove();
 }
