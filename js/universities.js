@@ -51,32 +51,30 @@ function resizeImage(file) {
     const img = new Image();
     const blobUrl = URL.createObjectURL(file);
     img.onload = () => {
-      const max = 256;
-      const scale = Math.min(1, max / Math.max(img.width, img.height));
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.max(1, Math.round(img.width * scale));
-      canvas.height = Math.max(1, Math.round(img.height * scale));
-      const ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#fff';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      canvas.toBlob((blob) => {
-        URL.revokeObjectURL(blobUrl);
-        if (blob) resolve(blob);
-        else reject(new Error('Không xử lý được ảnh'));
-      }, 'image/jpeg', 0.78);
+      const draw = (max) => {
+        const scale = Math.min(1, max / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(img.width * scale));
+        canvas.height = Math.max(1, Math.round(img.height * scale));
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        return canvas.toDataURL('image/png');
+      };
+      let max = 1080;
+      let url = draw(max);
+      while (url.length > 850000 && max > 480) {
+        max = Math.round(max * 0.8);
+        url = draw(max);
+      }
+      URL.revokeObjectURL(blobUrl);
+      if (url.startsWith('data:image/png')) resolve(url);
+      else reject(new Error('Không xử lý được ảnh'));
     };
     img.onerror = () => { URL.revokeObjectURL(blobUrl); reject(new Error('Ảnh không hợp lệ')); };
     img.src = blobUrl;
-  });
-}
-
-function blobToDataUrl(blob) {
-  return new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = () => resolve(r.result);
-    r.onerror = () => reject(new Error('Không đọc được ảnh'));
-    r.readAsDataURL(blob);
   });
 }
 
@@ -103,9 +101,8 @@ export async function addUniversity(name, file, onProgress = () => {}) {
   const db = firebaseDb();
   if (!db) throw new Error('Firebase chưa sẵn sàng.');
   onProgress(8);
-  const blob = await resizeImage(file);
+  const url = await resizeImage(file);
   onProgress(24);
-  const url = await blobToDataUrl(blob);
   const id = 'u' + Date.now().toString(36);
   onProgress(40);
   try {

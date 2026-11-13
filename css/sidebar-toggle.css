@@ -21,15 +21,15 @@
 .uni-grid { display: flex; flex-wrap: wrap; gap: 8px; }
 .uni-card {
   position: relative; width: 86px; display: flex; flex-direction: column; align-items: center; gap: 4px;
-  padding: 8px 6px; border-radius: 12px; border: 1px solid var(--line); background: #fff; cursor: pointer; text-align: center;
+  padding: 8px 6px; border-radius: 12px; border: 1px solid var(--line); background: transparent; cursor: pointer; text-align: center;
 }
 .uni-card input { position: absolute; opacity: 0; pointer-events: none; }
 .uni-card img { width: 48px; height: 48px; object-fit: contain; }
 .uni-card small { font-size: .68rem; font-weight: 700; line-height: 1.2; }
 .uni-card.active { border-color: var(--brown-dark); box-shadow: 0 0 0 2px var(--butter); }
-.goal-logo { width: 156px; height: 156px; object-fit: contain; }
+.goal-logo { width: 200px; height: 200px; object-fit: contain; background: transparent; }
 .goal-mark { display: flex; justify-content: center; margin: 2px 0 8px; }
-.goal-logo-side { width: 112px; height: 112px; object-fit: contain; filter: drop-shadow(0 8px 14px rgba(111, 85, 71, .18)); }
+.goal-logo-side { width: 132px; height: 132px; object-fit: contain; background: transparent; filter: drop-shadow(0 8px 14px rgba(111, 85, 71, .18)); }
 .goal-emoji { font-size: 3.4rem; line-height: 1; }
 .side-goal .goal-name { text-align: center; font-size: 1.15rem; }
 .uni-progress { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
