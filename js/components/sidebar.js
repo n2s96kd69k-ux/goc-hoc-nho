@@ -134,7 +134,7 @@ function goalCountdowns(g) {
     const dot = next ? dates.indexOf(next) + 1 : 0;
     const n = next ? daysBetween(today, next) : null;
     const text = !dates.length ? 'Chưa chốt' : n === null ? 'Đã thi' : n === 0 ? 'Hôm nay' : `${n} ngày`;
-    const label = next ? `${escapeHtml(e.name)} · Đợt ${dot}` : escapeHtml(e.name);
+    const label = e.single || !next ? escapeHtml(e.single ? e.name : (e.short || e.name)) : `${escapeHtml(e.short || e.name)} · Đợt ${dot}`;
     return `<li><span>${label}</span><strong>${text}</strong></li>`;
   }).join('')}</ul>`;
 }

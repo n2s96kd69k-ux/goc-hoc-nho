@@ -185,9 +185,11 @@ function dayText(date, today) {
   return 'Đã thi';
 }
 
-function roundRow(id, date, index, admin) {
-  if (!admin) return `<div class="exam-round"><span class="round-label">Đợt ${index + 1}</span><span class="exam-date">${formatDMY(date)}</span></div>`;
-  return `<div class="exam-round"><span class="round-label">Đợt ${index + 1}</span><input class="exam-date" type="date" data-exam="${id}" value="${escapeHtml(date || '')}"><button type="button" class="round-del" data-del-round aria-label="Xóa đợt">×</button></div>`;
+function roundRow(id, date, index, admin, single) {
+  const label = single ? '' : `<span class="round-label">Đợt ${index + 1}</span>`;
+  const del = admin && !single ? '<button type="button" class="round-del" data-del-round aria-label="Xóa đợt">×</button>' : '';
+  if (!admin) return `<div class="exam-round">${label}<span class="exam-date">${formatDMY(date)}</span></div>`;
+  return `<div class="exam-round">${label}<input class="exam-date" type="date" data-exam="${id}" value="${escapeHtml(date || '')}">${del}</div>`;
 }
 
 function paintExams() {
@@ -200,15 +202,20 @@ function paintExams() {
   const legend = board.querySelector('legend');
   board.innerHTML = `${legend ? legend.outerHTML : '<legend>Lịch thi</legend>'}
     <ul class="exam-list">
-      ${list.map((e) => `
+      ${list.map((e) => {
+        const single = !!e.single;
+        const dates = single ? [(e.dates || [])[0] || ''] : (e.dates || []);
+        return `
         <li class="exam-row" data-id="${e.id}">
           <label class="exam-pick"><input type="checkbox" data-show="${e.id}" ${picked.has(e.id) ? 'checked' : ''}><span class="exam-name">${escapeHtml(e.name)}</span></label>
           <div class="exam-rounds">
-            ${(e.dates || []).map((d, i) => roundRow(e.id, d, i, admin)).join('')}
-            ${!(e.dates || []).length && !admin ? '<span class="exam-date">Chưa chốt</span>' : ''}
-            ${admin ? '<button type="button" class="link-btn" data-add-round>Thêm đợt</button>' : ''}
+            ${dates.filter((d) => single || d).map((d, i) => roundRow(e.id, d, i, admin, single)).join('')}
+            ${!single && !dates.length && !admin ? '<span class="exam-date">Chưa chốt</span>' : ''}
+            ${single && !admin && !dates[0] ? '<span class="exam-date">Chưa chốt</span>' : ''}
+            ${admin && !single ? '<button type="button" class="link-btn" data-add-round>Thêm đợt</button>' : ''}
           </div>
-        </li>`).join('')}
+        </li>`;
+      }).join('')}
     </ul>
     ${admin ? '<button type="button" class="btn btn-soft btn-sm" id="exam-save">Lưu lịch thi</button>' : '<p class="small muted">Tích để hiện kỳ đó trên mục tiêu.</p>'}
   `;
@@ -219,7 +226,7 @@ function paintExams() {
       const row = add.closest('.exam-row');
       const box = row.querySelector('.exam-rounds');
       const hold = document.createElement('div');
-      hold.innerHTML = roundRow(row.dataset.id, '', box.querySelectorAll('.exam-round').length, true);
+      hold.innerHTML = roundRow(row.dataset.id, '', box.querySelectorAll('.exam-round').length, true, false);
       box.insertBefore(hold.firstElementChild, add);
       renumber(row);
       return;
@@ -279,8 +286,12 @@ function paintShown() {
       ${list.map((e) => {
         const dates = e.dates || [];
         const next = dates.filter((d) => d >= today).sort()[0] || '';
-        const lines = dates.length ? dates.map((d, i) => `<div class="round-line ${d === next ? 'is-next' : ''}"><span>Đợt ${i + 1}</span><strong>${dayText(d, today)}</strong></div>`).join('') : '<strong>Chưa chốt</strong>';
-        return `<div class="count-card"><small>${escapeHtml(e.name)}</small>${lines}</div>`;
+        const lines = !dates.length
+          ? '<strong>Chưa chốt</strong>'
+          : e.single
+            ? `<strong>${dayText(dates[0], today)}</strong>`
+            : dates.map((d, i) => `<div class="round-line ${d === next ? 'is-next' : ''}"><span>Đợt ${i + 1}</span><strong>${dayText(d, today)}</strong></div>`).join('');
+        return `<div class="count-card"><small>${escapeHtml(e.short || e.name)}</small>${lines}</div>`;
       }).join('')}
     </div>`;
 }

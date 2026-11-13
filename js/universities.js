@@ -9,13 +9,13 @@ let watching = false;
 const examListeners = new Set();
 
 export const EXAM_DEFS = [
-  { id: 'thpt', name: 'Tốt nghiệp THPT', dates: [] },
-  { id: 'vact', name: 'V-ACT (ĐGNL ĐHQG-HCM)', dates: ['2027-03-28', '2027-05-23'] },
-  { id: 'hsa', name: 'HSA (ĐGNL ĐHQGHN)', dates: ['2027-03-07', '2027-03-21', '2027-04-04', '2027-04-18', '2027-05-09', '2027-05-23'] },
-  { id: 'tsa', name: 'TSA (ĐH Bách Khoa HN)', dates: ['2027-01-16', '2027-03-20', '2027-05-22'] },
-  { id: 'vsat', name: 'V-SAT', dates: [] },
+  { id: 'thpt', name: 'Tốt nghiệp THPT', short: 'THPT', single: true, dates: [] },
+  { id: 'vact', name: 'V-ACT (ĐGNL ĐHQG-HCM)', short: 'V-ACT', dates: ['2027-03-28', '2027-05-23'] },
+  { id: 'hsa', name: 'HSA (ĐGNL ĐHQGHN)', short: 'HSA', dates: ['2027-03-07', '2027-03-21', '2027-04-04', '2027-04-18', '2027-05-09', '2027-05-23'] },
+  { id: 'tsa', name: 'TSA (ĐH Bách Khoa HN)', short: 'TSA', dates: ['2027-01-16', '2027-03-20', '2027-05-22'] },
+  { id: 'vsat', name: 'V-SAT', short: 'V-SAT', dates: [] },
 ];
-let exams = EXAM_DEFS.map((e) => ({ id: e.id, name: e.name, dates: [...e.dates] }));
+let exams = EXAM_DEFS.map((e) => ({ id: e.id, name: e.name, short: e.short, single: !!e.single, dates: [...e.dates] }));
 
 export function getUniversities() { return cache; }
 
@@ -37,7 +37,7 @@ function applyExams(list) {
     const dates = raw && Array.isArray(raw.dates)
       ? raw.dates.filter((d) => typeof d === 'string' && d).sort()
       : [...e.dates];
-    return { id: e.id, name: e.name, dates };
+    return { id: e.id, name: e.name, short: e.short, single: !!e.single, dates: e.single ? dates.slice(0, 1) : dates };
   });
   try { localStorage.setItem(EXAM_KEY, JSON.stringify(exams)); } catch {}
   emitExams();
@@ -183,7 +183,7 @@ export async function saveExamSchedule(dates) {
   if (!db) throw new Error('Firebase chưa sẵn sàng.');
   const next = EXAM_DEFS.map((e) => ({
     id: e.id,
-    dates: [...new Set((dates[e.id] || []).map((d) => String(d).trim()).filter(Boolean))].sort(),
+    dates: [...new Set((dates[e.id] || []).map((d) => String(d).trim()).filter(Boolean))].sort().slice(0, e.single ? 1 : 99),
   }));
   try {
     await setDoc(doc(db, 'universities', 'schedule'), { kind: 'schedule', exams: next, updatedAt: Date.now() });
