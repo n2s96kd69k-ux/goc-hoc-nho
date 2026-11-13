@@ -18,7 +18,7 @@ export function renderHeader() {
   const user = getCurrentUser();
   const el = document.getElementById('app-header');
   el.innerHTML = `
-    <button class="icon-btn menu-btn" id="menu-btn" type="button" aria-label="Mở menu">☰</button>
+    <button class="icon-btn menu-btn" id="menu-btn" type="button" aria-label="Ẩn thanh bên" aria-expanded="true" aria-controls="sidebar">☰</button>
     <a class="brand" href="#/" aria-label="Về trang tổng quan">
       <span class="brand-name">🌷 GÓC HỌC NHỎ</span>
       <span class="brand-tag">“Một góc nhỏ cho những ngày cố gắng.”</span>
@@ -34,7 +34,34 @@ export function renderHeader() {
   el.querySelector('#auth-btn').onclick = () => openAuthModal();
   el.querySelector('#header-mascot').onclick = () => { mascot.poke(); if (location.hash !== '#/room') navigate('/room'); };
   shownCoins = s.wallet.coins;
-  el.querySelector('#menu-btn').onclick = () => document.body.classList.toggle('drawer-open');
+  bindSidebarToggle(el.querySelector('#menu-btn'));
+}
+
+const SIDEBAR_KEY = 'ghn_sidebar_collapsed';
+function isMobileNav() { return window.matchMedia('(max-width: 768px)').matches; }
+
+function bindSidebarToggle(btn) {
+  const side = document.getElementById('sidebar');
+  if (!isMobileNav() && localStorage.getItem(SIDEBAR_KEY) === '1') {
+    document.body.classList.add('sidebar-collapsed');
+  }
+  const sync = () => {
+    const shown = isMobileNav()
+      ? document.body.classList.contains('drawer-open')
+      : !document.body.classList.contains('sidebar-collapsed');
+    btn.setAttribute('aria-expanded', shown ? 'true' : 'false');
+    btn.setAttribute('aria-label', shown ? 'Ẩn thanh bên' : 'Hiện thanh bên');
+    if (side) side.setAttribute('aria-hidden', shown ? 'false' : 'true');
+  };
+  sync();
+  btn.onclick = () => {
+    if (isMobileNav()) document.body.classList.toggle('drawer-open');
+    else {
+      const collapsed = document.body.classList.toggle('sidebar-collapsed');
+      localStorage.setItem(SIDEBAR_KEY, collapsed ? '1' : '0');
+    }
+    sync();
+  };
 }
 
 export function refreshHeaderAuth() {
