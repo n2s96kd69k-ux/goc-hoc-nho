@@ -81,7 +81,8 @@ export function renderSidebar() {
 
       ${show('goal') ? `<button class="side-block side-goal" id="side-goal" type="button">
         <h4 class="side-title">🎯 MỤC TIÊU</h4>
-        <div class="goal-name">${goalBadge(g)} ${escapeHtml(g.name || 'Chưa đặt mục tiêu')}</div>
+        <div class="goal-mark">${goalBadge(g)}</div>
+        <div class="goal-name">${escapeHtml(g.name || 'Chưa đặt mục tiêu')}</div>
         <div class="goal-days">${daysLeft === null ? 'Chưa đặt ngày thi' : daysLeft >= 0 ? `Còn <strong>${daysLeft}</strong> ngày` : 'Đã qua ngày thi'}</div>
         ${progressBar(goalPercent, { color: 'var(--lavender-dark)', height: 8 })}
         <div class="side-foot">Tiến độ ${goalPercent}%</div>
@@ -129,8 +130,8 @@ export function syncCalendarToWeek() {
 function goalBadge(g) {
   const uni = g.schoolId && getUniversities().find((u) => u.id === g.schoolId);
   const url = uni && typeof uni.url === 'string' && (uni.url.startsWith('https://') || uni.url.startsWith('data:image/')) ? uni.url.replace(/"/g, '') : '';
-  if (url) return `<img class="goal-mini" alt="" src="${url}">`;
-  return g.icon || '🏛️';
+  if (url) return `<img class="goal-logo-side" alt="" src="${url}">`;
+  return `<span class="goal-emoji">${g.icon || '🏛️'}</span>`;
 }
 
 export function goalProgressPercent() {

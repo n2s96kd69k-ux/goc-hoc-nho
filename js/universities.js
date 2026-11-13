@@ -51,7 +51,7 @@ function resizeImage(file) {
     const img = new Image();
     const blobUrl = URL.createObjectURL(file);
     img.onload = () => {
-      const max = 96;
+      const max = 256;
       const scale = Math.min(1, max / Math.max(img.width, img.height));
       const canvas = document.createElement('canvas');
       canvas.width = Math.max(1, Math.round(img.width * scale));
@@ -64,7 +64,7 @@ function resizeImage(file) {
         URL.revokeObjectURL(blobUrl);
         if (blob) resolve(blob);
         else reject(new Error('Không xử lý được ảnh'));
-      }, 'image/jpeg', 0.62);
+      }, 'image/jpeg', 0.78);
     };
     img.onerror = () => { URL.revokeObjectURL(blobUrl); reject(new Error('Ảnh không hợp lệ')); };
     img.src = blobUrl;
