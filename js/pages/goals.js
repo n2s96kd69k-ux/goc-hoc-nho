@@ -4,10 +4,11 @@ import { escapeHtml, todayKey, daysBetween, formatDMY, fromKey } from '../utils.
 import { goalProgressPercent } from '../components/sidebar.js';
 import { progressBar } from '../components/progressRing.js';
 import { toast } from '../components/toast.js';
-import { getUniversities, refreshUniversities, addUniversity, removeUniversity, isAdminUser } from '../universities.js';
+import { getUniversities, refreshUniversities, addUniversity, removeUniversity, isAdminUser, getExamSchedule, onExamSchedule, saveExamSchedule } from '../universities.js';
 
 const MONTHS = ['Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6', 'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12'];
 const ICONS = ['🏛️', '🎓', '📜', '🏫', '🌟', '🚀', '🏆', '🌷'];
+let stopExams = null;
 
 export function renderGoals(root) {
   const g = getState().goal;
@@ -26,7 +27,7 @@ export function renderGoals(root) {
     const total = months.length;
     timeline = `<ol class="timeline">
       ${months.map((m, i) => `<li class="${i === 0 ? 'current' : ''}" style="--i:${i / Math.max(1, total)}"><span>${MONTHS[m.getMonth()].toUpperCase()}${m.getFullYear() !== now.getFullYear() ? ' ' + m.getFullYear() : ''}</span></li>`).join('')}
-      <li class="exam"><span>🎯 NGÀY THI · ${formatDMY(g.examDate)}</span></li>
+      <li class="exam"><span>🎯 LỊCH THI · ${formatDMY(g.examDate)}</span></li>
     </ol>`;
   }
 
@@ -36,18 +37,21 @@ export function renderGoals(root) {
       <p class="page-sub">Đích đến của những ngày cố gắng.</p>
 
       <div class="goal-layout">
+        <div class="goal-main">
         <div class="paper goal-hero tone-lavender">
           <div class="tape"></div>
           <div class="goal-icon-big">${goalMark(g)}</div>
           <h2>${escapeHtml(g.name || 'Chưa đặt mục tiêu')}</h2>
+          <div class="exam-board" id="exam-board"></div>
           <div class="goal-meta">
-            <div><small>Ngày thi</small><strong>${g.examDate ? formatDMY(g.examDate) : '__/__/____'}</strong></div>
             <div><small>Điểm mục tiêu</small><strong>${g.targetScore || '____'}</strong></div>
             <div><small>Còn</small><strong>${daysLeft === null ? '—' : daysLeft >= 0 ? `${daysLeft} ngày` : 'Đã thi'}</strong></div>
           </div>
           ${progressBar(percent, { color: 'var(--lavender-dark)', height: 12 })}
           <div class="goal-pct">Tiến độ nhiệm vụ: ${percent}%</div>
           ${g.note ? `<p class="goal-note">“${escapeHtml(g.note)}”</p>` : ''}
+        </div>
+        <div class="paper exam-count" id="exam-count"></div>
         </div>
 
         <form class="paper task-form" id="goal-form">
@@ -130,7 +134,10 @@ export function renderGoals(root) {
     });
   };
   paintUnis();
-  refreshUniversities().then(paintUnis).catch(() => paintUnis());
+  paintExams();
+  if (stopExams) stopExams();
+  stopExams = onExamSchedule(() => paintExams());
+  refreshUniversities().then(() => { paintUnis(); paintExams(); }).catch(() => paintUnis());
   root.querySelector('#uni-add').onclick = async () => {
     const name = root.querySelector('#uni-name').value;
     const file = root.querySelector('#uni-file').files[0];
@@ -156,6 +163,51 @@ export function renderGoals(root) {
       toast(err.message || 'Không tải được logo', { kind: 'error' });
     }
     btn.disabled = false;
+  };
+}
+
+function paintExams() {
+  const board = document.querySelector('#exam-board');
+  const count = document.querySelector('#exam-count');
+  if (!board || !count) return;
+  const list = getExamSchedule();
+  const today = todayKey();
+  const admin = isAdminUser();
+  board.innerHTML = `
+    <p class="exam-label">Lịch thi</p>
+    <ul class="exam-list">
+      ${list.map((e) => `
+        <li>
+          <span>${escapeHtml(e.name)}</span>
+          ${admin
+            ? `<input type="date" data-exam="${e.id}" value="${escapeHtml(e.date || '')}">`
+            : `<strong>${e.date ? formatDMY(e.date) : 'Chưa chốt'}</strong>`}
+        </li>`).join('')}
+    </ul>
+    ${admin ? '<button type="button" class="btn btn-soft btn-sm" id="exam-save">Lưu lịch thi</button>' : ''}
+  `;
+  count.innerHTML = `
+    <h4 class="side-title">Đếm ngược</h4>
+    <div class="count-grid">
+      ${list.map((e) => {
+        const left = e.date ? daysBetween(today, e.date) : null;
+        const text = left === null ? 'Chưa chốt' : left > 0 ? `${left} ngày` : left === 0 ? 'Hôm nay' : 'Đã thi';
+        return `<div class="count-card"><small>${escapeHtml(e.name)}</small><strong>${text}</strong></div>`;
+      }).join('')}
+    </div>
+  `;
+  const save = board.querySelector('#exam-save');
+  if (save) save.onclick = async () => {
+    const dates = {};
+    board.querySelectorAll('[data-exam]').forEach((el) => { dates[el.dataset.exam] = el.value; });
+    save.disabled = true;
+    try {
+      await saveExamSchedule(dates);
+      toast('Đã cập nhật lịch thi');
+    } catch (err) {
+      toast(err.message || 'Không lưu được lịch thi', { kind: 'error' });
+      save.disabled = false;
+    }
   };
 }
 

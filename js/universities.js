@@ -3,10 +3,40 @@ import { collection, doc, getDocs, getDocFromServer, setDoc, deleteDoc, onSnapsh
 import { firebaseDb, getCurrentUser, accountId, OWNER_ID } from './cloud.js';
 
 const KEY = 'ghn_unis';
+const EXAM_KEY = 'ghn_exams';
 let cache = [];
 let watching = false;
+const examListeners = new Set();
+
+export const EXAM_DEFS = [
+  { id: 'thpt', name: 'Tốt nghiệp THPT', date: '' },
+  { id: 'vact', name: 'V-ACT (ĐGNL ĐHQG-HCM)', date: '2027-03-28' },
+  { id: 'hsa', name: 'HSA (ĐGNL ĐHQGHN)', date: '2027-03-07' },
+  { id: 'tsa', name: 'TSA (ĐH Bách Khoa HN)', date: '2027-01-16' },
+  { id: 'vsat', name: 'V-SAT', date: '' },
+];
+let exams = EXAM_DEFS.map((e) => ({ ...e }));
 
 export function getUniversities() { return cache; }
+
+export function getExamSchedule() { return exams; }
+
+export function onExamSchedule(fn) {
+  examListeners.add(fn);
+  return () => examListeners.delete(fn);
+}
+
+function emitExams() {
+  for (const fn of examListeners) fn(exams);
+}
+
+function applyExams(list) {
+  const saved = new Map((list || []).filter((e) => e && e.id).map((e) => [e.id, e.date || '']));
+  exams = EXAM_DEFS.map((e) => ({ ...e, date: saved.has(e.id) ? saved.get(e.id) : e.date }));
+  try { localStorage.setItem(EXAM_KEY, JSON.stringify(exams)); } catch {}
+  emitExams();
+  return exams;
+}
 
 export function isAdminUser() {
   const user = getCurrentUser();
@@ -26,11 +56,16 @@ function remember(list) {
 }
 
 function fromSnap(snap) {
-  return snap.docs.map((d) => ({ id: d.id, name: d.data().name, url: d.data().url }));
+  const schedule = snap.docs.find((d) => d.id === 'schedule');
+  if (schedule && Array.isArray(schedule.data().exams)) applyExams(schedule.data().exams);
+  return snap.docs
+    .filter((d) => d.id !== 'schedule')
+    .map((d) => ({ id: d.id, name: d.data().name, url: d.data().url }));
 }
 
 export async function refreshUniversities() {
   try { remember(JSON.parse(localStorage.getItem(KEY) || '[]')); } catch {}
+  try { applyExams(JSON.parse(localStorage.getItem(EXAM_KEY) || 'null') || EXAM_DEFS); } catch {}
   const db = firebaseDb();
   if (!db) return cache;
   if (!watching) {
@@ -134,4 +169,19 @@ export async function removeUniversity(id) {
     throw ruleError(err);
   }
   remember(cache.filter((u) => u.id !== id));
+}
+
+export async function saveExamSchedule(dates) {
+  if (!isAdminUser()) throw new Error('Chỉ quản trị viên được sửa lịch thi.');
+  const db = firebaseDb();
+  if (!db) throw new Error('Firebase chưa sẵn sàng.');
+  const next = EXAM_DEFS.map((e) => ({ id: e.id, date: (dates[e.id] || '').trim() }));
+  try {
+    await setDoc(doc(db, 'universities', 'schedule'), { kind: 'schedule', exams: next, updatedAt: Date.now() });
+  } catch (err) {
+    throw ruleError(err);
+  }
+  const saved = await getDocFromServer(doc(db, 'universities', 'schedule'));
+  if (!saved.exists() || !Array.isArray(saved.data().exams)) throw new Error('Server chưa thấy lịch thi.');
+  return applyExams(saved.data().exams);
 }
