@@ -67,12 +67,18 @@ export const OWNER_ID = 'GHN-776J9W';
 
 export function isOwner(pid) { return pid === OWNER_ID; }
 
-export async function loadRoleBook() {
-  const empty = { members: {} };
-  if (!db) return withOwner(empty);
-  const snap = await getDoc(doc(db, 'roles', 'directory'));
-  const data = snap.exists() ? snap.data() : empty;
-  return withOwner({ members: data.members || {} });
+export async function loadRoleBook(uid) {
+  const members = {};
+  if (db && uid) {
+    try {
+      const snap = await getDoc(doc(db, 'users', uid));
+      const saved = snap.exists() ? snap.data().roleBook : null;
+      if (saved && saved.members) Object.assign(members, saved.members);
+    } catch (e) {
+      console.warn('Không đọc được roleBook:', e);
+    }
+  }
+  return withOwner({ members });
 }
 
 function withOwner(book) {
@@ -89,13 +95,13 @@ export function roleOf(pid, book) {
   return row.role === 'admin' ? 'admin' : 'member';
 }
 
-export async function saveRoleBook(book) {
-  if (!db) throw new Error('Firebase chưa sẵn sàng.');
+export async function saveRoleBook(uid, book) {
+  if (!db || !uid) throw new Error('Firebase chưa sẵn sàng.');
   const next = withOwner(book);
-  await setDoc(doc(db, 'roles', 'directory'), {
-    members: next.members,
-    updatedAt: new Date().toISOString(),
-  });
+  await setDoc(doc(db, 'users', uid), {
+    roleBook: { members: next.members },
+    roleBookUpdatedAt: new Date().toISOString(),
+  }, { merge: true });
   return next;
 }
 

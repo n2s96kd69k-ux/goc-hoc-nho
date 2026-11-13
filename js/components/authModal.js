@@ -83,6 +83,8 @@ export function openAuthModal({ welcome = false } = {}) {
 
     const roleBox = m.body.querySelector('#role-box');
     const paintRoles = (book) => {
+      if (!book.members) book.members = {};
+      if (!book.members[OWNER_ID]) book.members[OWNER_ID] = { role: 'admin', owner: true, name: 'Lê Khả Thanh Bình' };
       const mine = roleOf(pid, book);
       const mineLabel = mine === 'admin' ? 'Quản trị viên' : mine === 'member' ? 'Thành viên' : 'Chưa có quyền';
       const rows = Object.entries(book.members).sort((a, b) => (a[0] === OWNER_ID ? -1 : b[0] === OWNER_ID ? 1 : a[0].localeCompare(b[0])));
@@ -118,7 +120,7 @@ export function openAuthModal({ welcome = false } = {}) {
         const id = b.dataset.drop;
         delete book.members[id];
         try {
-          book = await saveRoleBook(book);
+          book = await saveRoleBook(user.uid, book);
           paintRoles(book);
           toast('Đã gỡ ' + id);
         } catch (e) {
@@ -138,7 +140,7 @@ export function openAuthModal({ welcome = false } = {}) {
         const name = form.name.value.trim();
         book.members[id] = { role, name, owner: false };
         try {
-          book = await saveRoleBook(book);
+          book = await saveRoleBook(user.uid, book);
           paintRoles(book);
           toast(role === 'admin' ? 'Đã thêm quản trị viên' : 'Đã thêm thành viên');
         } catch (err) {
@@ -146,8 +148,11 @@ export function openAuthModal({ welcome = false } = {}) {
         }
       };
     };
-    loadRoleBook().then((book) => { if (activeAuthModal === m) paintRoles(book); }).catch(() => {
-      roleBox.textContent = 'Không tải được danh sách người dùng.';
+    if (pid === OWNER_ID) paintRoles({ members: {} });
+    loadRoleBook(user.uid).then((book) => { if (activeAuthModal === m) paintRoles(book); }).catch((e) => {
+      console.warn(e);
+      if (pid === OWNER_ID) paintRoles({ members: {} });
+      else roleBox.textContent = 'Không tải được danh sách người dùng.';
     });
 
     m.body.querySelector('#cloud-sync-now').onclick = async () => {
