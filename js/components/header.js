@@ -27,7 +27,7 @@ export function renderHeader() {
     </a>
     <button class="live-study" id="live-study" type="button" title="Học cùng mọi người ngay!">
       <span class="live-dot" aria-hidden="true"></span>
-      <span class="live-copy">Đang có <strong class="live-count" data-live-count>${liveCount}</strong> bạn đang học bài</span>
+      <span class="live-copy">Đang có <strong class="live-count" data-live-count>${liveTotal()}</strong> bạn đang học bài</span>
     </button>
     <div class="header-right">
       <button class="pill glass header-streak" id="streak-btn" type="button" title="Xem việc cần làm để giữ chuỗi">🔥 ${s.streak.current} ngày</button>
@@ -80,21 +80,35 @@ export function refreshHeaderAuth() {
 }
 
 let shownCoins = null;
-let liveCount = 142;
+let crowdCount = 142;
 let liveTimer = null;
+let selfStudying = false;
+
+function liveTotal() { return crowdCount + (selfStudying ? 1 : 0); }
+
+function paintLiveCount() {
+  const n = String(liveTotal());
+  document.querySelectorAll('[data-live-count]').forEach((el) => { el.textContent = n; });
+}
 
 function startLiveCount() {
   if (liveTimer) return;
+  document.addEventListener('study:presence', (e) => {
+    const on = !!(e.detail && e.detail.on);
+    if (on === selfStudying) return;
+    selfStudying = on;
+    paintLiveCount();
+  });
   liveTimer = setInterval(() => {
     const step = Math.random() < 0.75 ? (Math.random() < 0.5 ? -1 : 1) : (Math.random() < 0.5 ? -2 : 2);
-    liveCount = Math.min(168, Math.max(118, liveCount + step));
-    document.querySelectorAll('[data-live-count]').forEach((el) => { el.textContent = String(liveCount); });
+    crowdCount = Math.min(168, Math.max(118, crowdCount + step));
+    paintLiveCount();
   }, 15000);
 }
 
 function openLiveRoom() {
   const desks = ['Toán', 'Ngữ văn', 'Tiếng Anh', 'Lý', 'Hóa'].map((name, i) => {
-    const n = 8 + ((liveCount + i * 17) % 28);
+    const n = 8 + ((liveTotal() + i * 17) % 28);
     return `<li><span>${name}</span><strong>${n} bạn</strong></li>`;
   }).join('');
   const modal = openModal({
@@ -102,7 +116,7 @@ function openLiveRoom() {
     content: `
       <button class="live-study live-study-in" type="button" tabindex="-1">
         <span class="live-dot" aria-hidden="true"></span>
-        <span class="live-copy">Đang có <strong class="live-count" data-live-count>${liveCount}</strong> bạn đang học bài</span>
+        <span class="live-copy">Đang có <strong class="live-count" data-live-count>${liveTotal()}</strong> bạn đang học bài</span>
       </button>
       <p class="page-sub">Thư viện đang mở. Mọi người học trong yên lặng, bạn có thể vào học cùng.</p>
       <ul class="live-desks">${desks}</ul>

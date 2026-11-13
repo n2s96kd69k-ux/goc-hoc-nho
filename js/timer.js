@@ -61,6 +61,7 @@ export function start() {
   clearInterval(timer.interval);
   timer.interval = setInterval(tick, 250);
   if (timer.mode === 'focus') mascot.setState('focus'); else mascot.setState('rest');
+  document.dispatchEvent(new CustomEvent('study:presence', { detail: { on: timer.mode === 'focus' } }));
   emit('start');
 }
 
@@ -70,6 +71,7 @@ export function pause() {
   timer.status = 'paused';
   clearInterval(timer.interval);
   mascot.setState('idle');
+  document.dispatchEvent(new CustomEvent('study:presence', { detail: { on: false } }));
   emit('pause');
 }
 
@@ -78,6 +80,7 @@ export function reset() {
   timer.status = 'idle';
   setupDurations();
   mascot.setState('idle');
+  document.dispatchEvent(new CustomEvent('study:presence', { detail: { on: false } }));
   emit('reset');
 }
 
@@ -125,6 +128,7 @@ function complete() {
     mascot.setState('idle');
   }
   setupDurations();
+  document.dispatchEvent(new CustomEvent('study:presence', { detail: { on: false } }));
   emit('complete:' + finishedMode);
   document.dispatchEvent(new CustomEvent('pomodoro:complete', { detail: { mode: finishedMode, minutes, coins: timer.lastReward || 0 } }));
 }
