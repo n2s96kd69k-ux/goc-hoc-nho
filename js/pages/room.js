@@ -249,6 +249,23 @@ export function renderRoom(root) {
         }).join('')}
       </div>`;
     panelBody.querySelectorAll('[data-cat]').forEach((b) => b.onclick = () => { shopCat = b.dataset.cat; renderShop(); });
+    const tabs = panelBody.querySelector('.cat-tabs');
+    if (tabs) {
+      const active = tabs.querySelector('.chip.active');
+      if (active) {
+        const left = active.offsetLeft - 8;
+        const right = active.offsetLeft + active.offsetWidth + 8;
+        if (left < tabs.scrollLeft) tabs.scrollLeft = Math.max(0, left);
+        else if (right > tabs.scrollLeft + tabs.clientWidth) tabs.scrollLeft = right - tabs.clientWidth;
+      }
+      tabs.addEventListener('wheel', (e) => {
+        if (tabs.scrollWidth <= tabs.clientWidth + 2) return;
+        const dx = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+        if (!dx) return;
+        e.preventDefault();
+        tabs.scrollLeft += dx;
+      }, { passive: false });
+    }
     panelBody.querySelectorAll('[data-buy]').forEach((b) => b.onclick = () => {
       const def = getItemDef(b.dataset.buy);
       const r = buyItem(def.id);
