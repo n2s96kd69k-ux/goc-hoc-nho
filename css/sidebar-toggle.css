@@ -29,8 +29,8 @@
 .uni-card.active { border-color: var(--brown-dark); box-shadow: 0 0 0 2px var(--butter); }
 .goal-logo { width: 200px; height: 200px; object-fit: contain; background: transparent; }
 .goal-mark { display: flex; justify-content: center; margin: 2px 0 8px; }
-.goal-logo-side { width: 96px; height: 96px; object-fit: contain; background: transparent; filter: drop-shadow(0 6px 10px rgba(111, 85, 71, .16)); }
-.goal-emoji { font-size: 2.6rem; line-height: 1; }
+.goal-logo-side { width: 77px; height: 77px; object-fit: contain; background: transparent; filter: drop-shadow(0 6px 10px rgba(111, 85, 71, .16)); }
+.goal-emoji { font-size: 2.08rem; line-height: 1; }
 .goal-main { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .goal-hero .goal-meta { grid-template-columns: 1fr 1fr; }
 #exam-board .exam-list { gap: 8px; }
