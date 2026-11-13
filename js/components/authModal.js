@@ -14,6 +14,7 @@ import {
   logoutCloud,
   saveCloudState,
   friendlyAuthError,
+  accountId,
 } from '../cloud.js';
 import { escapeHtml } from '../utils.js';
 
@@ -38,6 +39,7 @@ export function openAuthModal({ welcome = false } = {}) {
   if (user && !welcome) {
     const label = escapeHtml(user.displayName || user.email || 'Tài khoản');
     const email = escapeHtml(user.email || '');
+    const pid = accountId(user.uid);
     const m = openModal({
       title: '☁️ Tài khoản đồng bộ',
       size: 'sm',
@@ -47,6 +49,13 @@ export function openAuthModal({ welcome = false } = {}) {
           <div style="padding:12px;border-radius:12px;background:rgba(255,255,255,0.7);border:1px solid rgba(0,0,0,0.06);">
             <div style="font-weight:700;font-size:15px;">${label}</div>
             ${email ? `<div style="font-size:13px;opacity:0.75;">${email}</div>` : ''}
+            <div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border-radius:10px;background:rgba(255,248,236,0.9);border:1px dashed rgba(111,85,71,0.25);">
+              <div>
+                <div style="font-size:11px;letter-spacing:.04em;opacity:.65;">ID TÀI KHOẢN</div>
+                <div id="account-id" style="font-weight:800;font-size:16px;letter-spacing:.08em;">${pid}</div>
+              </div>
+              <button class="btn btn-ghost btn-sm" id="copy-account-id" type="button">Sao chép</button>
+            </div>
             <div style="font-size:12px;margin-top:6px;color:#2e7d32;">✓ Tự động lưu dữ liệu lên đám mây</div>
           </div>
           <div class="modal-actions" style="justify-content:space-between;">
@@ -57,6 +66,15 @@ export function openAuthModal({ welcome = false } = {}) {
       `,
     });
     activeAuthModal = m;
+
+    m.body.querySelector('#copy-account-id').onclick = async () => {
+      try {
+        await navigator.clipboard.writeText(pid);
+        toast('Đã chép ID ' + pid, { icon: '✓' });
+      } catch {
+        toast(pid, { icon: '🪪' });
+      }
+    };
 
     m.body.querySelector('#cloud-sync-now').onclick = async () => {
       try {

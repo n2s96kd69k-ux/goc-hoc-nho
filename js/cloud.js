@@ -43,6 +43,25 @@ export function getCurrentUser() {
   return currentUser;
 }
 
+const ID_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+/** Mã tài khoản cố định, sinh từ uid Firebase. Mỗi người một mã, không đổi. */
+export function accountId(uid) {
+  if (!uid) return '';
+  let h = 2166136261;
+  for (let i = 0; i < uid.length; i++) {
+    h ^= uid.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  let n = h >>> 0;
+  let out = '';
+  for (let i = 0; i < 6; i++) {
+    out += ID_ALPHABET[n % ID_ALPHABET.length];
+    n = Math.imul(n ^ uid.charCodeAt(i % uid.length), 2246822519) >>> 0;
+  }
+  return `GHN-${out}`;
+}
+
 export function onCloudAuthChange(callback) {
   if (!auth) {
     callback(null);
@@ -91,6 +110,7 @@ export async function saveCloudState(uid, state) {
   if (!db || !uid || !state) return false;
   const ref = doc(db, 'users', uid);
   await setDoc(ref, {
+    publicId: accountId(uid),
     state: JSON.parse(JSON.stringify(state)),
     updatedAt: new Date().toISOString(),
   }, { merge: true });
