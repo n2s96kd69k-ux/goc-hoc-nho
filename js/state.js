@@ -3,6 +3,7 @@ import { loadState, saveState } from './storage.js';
 import { createInitialState } from './seed.js';
 import { debounce, todayKey, startOfWeek, toKey } from './utils.js';
 import { migrateRoom } from './room.js';
+import { getCurrentUser, loadCloudState, saveCloudState } from './cloud.js';
 
 let state = null;
 const listeners = new Set();
@@ -36,20 +37,37 @@ export function initState() {
 export function getState() { return state; }
 
 const persist = debounce(() => saveState(state), 120);
+const persistCloud = debounce(() => {
+  const u = getCurrentUser();
+  if (u) saveCloudState(u.uid, state).catch((e) => console.warn('Đồng bộ đám mây lỗi:', e));
+}, 1200);
 
 /** Thay đổi state qua hàm mutator, sau đó lưu và thông báo */
 export function update(mutator, meta = {}) {
   mutator(state);
   persist();
+  persistCloud();
   if (!meta.silent) emit(meta);
 }
 
-export function replaceState(newState) {
+export function replaceState(newState, { skipCloud = false } = {}) {
   state = migrate(newState);
   state.ui.viewWeek = toKey(startOfWeek(todayKey()));
   state.ui.viewDay = todayKey();
   saveState(state);
+  if (!skipCloud) persistCloud();
   emit({ type: 'replace' });
+}
+
+export async function syncCloudForUser(user) {
+  if (!user) return null;
+  const remote = await loadCloudState(user.uid);
+  if (remote) {
+    replaceState(remote, { skipCloud: true });
+    return 'loaded';
+  }
+  await saveCloudState(user.uid, state);
+  return 'uploaded';
 }
 
 export function subscribe(fn) {

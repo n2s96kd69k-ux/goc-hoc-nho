@@ -1,12 +1,14 @@
 // ===== Khởi động ứng dụng =====
-import { initState, subscribe, getState } from './state.js';
+import { initState, subscribe, getState, syncCloudForUser } from './state.js';
 import { registerRoute, startRouter, onRoute, currentRoute } from './router.js';
-import { renderHeader, refreshHeaderStats, setHeaderMascotState } from './components/header.js';
+import { renderHeader, refreshHeaderStats, refreshHeaderAuth, setHeaderMascotState } from './components/header.js';
 import { renderSidebar, renderBottomNav, setSidebarMascotState } from './components/sidebar.js';
 import { mascot } from './mascot.js';
 import { onTimer, getTimer, setupDurations } from './timer.js';
 import { recomputeStreak } from './gamification.js';
 import { pomodoroCompletePopup } from './components/reward.js';
+import { toast } from './components/toast.js';
+import { onCloudAuthChange } from './cloud.js';
 import { mmss } from './utils.js';
 
 import { renderOverview } from './pages/overview.js';
@@ -104,6 +106,27 @@ function setupTimerPill() {
   });
 }
 
+function setupCloudSync() {
+  let lastUid = null;
+  onCloudAuthChange(async (user) => {
+    refreshHeaderAuth();
+    if (!user) {
+      lastUid = null;
+      return;
+    }
+    if (user.uid === lastUid) return;
+    lastUid = user.uid;
+    try {
+      const res = await syncCloudForUser(user);
+      if (res === 'loaded') toast('Đã đồng bộ dữ liệu từ tài khoản ☁️', { icon: '✓' });
+      else if (res === 'uploaded') toast('Đã lưu dữ liệu hiện tại lên tài khoản ☁️', { icon: '✓' });
+    } catch (e) {
+      console.warn('Lỗi đồng bộ Firebase:', e);
+      toast('Đã đăng nhập nhưng chưa đồng bộ được Firestore', { kind: 'error' });
+    }
+  });
+}
+
 function boot() {
   initState();
   recomputeStreak();
@@ -119,6 +142,7 @@ function boot() {
   });
   subscribe(onStateChange);
   setupTimerPill();
+  setupCloudSync();
 
   // Drawer backdrop
   document.getElementById('drawer-backdrop').onclick = () => document.body.classList.remove('drawer-open');

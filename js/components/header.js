@@ -2,9 +2,20 @@
 import { getState } from '../state.js';
 import { mascotSVG, mascot } from '../mascot.js';
 import { navigate } from '../router.js';
+import { getCurrentUser } from '../cloud.js';
+import { openAuthModal } from './authModal.js';
+import { esc } from '../utils.js';
+
+function authButtonText(user) {
+  if (!user) return '☁️ Đăng nhập';
+  const raw = user.displayName || (user.email ? user.email.split('@')[0] : 'Tài khoản');
+  const short = raw.length > 14 ? raw.slice(0, 12) + '…' : raw;
+  return `☁️ ${esc(short)}`;
+}
 
 export function renderHeader() {
   const s = getState();
+  const user = getCurrentUser();
   const el = document.getElementById('app-header');
   el.innerHTML = `
     <button class="icon-btn menu-btn" id="menu-btn" type="button" aria-label="Mở menu">☰</button>
@@ -15,13 +26,21 @@ export function renderHeader() {
     <div class="header-right">
       <span class="pill glass header-streak" title="Chuỗi cố gắng">🔥 ${s.streak.current} ngày</span>
       <span class="pill glass header-coins" title="Xu của bạn">🪙 ${s.wallet.coins} xu</span>
+      <button class="pill glass header-auth" id="auth-btn" type="button" title="Tài khoản & Đồng bộ">${authButtonText(user)}</button>
       <button class="header-mascot mascot-wrap mascot-${mascot.state}" id="header-mascot" type="button" aria-label="Mochi" title="${s.mascot.name}">${mascotSVG(34)}</button>
       <button class="icon-btn" id="settings-btn" type="button" aria-label="Cài đặt">⚙</button>
     </div>`;
   el.querySelector('#settings-btn').onclick = () => navigate('/settings');
+  el.querySelector('#auth-btn').onclick = () => openAuthModal();
   el.querySelector('#header-mascot').onclick = () => { mascot.poke(); if (location.hash !== '#/room') navigate('/room'); };
   shownCoins = s.wallet.coins;
   el.querySelector('#menu-btn').onclick = () => document.body.classList.toggle('drawer-open');
+}
+
+export function refreshHeaderAuth() {
+  const btn = document.getElementById('auth-btn');
+  if (!btn) return;
+  btn.textContent = authButtonText(getCurrentUser());
 }
 
 let shownCoins = null;
