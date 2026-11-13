@@ -1,7 +1,7 @@
 // ===== Trang /goals : Mục tiêu =====
 import { getState, update } from '../state.js';
 import { escapeHtml, todayKey, daysBetween, formatDMY, fromKey } from '../utils.js';
-import { goalProgressPercent } from '../components/sidebar.js';
+import { goalProgressPercent, renderSidebar } from '../components/sidebar.js';
 import { progressBar } from '../components/progressRing.js';
 import { toast } from '../components/toast.js';
 import { getUniversities, refreshUniversities, addUniversity, removeUniversity, isAdminUser, getExamSchedule, onExamSchedule, saveExamSchedule } from '../universities.js';
@@ -189,10 +189,10 @@ function paintExams() {
     <ul class="exam-list">
       ${list.map((e) => `
         <li>
-          <label class="exam-pick"><input type="checkbox" data-show="${e.id}" ${picked.has(e.id) ? 'checked' : ''}> ${escapeHtml(e.name)}</label>
+          <label class="exam-pick"><input type="checkbox" data-show="${e.id}" ${picked.has(e.id) ? 'checked' : ''}><span class="exam-name">${escapeHtml(e.name)}</span></label>
           ${admin
-            ? `<input type="date" data-exam="${e.id}" value="${escapeHtml(e.date || '')}">`
-            : `<strong>${e.date ? formatDMY(e.date) : 'Chưa chốt'}</strong>`}
+            ? `<input class="exam-date" type="date" data-exam="${e.id}" value="${escapeHtml(e.date || '')}">`
+            : `<span class="exam-date">${e.date ? formatDMY(e.date) : 'Chưa chốt'}</span>`}
         </li>`).join('')}
     </ul>
     ${admin ? '<button type="button" class="btn btn-soft btn-sm" id="exam-save">Lưu lịch thi</button>' : '<p class="small muted">Tích để hiện kỳ đó trên mục tiêu.</p>'}
@@ -215,7 +215,6 @@ function paintExams() {
       await saveExamSchedule(dates);
       const visible = shownExams();
       update((s) => { s.goal.examDate = nearestDate(visible); }, { type: 'sidebar-ui' });
-      toast('Đã cập nhật lịch thi');
       paintShown();
       save.disabled = false;
     } catch (err) {
@@ -224,22 +223,22 @@ function paintExams() {
     }
   };
   paintShown();
+  renderSidebar();
 }
 
 function paintShown() {
   const box = document.querySelector('#exam-shown');
   const count = document.querySelector('#exam-count');
   const left = document.querySelector('#goal-left');
-  if (!box || !count) return;
-  const list = shownExams();
+  if (box) box.innerHTML = '';
+  if (!count) return;
+  const list = getExamSchedule();
   const today = todayKey();
-  box.innerHTML = list.length ? `<ul class="exam-list exam-shown">${list.map((e) => `
-    <li><span>${escapeHtml(e.name)}</span><strong>${e.date ? formatDMY(e.date) : 'Chưa chốt'}</strong></li>`).join('')}</ul>` : '';
   const next = nearestDate(list);
   const days = next ? daysBetween(today, next) : null;
   if (left) left.textContent = days === null ? '—' : days >= 0 ? `${days} ngày` : 'Đã thi';
-  count.hidden = !list.length;
-  count.innerHTML = list.length ? `
+  count.hidden = false;
+  count.innerHTML = `
     <h4 class="side-title">Đếm ngược</h4>
     <div class="count-grid">
       ${list.map((e) => {
@@ -247,7 +246,7 @@ function paintShown() {
         const text = n === null ? 'Chưa chốt' : n > 0 ? `${n} ngày` : n === 0 ? 'Hôm nay' : 'Đã thi';
         return `<div class="count-card"><small>${escapeHtml(e.name)}</small><strong>${text}</strong></div>`;
       }).join('')}
-    </div>` : '';
+    </div>`;
 }
 
 function goalMark(g) {

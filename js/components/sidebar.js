@@ -7,7 +7,7 @@ import { progressBar } from './progressRing.js';
 import { mascotSVG, mascot, mascotMessage } from '../mascot.js';
 import { navigate, currentRoute } from '../router.js';
 import { openDayDetail } from './dayDetail.js';
-import { getUniversities } from '../universities.js';
+import { getUniversities, getExamSchedule } from '../universities.js';
 
 export const SIDEBAR_BLOCKS = [
   { key: 'calendar', label: '📅 Lịch', on: true },
@@ -48,8 +48,6 @@ export function renderSidebar() {
 
   // Mục tiêu
   const g = s.goal;
-  const daysLeft = g.examDate ? daysBetween(todayKey(), g.examDate) : null;
-  const goalPercent = goalProgressPercent();
   const show = (key) => sidebarOn(s.settings, key);
 
   el.innerHTML = `
@@ -83,9 +81,7 @@ export function renderSidebar() {
         <h4 class="side-title">🎯 MỤC TIÊU</h4>
         <div class="goal-mark">${goalBadge(g)}</div>
         <div class="goal-name">${escapeHtml(g.name || 'Chưa đặt mục tiêu')}</div>
-        <div class="goal-days">${daysLeft === null ? 'Chưa đặt ngày thi' : daysLeft >= 0 ? `Còn <strong>${daysLeft}</strong> ngày` : 'Đã qua ngày thi'}</div>
-        ${progressBar(goalPercent, { color: 'var(--lavender-dark)', height: 8 })}
-        <div class="side-foot">Tiến độ ${goalPercent}%</div>
+        ${goalCountdowns(g)}
       </button>` : ''}
 
       ${show('mascot') ? `<section class="side-block side-mascot" id="side-mascot">
@@ -125,6 +121,18 @@ export function syncCalendarToWeek() {
   const d = fromKey(s.ui.viewWeek);
   const mid = new Date(d); mid.setDate(mid.getDate() + 3);
   calMonth = { year: mid.getFullYear(), month: mid.getMonth() };
+}
+
+function goalCountdowns(g) {
+  const ids = g.examShows || [];
+  const today = todayKey();
+  const list = getExamSchedule().filter((e) => ids.includes(e.id));
+  if (!list.length) return '<p class="goal-days">Chưa chọn kỳ thi</p>';
+  return `<ul class="side-counts">${list.map((e) => {
+    const n = e.date ? daysBetween(today, e.date) : null;
+    const text = n === null ? 'Chưa chốt' : n > 0 ? `${n} ngày` : n === 0 ? 'Hôm nay' : 'Đã thi';
+    return `<li><span>${escapeHtml(e.name)}</span><strong>${text}</strong></li>`;
+  }).join('')}</ul>`;
 }
 
 function goalBadge(g) {
