@@ -19,7 +19,7 @@ export const NAV = [
   { path: '/settings', icon: '⚙', label: 'Cài đặt' },
 ];
 
-let calMonth = null; // { year, month }
+let calMonth = null;
 
 export function renderSidebar() {
   const s = getState();
@@ -30,8 +30,6 @@ export function renderSidebar() {
   const route = currentRoute();
   const path = route ? route.path : '/';
   const maxMin = Math.max(30, ...week.perDay.map((d) => d.minutes));
-
-  // Mục tiêu
   const g = s.goal;
   const daysLeft = g.examDate ? daysBetween(todayKey(), g.examDate) : null;
   const goalPercent = goalProgressPercent();
@@ -41,12 +39,11 @@ export function renderSidebar() {
       <section class="side-block" id="side-calendar">
         ${calendarHTML({ year: calMonth.year, month: calMonth.month, viewWeekKey: s.ui.viewWeek, showStatus: true })}
       </section>
-
       <section class="side-block" id="side-progress">
         <h4 class="side-title">📊 TIẾN ĐỘ TUẦN</h4>
         <div class="mini-progress">
           ${week.perDay.map((d, i) => `
-            <div class="mini-row ${d.key === todayKey() ? 'today' : ''}">
+            <div class="mini-row ${d.key === todayKey() ? 'today' : ''}" data-day="${d.key}">
               <span class="mini-label">${DAY_SHORT[i]}</span>
               ${progressBar(d.percent, { height: 8, color: d.percent === 100 ? 'var(--matcha-dark)' : 'var(--peach-dark)' })}
               <span class="mini-val">${d.total ? d.percent + '%' : '–'}</span>
@@ -54,7 +51,6 @@ export function renderSidebar() {
         </div>
         <div class="side-foot">${week.done}/${week.total} nhiệm vụ · ${week.percent}%</div>
       </section>
-
       <section class="side-block" id="side-time">
         <h4 class="side-title">⏱ THỜI GIAN HỌC</h4>
         <div class="side-big">Tuần này<br><strong>${minutesToText(week.minutes)}</strong></div>
@@ -62,7 +58,6 @@ export function renderSidebar() {
           ${week.perDay.map((d, i) => `<div class="mini-bar-col" title="${DAY_SHORT[i]}: ${minutesToText(d.minutes)}"><div class="mini-bar" style="height:${Math.max(4, (d.minutes / maxMin) * 100)}%"></div><span>${DAY_SHORT[i]}</span></div>`).join('')}
         </div>
       </section>
-
       <button class="side-block side-goal" id="side-goal" type="button">
         <h4 class="side-title">🎯 MỤC TIÊU</h4>
         <div class="goal-name">${g.icon || '🏛️'} ${escapeHtml(g.name || 'Chưa đặt mục tiêu')}</div>
@@ -70,12 +65,10 @@ export function renderSidebar() {
         ${progressBar(goalPercent, { color: 'var(--lavender-dark)', height: 8 })}
         <div class="side-foot">Tiến độ ${goalPercent}%</div>
       </button>
-
       <section class="side-block side-mascot" id="side-mascot">
         <div class="mascot-wrap mascot-${mascot.state}" id="sidebar-mascot">${mascotSVG(64)}</div>
         <p class="mascot-bubble" id="sidebar-mascot-msg">${mascotMessage(mascot.state, { userName: s.settings.userName, stable: true })}</p>
       </section>
-
       <nav class="side-nav" aria-label="Điều hướng">
         ${NAV.map((n) => `<a href="#${n.path}" class="nav-item ${path === n.path ? 'active' : ''}" data-path="${n.path}"><span class="nav-icon">${n.icon}</span>${n.label}</a>`).join('')}
       </nav>
@@ -99,7 +92,6 @@ export function renderSidebar() {
   el.querySelector('#sidebar-mascot').onclick = () => mascot.poke();
 }
 
-/** Đồng bộ tháng lịch theo tuần đang xem */
 export function syncCalendarToWeek() {
   const s = getState();
   const d = fromKey(s.ui.viewWeek);
