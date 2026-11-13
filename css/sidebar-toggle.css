@@ -1,0 +1,14 @@
+/* Nút ☰: máy tính thu/mở thanh bên, điện thoại vẫn dùng drawer */
+.icon-btn.menu-btn { display: inline-grid; }
+
+@media (min-width: 769px) {
+  .sidebar { transition: flex-basis .28s var(--ease), width .28s var(--ease); }
+  body.sidebar-collapsed .sidebar {
+    width: 0;
+    flex: 0 0 0;
+    min-width: 0;
+    overflow: hidden;
+    border-right-width: 0;
+    pointer-events: none;
+  }
+}
