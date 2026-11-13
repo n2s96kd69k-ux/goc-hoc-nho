@@ -45,6 +45,8 @@ function renderCurrentPage(params) {
   const paint = () => {
     el.classList.remove('page-leave');
     fn(el, params || route.params);
+    // Chỉ animate cả trang khi chuyển route. Tick nhiệm vụ không được giật cả bảng tuần.
+    if (!isNav) return;
     el.classList.remove('page-enter'); void el.offsetWidth;
     el.classList.add('page-enter');
   };
