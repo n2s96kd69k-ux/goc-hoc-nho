@@ -100,7 +100,11 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   padding: 6px 12px; border-radius: 999px;
   background: #fff; border: 1px solid var(--line);
   font-weight: 700; font-size: .85rem; white-space: nowrap;
+  font-family: inherit; color: inherit; cursor: pointer;
 }
+.header-streak { cursor: pointer; }
+.streak-row { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; font-weight: 700; }
+.streak-tasks { margin: 8px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
 .pill.big { font-size: 1rem; padding: 8px 16px; }
 .header-coins.bump { animation: bump .5s var(--ease); }
 @keyframes bump { 30% { transform: scale(1.18); background: var(--butter); } }

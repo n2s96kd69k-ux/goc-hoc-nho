@@ -100,7 +100,9 @@ function complete() {
     const key = todayKey();
     update((s) => {
       const d = dayRecord(key);
+      if (typeof d.pomoMinutes !== 'number') d.pomoMinutes = d.pomodoros ? (d.minutes || 0) : 0;
       d.minutes += minutes;
+      d.pomoMinutes += minutes;
       d.pomodoros += 1;
       s.timer.totalFocusMinutes = (s.timer.totalFocusMinutes || 0) + minutes;
       s.timer.totalPomodoros = (s.timer.totalPomodoros || 0) + 1;

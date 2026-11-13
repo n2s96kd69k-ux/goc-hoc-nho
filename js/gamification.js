@@ -27,12 +27,28 @@ export function addCoins(amount, reason = '') {
   return getState().wallet.coins;
 }
 
-/** Ngày được tính là "có học" khi có ≥1 task xong hoặc ≥1 pomodoro / ≥15 phút */
-export function isStudyDay(key) {
+export const STREAK_MINUTES = 45;
+export const STREAK_TASKS = 3;
+
+export function streakProgress(key) {
   const s = getState();
-  const d = s.days[key];
-  const hasTask = s.tasks.some((t) => t.date === key && t.done);
-  return hasTask || (d && (d.pomodoros > 0 || d.minutes >= 15));
+  const d = s.days[key] || {};
+  const minutes = typeof d.pomoMinutes === 'number' ? d.pomoMinutes : (d.pomodoros ? (d.minutes || 0) : 0);
+  const tasks = s.tasks.filter((t) => t.date === key && t.done).length;
+  const todo = s.tasks.filter((t) => t.date === key && !t.done);
+  return {
+    minutes,
+    minutesNeed: STREAK_MINUTES,
+    tasks,
+    tasksNeed: STREAK_TASKS,
+    todo,
+    ok: minutes >= STREAK_MINUTES && tasks >= STREAK_TASKS,
+  };
+}
+
+/** Ngày được tính chuỗi khi Pomodoro đủ 45 phút và xong 3 nhiệm vụ */
+export function isStudyDay(key) {
+  return streakProgress(key).ok;
 }
 
 /** Tính lại chuỗi ngày học liên tiếp. Trả về { current, events[] } */

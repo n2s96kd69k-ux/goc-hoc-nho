@@ -4,7 +4,9 @@ import { mascotSVG, mascot } from '../mascot.js';
 import { navigate } from '../router.js';
 import { getCurrentUser } from '../cloud.js';
 import { openAuthModal } from './authModal.js';
-import { escapeHtml } from '../utils.js';
+import { openModal } from './modal.js';
+import { escapeHtml, todayKey } from '../utils.js';
+import { streakProgress } from '../gamification.js';
 
 function authButtonText(user) {
   if (!user) return '☁️ Đăng nhập';
@@ -24,13 +26,14 @@ export function renderHeader() {
       <span class="brand-tag">“Một góc nhỏ cho những ngày cố gắng.”</span>
     </a>
     <div class="header-right">
-      <span class="pill glass header-streak" title="Chuỗi cố gắng">🔥 ${s.streak.current} ngày</span>
+      <button class="pill glass header-streak" id="streak-btn" type="button" title="Xem việc cần làm để giữ chuỗi">🔥 ${s.streak.current} ngày</button>
       <span class="pill glass header-coins" title="Xu của bạn">🪙 ${s.wallet.coins} xu</span>
       <button class="pill glass header-auth" id="auth-btn" type="button" title="Tài khoản & Đồng bộ">${authButtonText(user)}</button>
       <button class="header-mascot mascot-wrap mascot-${mascot.state}" id="header-mascot" type="button" aria-label="Mochi" title="${s.mascot.name}">${mascotSVG(34)}</button>
       <button class="icon-btn" id="settings-btn" type="button" aria-label="Cài đặt">⚙</button>
     </div>`;
   el.querySelector('#settings-btn').onclick = () => navigate('/settings');
+  el.querySelector('#streak-btn').onclick = () => openStreakPanel();
   el.querySelector('#auth-btn').onclick = () => openAuthModal();
   el.querySelector('#header-mascot').onclick = () => { mascot.poke(); if (location.hash !== '#/room') navigate('/room'); };
   shownCoins = s.wallet.coins;
@@ -98,4 +101,35 @@ export function setHeaderMascotState(state) {
   const el = document.getElementById('header-mascot');
   if (!el) return;
   el.className = `header-mascot mascot-wrap mascot-${state}`;
+}
+
+function openStreakPanel() {
+  const p = streakProgress(todayKey());
+  const minLeft = Math.max(0, p.minutesNeed - p.minutes);
+  const taskLeft = Math.max(0, p.tasksNeed - p.tasks);
+  const minPct = Math.min(100, Math.round((p.minutes / p.minutesNeed) * 100));
+  const taskPct = Math.min(100, Math.round((p.tasks / p.tasksNeed) * 100));
+  const tasks = taskLeft ? p.todo : [];
+  const taskHtml = !taskLeft
+    ? '<p class="small muted">Đã xong đủ 3 nhiệm vụ.</p>'
+    : tasks.length
+      ? `<ul class="streak-tasks">${tasks.map((t) => `<li>${escapeHtml(t.title)}</li>`).join('')}</ul><p class="small muted">Cần hoàn thành thêm ${taskLeft} nhiệm vụ.</p>`
+      : '<p class="small muted">Hôm nay chưa có nhiệm vụ. Hãy thêm và hoàn thành đủ 3 việc.</p>';
+  const modal = openModal({
+    title: p.ok ? 'Hôm nay đã giữ chuỗi' : 'Việc cần làm để giữ chuỗi',
+    content: `
+      <p class="page-sub">Chuỗi chỉ tăng khi Pomodoro đủ 45 phút và xong 3 nhiệm vụ trong ngày.</p>
+      <div class="streak-row"><span>🍅 Pomodoro</span><strong>${p.minutes}/${p.minutesNeed} phút</strong></div>
+      <div class="bar"><div class="bar-fill" style="width:${minPct}%"></div></div>
+      <p class="small muted">${minLeft ? `Còn ${minLeft} phút Pomodoro.` : 'Đã đủ 45 phút Pomodoro.'}</p>
+      <div class="streak-row"><span>✓ Nhiệm vụ</span><strong>${Math.min(p.tasks, p.tasksNeed)}/${p.tasksNeed}</strong></div>
+      <div class="bar"><div class="bar-fill" style="width:${taskPct}%"></div></div>
+      ${taskHtml}
+      <div class="modal-actions">
+        <button class="btn btn-soft" type="button" id="streak-pomo">Đi Pomodoro</button>
+        <button class="btn btn-primary" type="button" id="streak-plan">Xem kế hoạch</button>
+      </div>`,
+  });
+  modal.el.querySelector('#streak-pomo').onclick = () => { modal.close(); navigate('/pomodoro'); };
+  modal.el.querySelector('#streak-plan').onclick = () => { modal.close(); navigate('/'); };
 }
