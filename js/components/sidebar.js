@@ -7,7 +7,7 @@ import { progressBar } from './progressRing.js';
 import { mascotSVG, mascot, mascotMessage } from '../mascot.js';
 import { navigate, currentRoute } from '../router.js';
 import { openDayDetail } from './dayDetail.js';
-import { getUniversities, getExamSchedule } from '../universities.js';
+import { getUniversities, getExamSchedule, activeRound } from '../universities.js';
 
 export const SIDEBAR_BLOCKS = [
   { key: 'calendar', label: '📅 Lịch', on: true },
@@ -129,12 +129,10 @@ function goalCountdowns(g) {
   const list = getExamSchedule().filter((e) => ids.includes(e.id));
   if (!list.length) return '<p class="goal-days">Chưa chọn kỳ thi</p>';
   return `<ul class="side-counts">${list.map((e) => {
-    const dates = (e.dates || []).filter(Boolean).sort();
-    const next = dates.find((d) => d >= today) || '';
-    const dot = next ? dates.indexOf(next) + 1 : 0;
-    const n = next ? daysBetween(today, next) : null;
-    const text = !dates.length ? 'Chưa chốt' : n === null ? 'Đã thi' : n === 0 ? 'Hôm nay' : `${n} ngày`;
-    const label = e.single || !next ? escapeHtml(e.single ? e.name : (e.short || e.name)) : `${escapeHtml(e.short || e.name)} · Đợt ${dot}`;
+    const round = activeRound(e, today);
+    const n = round.date && !round.past ? daysBetween(today, round.date) : null;
+    const text = !round.date ? 'Chưa chốt' : round.past ? 'Đã thi' : n === 0 ? 'Hôm nay' : `${n} ngày`;
+    const label = e.single || !round.date ? escapeHtml(e.single ? e.name : (e.short || e.name)) : `${escapeHtml(e.short || e.name)} · Đợt ${round.index + 1}`;
     return `<li><span>${label}</span><strong>${text}</strong></li>`;
   }).join('')}</ul>`;
 }

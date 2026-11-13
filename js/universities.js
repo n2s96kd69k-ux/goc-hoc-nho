@@ -21,6 +21,15 @@ export function getUniversities() { return cache; }
 
 export function getExamSchedule() { return exams; }
 
+export function activeRound(exam, today) {
+  const dates = [...(exam.dates || [])];
+  const filled = dates.map((d, i) => ({ d, i })).filter((x) => x.d);
+  if (!filled.length) return { index: 0, date: '', total: dates.length, past: false };
+  const upcoming = filled.find((x) => x.d >= today);
+  const pick = upcoming || filled[filled.length - 1];
+  return { index: pick.i, date: pick.d, total: Math.max(dates.length, pick.i + 1), past: !upcoming };
+}
+
 export function onExamSchedule(fn) {
   examListeners.add(fn);
   return () => examListeners.delete(fn);
