@@ -12,7 +12,7 @@ import { mascotSVG } from '../mascot.js';
 import { syncCalendarToWeek } from './sidebar.js';
 
 const MAX_VISIBLE = 6;
-const expanded = new Set(); // ngày đã bấm "Xem thêm"
+const expanded = new Set();
 
 export function plannerHTML() {
   const s = getState();
@@ -120,7 +120,6 @@ function dayCardHTML(key, i, filter, isActive) {
 
 function taskItemHTML(t) {
   const sub = getSubject(t.subjectId);
-  const pr = PRIORITIES.find((p) => p.id === t.priority);
   return `
     <li class="task ${t.done ? 'done' : ''} pr-${t.priority}" data-id="${t.id}">
       <button class="checkbox ${t.done ? 'checked' : ''}" type="button" data-toggle="${t.id}" aria-label="${t.done ? 'Bỏ đánh dấu' : 'Hoàn thành'}: ${escapeHtml(t.title)}" aria-pressed="${t.done}">
@@ -136,14 +135,13 @@ function taskItemHTML(t) {
 function emptyDayHTML(key) {
   return `
     <div class="empty-day">
-      <div class="empty-mascot">${mascotSVG(56, { state: 'sleepy' })}</div>
+      <div class="empty-mascot">${mascotSVG(56)}</div>
       <p>Chưa có kế hoạch ${key === todayKey() ? 'hôm nay' : 'ngày này'}.</p>
       <small>Nào, thêm một nhiệm vụ đầu tiên nhé?</small>
       <button type="button" class="btn btn-soft btn-sm" data-add="${key}">+ Thêm nhiệm vụ</button>
     </div>`;
 }
 
-/** Gắn sự kiện cho planner đã render trong root */
 export function bindPlanner(root) {
   const s = getState();
 
@@ -174,7 +172,7 @@ export function bindPlanner(root) {
       if (res.dayComplete) {
         const card = b.closest('.day-card');
         sparkleAt(card ? card.querySelector('.ring') : b, 8);
-        toast('Hôm nay giỏi lắm 🌷 +20 xu', { icon: '✨' });
+        toast(`Hôm nay giỏi lắm 🌷 +${res.coins} xu`, { icon: '✨' });
       } else {
         toast('Xong một việc rồi ✨', { icon: '✓' });
       }
@@ -182,10 +180,8 @@ export function bindPlanner(root) {
     }
   });
 
-  // Tabs ngày (mobile)
   root.querySelectorAll('[data-day].day-tab').forEach((b) => b.onclick = () => setViewDay(b.dataset.day));
 
-  // Vuốt trái/phải trên mobile
   const grid = root.querySelector('#week-grid');
   let sx = 0, sy = 0, tracking = false;
   grid.addEventListener('touchstart', (e) => { sx = e.touches[0].clientX; sy = e.touches[0].clientY; tracking = true; }, { passive: true });
