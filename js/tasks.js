@@ -1,14 +1,15 @@
 // ===== Logic nhiệm vụ =====
 import { getState, update, dayRecord } from './state.js';
-import { uid, pct } from './utils.js';
+import { uid, pct, todayKey } from './utils.js';
 import { addCoins, REWARDS, recomputeStreak, checkWeekComplete } from './gamification.js';
 import { sounds } from './sounds.js';
 import { mascot } from './mascot.js';
 
 export function tasksOfDay(key) {
-  return getState().tasks
-    .filter((t) => t.date === key)
-    .sort((a, b) => Number(a.done) - Number(b.done) || (a.createdAt || 0) - (b.createdAt || 0));
+  const list = getState().tasks.filter((t) => t.date === key);
+  const ranked = list.some((t) => typeof t.order === 'number');
+  if (!ranked) return list.sort((a, b) => Number(a.done) - Number(b.done) || (a.createdAt || 0) - (b.createdAt || 0));
+  return list.sort((a, b) => (a.order ?? 1e15) - (b.order ?? 1e15));
 }
 
 export function tasksOfWeek(keys) {
@@ -22,6 +23,7 @@ export function dayProgress(key) {
   return { total: list.length, done, percent: pct(done, list.length) };
 }
 
+/** Môn chính của ngày: môn có nhiều task nhất */
 export function mainSubjectOfDay(key) {
   const list = tasksOfDay(key);
   if (!list.length) return null;
@@ -67,6 +69,10 @@ export function deleteTask(id) {
   update((s) => { s.tasks = s.tasks.filter((t) => t.id !== id); }, { type: 'task-delete', id });
 }
 
+/**
+ * Bật/tắt hoàn thành. Trả về thông tin phần thưởng để UI hiển thị.
+ * @returns {{done:boolean, coins:number, dayComplete:boolean, streakEvents:Array}}
+ */
 export function toggleTask(id) {
   const s = getState();
   const t = s.tasks.find((x) => x.id === id);
@@ -78,6 +84,7 @@ export function toggleTask(id) {
     const task = st.tasks.find((x) => x.id === id);
     task.done = nowDone;
     task.completedAt = nowDone ? Date.now() : null;
+    // Đảm bảo bản ghi ngày tồn tại (để lịch tháng có màu)
     dayRecord(t.date);
   }, { type: 'task-toggle', id, done: nowDone });
 
@@ -107,8 +114,41 @@ export function toggleTask(id) {
   return { done: nowDone, coins, dayComplete, weekBonus, streakEvents: events };
 }
 
+/** Chuyển task sang ngày khác */
 export function moveTask(id, newDate) {
   updateTask(id, { date: newDate });
+}
+
+/** Đặt task vào ngày mới, chèn trước beforeId. Xong việc kéo sang tương lai thì bỏ đánh dấu. */
+export function placeTask(id, date, beforeId) {
+  const current = getState().tasks.find((t) => t.id === id);
+  if (!current) return null;
+  const prev = { date: current.date, order: current.order, done: current.done, completedAt: current.completedAt };
+  const reset = !!current.done && date > todayKey();
+  update((st) => {
+    const task = st.tasks.find((t) => t.id === id);
+    if (!task) return;
+    const others = st.tasks
+      .filter((t) => t.date === date && t.id !== id)
+      .sort((a, b) => (typeof a.order === 'number' ? a.order : a.createdAt || 0) - (typeof b.order === 'number' ? b.order : b.createdAt || 0));
+    let index = beforeId ? others.findIndex((t) => t.id === beforeId) : others.length;
+    if (index < 0) index = others.length;
+    others.splice(index, 0, task);
+    task.date = date;
+    if (reset) {
+      task.done = false;
+      task.completedAt = null;
+    }
+    others.forEach((t, i) => { t.order = i; });
+  }, { type: 'task-move', id });
+  return { prev, reset };
+}
+
+export function restoreTask(id, prev) {
+  update((st) => {
+    const task = st.tasks.find((t) => t.id === id);
+    if (task) Object.assign(task, prev);
+  }, { type: 'task-move', id, rollback: true });
 }
 
 export function getTask(id) { return getState().tasks.find((t) => t.id === id); }

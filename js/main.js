@@ -66,6 +66,7 @@ function onStateChange(state, meta) {
   // Những thay đổi nhỏ không cần vẽ lại toàn trang
   if (type === 'coins' || type === 'streak' || type === 'note') return;
   if (type === 'task-toggle') { patchTaskToggle(meta.id); return; }
+  if (type === 'task-move') return;
   if (type === 'sidebar-ui') { renderSidebar(); return; }
   if (type === 'mascot') { renderHeader(); }
   renderSidebar();

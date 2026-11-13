@@ -112,6 +112,16 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   font-size: 1rem;
 }
 .icon-btn:hover { background: rgba(111, 85, 71, .08); transform: translateY(-1px); }
+.icon-btn.menu-btn { display: inline-grid; }
+
+/* Máy tính: nút ☰ thu / mở thanh bên trái */
+@media (min-width: 769px) {
+  .sidebar { transition: flex-basis .28s var(--ease), width .28s var(--ease); }
+  body.sidebar-collapsed .sidebar {
+    width: 0; flex: 0 0 0; min-width: 0;
+    overflow: hidden; border-right-width: 0; pointer-events: none;
+  }
+}
 
 /* ---------- Buttons ---------- */
 .btn {
@@ -313,8 +323,15 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 
 .day-tasks { flex: 1; min-height: 0; }
 .task-list { display: flex; flex-direction: column; gap: 4px; }
-.task { display: flex; align-items: flex-start; gap: 8px; padding: 5px 4px; border-radius: 10px; transition: background .2s; }
+.task { display: flex; align-items: flex-start; gap: 8px; padding: 5px 4px; border-radius: 10px; transition: background .2s; cursor: grab; touch-action: pan-y; }
 .task:hover { background: var(--cream-2); }
+.task.is-dragging {
+  position: fixed; z-index: 80; margin: 0; opacity: .7; cursor: grabbing;
+  transform: rotate(-3deg); background: #fff; pointer-events: none; touch-action: none;
+  box-shadow: 0 16px 32px rgba(111, 85, 71, .28);
+}
+.task-placeholder { border: 1.5px dashed rgba(111, 85, 71, .45); border-radius: 10px; background: rgba(255, 255, 255, .28); box-sizing: border-box; }
+.day-card.drop-target { box-shadow: inset 0 0 0 999px rgba(255, 236, 190, .42), 0 0 0 2px rgba(196, 154, 78, .45); }
 .task.done .task-title { color: var(--brown-soft); text-decoration: line-through; text-decoration-color: rgba(111, 85, 71, .35); }
 .task-title { text-align: left; font-size: .86rem; font-weight: 600; line-height: 1.3; flex: 1; min-width: 0; word-break: break-word; display: flex; flex-direction: column; gap: 1px; color: var(--brown-dark); }
 .task-meta { font-size: .68rem; color: var(--brown-soft); font-weight: 600; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }

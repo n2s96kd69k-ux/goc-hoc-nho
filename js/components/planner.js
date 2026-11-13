@@ -1,7 +1,8 @@
 // ===== WEEKLY PLANNER — nhân vật chính =====
 import { getState, update } from '../state.js';
 import { DAY_LABELS, DAY_SHORT, DAY_ICONS, DAY_COLORS, fromKey, toKey, addDays, weekKeys, weekRangeLabel, formatDM, todayKey, startOfWeek, minutesToText, escapeHtml, PRIORITIES } from '../utils.js';
-import { tasksOfDay, dayProgress, mainSubjectOfDay, toggleTask, applyFilter, getTask } from '../tasks.js';
+import { tasksOfDay, dayProgress, mainSubjectOfDay, toggleTask, applyFilter, getTask, placeTask, restoreTask } from '../tasks.js';
+import { getCurrentUser, saveCloudState } from '../cloud.js';
 import { getSubject } from '../subjects.js';
 import { minutesOfDay, pomodorosOfDay, dayStatus } from '../statistics.js';
 import { progressRing } from './progressRing.js';
@@ -12,7 +13,8 @@ import { mascotSVG } from '../mascot.js';
 import { syncCalendarToWeek } from './sidebar.js';
 
 const MAX_VISIBLE = 6;
-const expanded = new Set();
+const expanded = new Set(); // ngày đã bấm "Xem thêm"
+let suppressSwipe = false;
 
 export function plannerHTML() {
   const s = getState();
@@ -22,12 +24,14 @@ export function plannerHTML() {
   const isThisWeek = keys.includes(t);
   const filter = s.ui.filter || 'all';
   const viewDay = keys.includes(s.ui.viewDay) ? s.ui.viewDay : (isThisWeek ? t : keys[0]);
+
   const filters = [
     { id: 'all', label: 'Tất cả' },
     ...s.subjects.map((sub) => ({ id: sub.id, label: `${sub.icon} ${sub.name}` })),
     { id: 'done', label: '✓ Hoàn thành' },
     { id: 'todo', label: '○ Chưa xong' },
   ];
+
   return `
     <section class="planner" id="planner">
       <div class="planner-head">
@@ -39,9 +43,11 @@ export function plannerHTML() {
         </div>
         <button class="btn btn-primary" type="button" id="add-task-btn">+ THÊM NHIỆM VỤ</button>
       </div>
+
       <div class="filter-row" role="tablist" aria-label="Bộ lọc">
         ${filters.map((f) => `<button type="button" class="chip ${filter === f.id ? 'active' : ''}" data-filter="${f.id}">${f.label}</button>`).join('')}
       </div>
+
       <div class="day-tabs" aria-label="Chọn ngày">
         ${keys.map((k, i) => {
           const p = dayProgress(k);
@@ -50,6 +56,7 @@ export function plannerHTML() {
           </button>`;
         }).join('')}
       </div>
+
       <div class="week-grid" id="week-grid" data-view-day="${viewDay}">
         ${keys.map((k, i) => dayCardHTML(k, i, filter, k === viewDay)).join('')}
       </div>
@@ -75,6 +82,7 @@ function dayCardHTML(key, i, filter, isActive) {
   if (isPast && !complete) cls.push('is-past');
   if (complete) cls.push('is-complete');
   if (isActive) cls.push('is-active');
+
   return `
     <article class="${cls.join(' ')}" data-day="${key}">
       <div class="tape"></div>
@@ -86,11 +94,14 @@ function dayCardHTML(key, i, filter, isActive) {
           <div class="day-date">${formatDM(key)}</div>
         </div>
       </header>
+
       <div class="day-progress">
         ${progressRing(prog.percent, { size: 78, stroke: 8, color: complete ? 'var(--matcha-dark)' : `var(--${DAY_COLORS[i]}-dark)` })}
         <div class="day-progress-text"><strong>${prog.done} / ${prog.total}</strong><span>nhiệm vụ</span></div>
       </div>
+
       ${main ? `<div class="day-subject" style="--sub:${main.color}">🎯 ${escapeHtml(main.name).toUpperCase()}</div>` : ''}
+
       <div class="day-tasks">
         ${all.length === 0 ? emptyDayHTML(key) : list.length === 0 ? '<p class="muted small">Không có nhiệm vụ khớp bộ lọc.</p>' : `
           <ul class="task-list">
@@ -100,6 +111,7 @@ function dayCardHTML(key, i, filter, isActive) {
           ${isExpanded && list.length > MAX_VISIBLE ? `<button type="button" class="link-btn" data-less="${key}">Thu gọn</button>` : ''}
         `}
       </div>
+
       <footer class="day-foot">
         <span title="Pomodoro">🍅 ${pomos} Pomodoro</span>
         <span title="Thời gian học">☕ ${minutesToText(minutes)}</span>
@@ -110,6 +122,7 @@ function dayCardHTML(key, i, filter, isActive) {
 
 function taskItemHTML(t) {
   const sub = getSubject(t.subjectId);
+  const pr = PRIORITIES.find((p) => p.id === t.priority);
   return `
     <li class="task ${t.done ? 'done' : ''} pr-${t.priority}" data-id="${t.id}">
       <button class="checkbox ${t.done ? 'checked' : ''}" type="button" data-toggle="${t.id}" aria-label="${t.done ? 'Bỏ đánh dấu' : 'Hoàn thành'}: ${escapeHtml(t.title)}" aria-pressed="${t.done}">
@@ -132,8 +145,214 @@ function emptyDayHTML(key) {
     </div>`;
 }
 
+function bindTaskDrag(root) {
+  root.querySelectorAll('.task').forEach((li) => {
+    li.addEventListener('click', (e) => {
+      if (li.dataset.dragged === '1') {
+        e.preventDefault();
+        e.stopPropagation();
+        delete li.dataset.dragged;
+      }
+    }, true);
+    li.addEventListener('pointerdown', (e) => {
+      if (e.button !== undefined && e.button !== 0) return;
+      if (e.target.closest('.checkbox')) return;
+      const startX = e.clientX;
+      const startY = e.clientY;
+      const originDay = li.closest('.day-card')?.dataset.day || '';
+      const originParent = li.parentElement;
+      const originNext = li.nextSibling;
+      let dragging = false;
+      let placeholder = null;
+      let highlighted = null;
+      let grabX = 0;
+      let grabY = 0;
+
+      const clearHighlight = () => {
+        if (highlighted) highlighted.classList.remove('drop-target');
+        highlighted = null;
+      };
+      const restoreEmpty = (card) => {
+        if (!card || card === li.closest('.day-card')) return;
+        const box = card.querySelector('.day-tasks');
+        if (box && box.dataset.empty != null && !box.querySelector('.task')) {
+          box.innerHTML = box.dataset.empty;
+          delete box.dataset.empty;
+          box.querySelectorAll('[data-add]').forEach((b) => b.onclick = () => openTaskForm({ date: card.dataset.day }));
+        }
+      };
+      const listOf = (card) => {
+        let list = card.querySelector('.task-list');
+        if (list) return list;
+        const box = card.querySelector('.day-tasks');
+        if (!box) return null;
+        if (box.dataset.empty == null) box.dataset.empty = box.innerHTML;
+        box.innerHTML = '<ul class="task-list"></ul>';
+        return box.querySelector('.task-list');
+      };
+      const movePlaceholder = (card, clientY) => {
+        const list = listOf(card);
+        if (!list) return;
+        const items = [...list.querySelectorAll('.task')].filter((el) => el !== li);
+        let before = null;
+        for (const item of items) {
+          const r = item.getBoundingClientRect();
+          if (clientY < r.top + r.height / 2) { before = item; break; }
+        }
+        if (before) list.insertBefore(placeholder, before);
+        else list.appendChild(placeholder);
+      };
+      const onMove = (ev) => {
+        if (!dragging) {
+          if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < 8) return;
+          dragging = true;
+          suppressSwipe = true;
+          li.dataset.dragged = '1';
+          const r = li.getBoundingClientRect();
+          grabX = ev.clientX - r.left;
+          grabY = ev.clientY - r.top;
+          placeholder = document.createElement('li');
+          placeholder.className = 'task-placeholder';
+          placeholder.style.height = r.height + 'px';
+          originParent.insertBefore(placeholder, li);
+          li.classList.add('is-dragging');
+          li.style.width = r.width + 'px';
+          li.style.left = r.left + 'px';
+          li.style.top = r.top + 'px';
+          document.body.appendChild(li);
+        }
+        li.style.left = (ev.clientX - grabX) + 'px';
+        li.style.top = (ev.clientY - grabY) + 'px';
+        const under = document.elementFromPoint(ev.clientX, ev.clientY);
+        const card = under && under.closest('.day-card');
+        if (card !== highlighted) {
+          const previous = highlighted;
+          clearHighlight();
+          if (previous && previous !== card) restoreEmpty(previous);
+          if (card) {
+            card.classList.add('drop-target');
+            highlighted = card;
+          }
+        }
+        if (card) movePlaceholder(card, ev.clientY);
+        ev.preventDefault();
+      };
+      const finish = async () => {
+        window.removeEventListener('pointermove', onMove);
+        window.removeEventListener('pointerup', finish);
+        if (!dragging) return;
+        const card = highlighted;
+        clearHighlight();
+        li.classList.remove('is-dragging');
+        li.style.width = '';
+        li.style.left = '';
+        li.style.top = '';
+        const home = placeholder && placeholder.parentElement;
+        const targetDay = card && card.dataset.day;
+        const sameSlot = home === originParent && placeholder.nextSibling === originNext;
+        if (!card || !targetDay || sameSlot) {
+          if (originParent) originParent.insertBefore(li, originNext);
+          if (placeholder) placeholder.remove();
+          document.querySelectorAll('.day-tasks[data-empty]').forEach((box) => {
+            if (!box.querySelector('.task')) {
+              const day = box.closest('.day-card')?.dataset.day;
+              box.innerHTML = box.dataset.empty;
+              delete box.dataset.empty;
+              if (day) box.querySelectorAll('[data-add]').forEach((b) => b.onclick = () => openTaskForm({ date: day }));
+            }
+          });
+          suppressSwipe = false;
+          return;
+        }
+        const list = placeholder.parentElement;
+        const next = placeholder.nextElementSibling;
+        let beforeId = next && next.dataset && next.dataset.id ? next.dataset.id : null;
+        if (!beforeId) {
+          const visible = new Set([...list.querySelectorAll('.task')].map((el) => el.dataset.id).filter((id) => id && id !== li.dataset.id));
+          const hidden = tasksOfDay(targetDay).find((t) => t.id !== li.dataset.id && !visible.has(t.id));
+          if (hidden && list.closest('.day-card')?.querySelector('[data-more]')) beforeId = hidden.id;
+        }
+        list.insertBefore(li, placeholder);
+        placeholder.remove();
+        const placed = placeTask(li.dataset.id, targetDay, beforeId);
+        const fromCard = root.querySelector(`.day-card[data-day="${originDay}"]`);
+        const toCard = root.querySelector(`.day-card[data-day="${targetDay}"]`);
+        if (placed && placed.reset) {
+          li.classList.remove('done');
+          const box = li.querySelector('.checkbox');
+          if (box) {
+            box.classList.remove('checked');
+            box.setAttribute('aria-pressed', 'false');
+          }
+        }
+        const paintDays = () => {
+          if (fromCard) updateDayCardProgress(fromCard, originDay);
+          if (toCard) updateDayCardProgress(toCard, targetDay);
+          [originDay, targetDay].forEach((key) => {
+            updateDayTab(key);
+            updateTodayBar(key);
+            updateSideProgress(key);
+            updateCalDot(key);
+          });
+        };
+        paintDays();
+        try {
+          const user = getCurrentUser();
+          if (user) await saveCloudState(user.uid, getState());
+          if (fromCard && !fromCard.querySelector('.task')) {
+            fromCard.querySelector('.day-tasks').innerHTML = emptyDayHTML(originDay);
+            fromCard.querySelectorAll('[data-add]').forEach((b) => b.onclick = () => openTaskForm({ date: originDay }));
+          }
+          document.querySelectorAll('.day-tasks[data-empty]').forEach((box) => delete box.dataset.empty);
+          suppressSwipe = false;
+        } catch (err) {
+          if (placed) restoreTask(li.dataset.id, placed.prev);
+          toast('Chưa lưu được. Nhiệm vụ đã về chỗ cũ.', { kind: 'error' });
+          flyBack(li, originParent, originNext);
+          if (placed && placed.reset) {
+            li.classList.toggle('done', !!placed.prev.done);
+            const box = li.querySelector('.checkbox');
+            if (box) {
+              box.classList.toggle('checked', !!placed.prev.done);
+              box.setAttribute('aria-pressed', String(!!placed.prev.done));
+            }
+          }
+          document.querySelectorAll('.day-tasks[data-empty]').forEach((box) => {
+            if (!box.querySelector('.task')) {
+              const day = box.closest('.day-card')?.dataset.day;
+              box.innerHTML = box.dataset.empty;
+              delete box.dataset.empty;
+              if (day) box.querySelectorAll('[data-add]').forEach((b) => b.onclick = () => openTaskForm({ date: day }));
+            }
+          });
+          paintDays();
+          setTimeout(() => { suppressSwipe = false; }, 400);
+        }
+      };
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', finish);
+    });
+  });
+}
+
+function flyBack(li, parent, next) {
+  if (!parent) return;
+  const from = li.getBoundingClientRect();
+  parent.insertBefore(li, next);
+  const to = li.getBoundingClientRect();
+  li.style.transition = 'none';
+  li.style.transform = `translate(${from.left - to.left}px, ${from.top - to.top}px) rotate(-3deg)`;
+  requestAnimationFrame(() => {
+    li.style.transition = 'transform .35s ease';
+    li.style.transform = '';
+    setTimeout(() => { li.style.transition = ''; }, 360);
+  });
+}
+
+/** Gắn sự kiện cho planner đã render trong root */
 export function bindPlanner(root) {
   const s = getState();
+
   root.querySelectorAll('[data-week]').forEach((b) => b.onclick = () => {
     const delta = Number(b.dataset.week);
     update((st) => {
@@ -144,12 +363,14 @@ export function bindPlanner(root) {
       syncCalendarToWeek();
     }, { type: 'view' });
   });
+
   root.querySelector('#add-task-btn').onclick = () => openTaskForm({ date: s.ui.viewDay || todayKey() });
   root.querySelectorAll('[data-add]').forEach((b) => b.onclick = () => openTaskForm({ date: b.dataset.add }));
   root.querySelectorAll('[data-edit]').forEach((b) => b.onclick = () => openTaskForm({ taskId: b.dataset.edit }));
   root.querySelectorAll('[data-filter]').forEach((b) => b.onclick = () => update((st) => { st.ui.filter = b.dataset.filter; }, { type: 'view' }));
   root.querySelectorAll('[data-more]').forEach((b) => b.onclick = () => { expanded.add(b.dataset.more); update(() => {}, { type: 'view' }); });
   root.querySelectorAll('[data-less]').forEach((b) => b.onclick = () => { expanded.delete(b.dataset.less); update(() => {}, { type: 'view' }); });
+
   root.querySelectorAll('[data-toggle]').forEach((b) => b.onclick = (e) => {
     e.stopPropagation();
     b.classList.add('animating');
@@ -166,12 +387,18 @@ export function bindPlanner(root) {
       res.streakEvents.forEach((ev) => setTimeout(() => streakPopup(ev.milestone, ev.coins), 500));
     }
   });
+
+  bindTaskDrag(root);
+
+  // Tabs ngày (mobile)
   root.querySelectorAll('[data-day].day-tab').forEach((b) => b.onclick = () => setViewDay(b.dataset.day));
+
+  // Vuốt trái/phải trên mobile
   const grid = root.querySelector('#week-grid');
   let sx = 0, sy = 0, tracking = false;
   grid.addEventListener('touchstart', (e) => { sx = e.touches[0].clientX; sy = e.touches[0].clientY; tracking = true; }, { passive: true });
   grid.addEventListener('touchend', (e) => {
-    if (!tracking) return; tracking = false;
+    if (!tracking || suppressSwipe) return; tracking = false;
     const dx = e.changedTouches[0].clientX - sx, dy = e.changedTouches[0].clientY - sy;
     if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
       const keys = weekKeys(fromKey(getState().ui.viewWeek));
@@ -186,6 +413,7 @@ function setViewDay(key, dir) {
   update((st) => { st.ui.viewDay = key; }, { type: 'view', slide: dir });
 }
 
+/** Cập nhật đúng ô vừa tick. Không vẽ lại cả trang, kẻo bảng tuần nhảy theo. */
 export function patchTaskToggle(id) {
   const task = getTask(id);
   if (!task) return;
@@ -212,9 +440,9 @@ function updateDayCardProgress(card, key) {
   if (label) label.textContent = `${prog.percent}%`;
   const ring = card.querySelector('.ring-fill');
   if (ring) {
-    const circ = parseFloat(ring.getAttribute('stroke-dasharray')) || 0;
-    ring.setAttribute('stroke-dashoffset', (circ - (circ * prog.percent) / 100).toFixed(2));
-    const tone = [...card.classList].find((cls) => cls.startsWith('tone-'));
+    const c = parseFloat(ring.getAttribute('stroke-dasharray')) || 0;
+    ring.setAttribute('stroke-dashoffset', (c - (c * prog.percent) / 100).toFixed(2));
+    const tone = [...card.classList].find((c) => c.startsWith('tone-'));
     ring.setAttribute('stroke', complete ? 'var(--matcha-dark)' : `var(--${tone ? tone.slice(5) : 'matcha'}-dark)`);
   }
   card.classList.toggle('is-complete', complete);
