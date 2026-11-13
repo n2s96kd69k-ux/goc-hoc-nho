@@ -15,6 +15,10 @@ import {
   saveCloudState,
   friendlyAuthError,
   accountId,
+  OWNER_ID,
+  loadRoleBook,
+  saveRoleBook,
+  roleOf,
 } from '../cloud.js';
 import { escapeHtml } from '../utils.js';
 
@@ -42,7 +46,7 @@ export function openAuthModal({ welcome = false } = {}) {
     const pid = accountId(user.uid);
     const m = openModal({
       title: '☁️ Tài khoản đồng bộ',
-      size: 'sm',
+      size: 'md',
       onClose: () => { activeAuthModal = null; },
       content: `
         <div style="display:flex;flex-direction:column;gap:12px;">
@@ -58,6 +62,7 @@ export function openAuthModal({ welcome = false } = {}) {
             </div>
             <div style="font-size:12px;margin-top:6px;color:#2e7d32;">✓ Tự động lưu dữ liệu lên đám mây</div>
           </div>
+          <div id="role-box" class="small muted">Đang tải quyền…</div>
           <div class="modal-actions" style="justify-content:space-between;">
             <button class="btn btn-ghost" id="cloud-sync-now" type="button">🔄 Đồng bộ ngay</button>
             <button class="btn btn-danger" id="cloud-logout-btn" type="button">Đăng xuất</button>
@@ -75,6 +80,75 @@ export function openAuthModal({ welcome = false } = {}) {
         toast(pid, { icon: '🪪' });
       }
     };
+
+    const roleBox = m.body.querySelector('#role-box');
+    const paintRoles = (book) => {
+      const mine = roleOf(pid, book);
+      const mineLabel = mine === 'admin' ? 'Quản trị viên' : mine === 'member' ? 'Thành viên' : 'Chưa có quyền';
+      const rows = Object.entries(book.members).sort((a, b) => (a[0] === OWNER_ID ? -1 : b[0] === OWNER_ID ? 1 : a[0].localeCompare(b[0])));
+      roleBox.className = '';
+      roleBox.innerHTML = `
+        <div style="padding:12px;border-radius:12px;background:rgba(255,255,255,0.7);border:1px solid rgba(0,0,0,0.06);display:flex;flex-direction:column;gap:10px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+            <strong>Người dùng</strong>
+            <span class="chip ${mine === 'admin' ? 'active' : ''}">${mineLabel}</span>
+          </div>
+          <ul class="settings-list" style="margin:0;">
+            ${rows.map(([id, row]) => `
+              <li>
+                <span><strong>${escapeHtml(id)}</strong> · ${escapeHtml(row.name || 'Chưa đặt tên')}<br><small>${row.role === 'admin' ? 'Quản trị viên' : 'Thành viên'}${id === OWNER_ID ? ' · chủ' : ''}</small></span>
+                ${mine === 'admin' && id !== OWNER_ID ? `<button type="button" class="btn btn-ghost btn-sm" data-drop="${escapeHtml(id)}">Gỡ</button>` : ''}
+              </li>`).join('')}
+          </ul>
+          ${mine === 'admin' ? `
+            <form id="add-member" style="display:flex;flex-direction:column;gap:8px;">
+              <input class="input" name="pid" placeholder="ID tài khoản, ví dụ GHN-AB23CD" maxlength="10" required style="text-transform:uppercase;">
+              <input class="input" name="name" placeholder="Tên (không bắt buộc)" maxlength="40">
+              <label class="field"><span>Quyền</span>
+                <select class="input" name="role">
+                  <option value="member">Thành viên</option>
+                  <option value="admin">Quản trị viên</option>
+                </select>
+              </label>
+              <button class="btn btn-primary btn-sm" type="submit">Thêm người dùng</button>
+            </form>` : '<p class="small muted" style="margin:0;">Chỉ quản trị viên thêm hoặc gỡ người dùng.</p>'}
+        </div>`;
+      if (mine !== 'admin') return;
+      roleBox.querySelectorAll('[data-drop]').forEach((b) => b.onclick = async () => {
+        const id = b.dataset.drop;
+        delete book.members[id];
+        try {
+          book = await saveRoleBook(book);
+          paintRoles(book);
+          toast('Đã gỡ ' + id);
+        } catch (e) {
+          toast('Không lưu được: ' + (e.message || 'lỗi quyền'), { kind: 'error' });
+        }
+      });
+      roleBox.querySelector('#add-member').onsubmit = async (e) => {
+        e.preventDefault();
+        const form = e.target;
+        const id = form.pid.value.trim().toUpperCase();
+        if (!/^GHN-[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/.test(id)) {
+          toast('ID phải dạng GHN- và 6 ký tự', { kind: 'error' });
+          return;
+        }
+        if (id === OWNER_ID) { toast('Chủ đã là quản trị viên'); return; }
+        const role = form.role.value === 'admin' ? 'admin' : 'member';
+        const name = form.name.value.trim();
+        book.members[id] = { role, name, owner: false };
+        try {
+          book = await saveRoleBook(book);
+          paintRoles(book);
+          toast(role === 'admin' ? 'Đã thêm quản trị viên' : 'Đã thêm thành viên');
+        } catch (err) {
+          toast('Không lưu được: ' + (err.message || 'lỗi quyền'), { kind: 'error' });
+        }
+      };
+    };
+    loadRoleBook().then((book) => { if (activeAuthModal === m) paintRoles(book); }).catch(() => {
+      roleBox.textContent = 'Không tải được danh sách người dùng.';
+    });
 
     m.body.querySelector('#cloud-sync-now').onclick = async () => {
       try {

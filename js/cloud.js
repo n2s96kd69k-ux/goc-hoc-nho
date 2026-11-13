@@ -62,6 +62,43 @@ export function accountId(uid) {
   return `GHN-${out}`;
 }
 
+/** Chủ ứng dụng — luôn là quản trị viên, không gỡ được. */
+export const OWNER_ID = 'GHN-776J9W';
+
+export function isOwner(pid) { return pid === OWNER_ID; }
+
+export async function loadRoleBook() {
+  const empty = { members: {} };
+  if (!db) return withOwner(empty);
+  const snap = await getDoc(doc(db, 'roles', 'directory'));
+  const data = snap.exists() ? snap.data() : empty;
+  return withOwner({ members: data.members || {} });
+}
+
+function withOwner(book) {
+  const members = { ...(book.members || {}) };
+  const cur = members[OWNER_ID] || {};
+  members[OWNER_ID] = { ...cur, role: 'admin', owner: true, name: cur.name || 'Lê Khả Thanh Bình' };
+  return { members };
+}
+
+export function roleOf(pid, book) {
+  if (pid === OWNER_ID) return 'admin';
+  const row = book && book.members && book.members[pid];
+  if (!row) return null;
+  return row.role === 'admin' ? 'admin' : 'member';
+}
+
+export async function saveRoleBook(book) {
+  if (!db) throw new Error('Firebase chưa sẵn sàng.');
+  const next = withOwner(book);
+  await setDoc(doc(db, 'roles', 'directory'), {
+    members: next.members,
+    updatedAt: new Date().toISOString(),
+  });
+  return next;
+}
+
 export function onCloudAuthChange(callback) {
   if (!auth) {
     callback(null);
@@ -109,11 +146,13 @@ export async function loadCloudState(uid) {
 export async function saveCloudState(uid, state) {
   if (!db || !uid || !state) return false;
   const ref = doc(db, 'users', uid);
-  await setDoc(ref, {
+  const patch = {
     publicId: accountId(uid),
     state: JSON.parse(JSON.stringify(state)),
     updatedAt: new Date().toISOString(),
-  }, { merge: true });
+  };
+  if (accountId(uid) === OWNER_ID) patch.role = 'admin';
+  await setDoc(ref, patch, { merge: true });
   return true;
 }
 
