@@ -11,10 +11,10 @@ function subjectOptions(selected) {
   return getState().subjects.map((s) => `<option value="${s.id}" ${s.id === selected ? 'selected' : ''}>${s.icon} ${escapeHtml(s.name)}</option>`).join('');
 }
 
-export function openTaskForm({ date = todayKey(), taskId = null } = {}) {
+export function openTaskForm({ date = todayKey(), taskId = null, subjectId = null } = {}) {
   const task = taskId ? getTask(taskId) : null;
   const isEdit = !!task;
-  const v = task || { title: '', subjectId: getState().subjects[0] && getState().subjects[0].id, date, minutes: 30, priority: 'medium', pomodoros: 1, note: '' };
+  const v = task || { title: '', subjectId: subjectId || (getState().subjects[0] && getState().subjects[0].id), date, minutes: 30, priority: 'medium', pomodoros: 1, note: '' };
 
   const m = openModal({
     title: isEdit ? '✏️ Sửa nhiệm vụ' : '🌷 Thêm nhiệm vụ',
