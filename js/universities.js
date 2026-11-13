@@ -1,10 +1,10 @@
-// ===== Logo trường trên Firebase Storage. 100% chỉ khi link ảnh mở được từ bên ngoài. =====
-import { getApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
-import { getStorage, ref, uploadBytesResumable, getDownloadURL, listAll, getMetadata, deleteObject } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-storage.js';
-import { firebaseApp, getCurrentUser, accountId, OWNER_ID } from './cloud.js';
+// ===== Logo trường trên Firestore (gói Spark, không cần Storage). =====
+import { collection, doc, getDocs, getDocFromServer, setDoc, deleteDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+import { firebaseDb, getCurrentUser, accountId, OWNER_ID } from './cloud.js';
 
 const KEY = 'ghn_unis';
 let cache = [];
+let watching = false;
 
 export function getUniversities() { return cache; }
 
@@ -13,15 +13,10 @@ export function isAdminUser() {
   return !!(user && accountId(user.uid) === OWNER_ID);
 }
 
-function storage() {
-  firebaseApp();
-  return getStorage(getApp());
-}
-
 function remember(list) {
   const map = new Map();
   for (const u of list || []) {
-    if (u && u.id && typeof u.url === 'string' && u.url.startsWith('https://')) {
+    if (u && u.id && typeof u.url === 'string' && u.url.startsWith('data:image/')) {
       map.set(u.id, { id: u.id, name: u.name || 'Trường', url: u.url });
     }
   }
@@ -30,20 +25,21 @@ function remember(list) {
   return cache;
 }
 
+function fromSnap(snap) {
+  return snap.docs.map((d) => ({ id: d.id, name: d.data().name, url: d.data().url }));
+}
+
 export async function refreshUniversities() {
   try { remember(JSON.parse(localStorage.getItem(KEY) || '[]')); } catch {}
+  const db = firebaseDb();
+  if (!db) return cache;
+  if (!watching) {
+    watching = true;
+    onSnapshot(collection(db, 'universities'), (snap) => remember(fromSnap(snap)), () => {});
+  }
   try {
-    const listed = await listAll(ref(storage(), 'universities'));
-    const out = [];
-    await Promise.all(listed.items.map(async (item) => {
-      const [url, meta] = await Promise.all([getDownloadURL(item), getMetadata(item)]);
-      out.push({
-        id: item.name.replace(/\.jpg$/i, ''),
-        name: (meta.customMetadata && meta.customMetadata.name) || 'Trường',
-        url,
-      });
-    }));
-    if (out.length) remember(out);
+    const snap = await getDocs(collection(db, 'universities'));
+    remember(fromSnap(snap));
   } catch (e) {
     console.warn(e);
   }
@@ -55,7 +51,7 @@ function resizeImage(file) {
     const img = new Image();
     const blobUrl = URL.createObjectURL(file);
     img.onload = () => {
-      const max = 128;
+      const max = 96;
       const scale = Math.min(1, max / Math.max(img.width, img.height));
       const canvas = document.createElement('canvas');
       canvas.width = Math.max(1, Math.round(img.width * scale));
@@ -68,38 +64,35 @@ function resizeImage(file) {
         URL.revokeObjectURL(blobUrl);
         if (blob) resolve(blob);
         else reject(new Error('Không xử lý được ảnh'));
-      }, 'image/jpeg', 0.72);
+      }, 'image/jpeg', 0.62);
     };
     img.onerror = () => { URL.revokeObjectURL(blobUrl); reject(new Error('Ảnh không hợp lệ')); };
     img.src = blobUrl;
   });
 }
 
-function uploadFile(fileRef, blob, name, onProgress) {
+function blobToDataUrl(blob) {
   return new Promise((resolve, reject) => {
-    const task = uploadBytesResumable(fileRef, blob, {
-      contentType: 'image/jpeg',
-      customMetadata: { name },
-    });
-    task.on('state_changed', (snap) => {
-      const ratio = snap.totalBytes ? snap.bytesTransferred / snap.totalBytes : 0;
-      onProgress(Math.min(70, Math.round(20 + ratio * 50)));
-    }, (err) => reject(err), () => resolve());
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = () => reject(new Error('Không đọc được ảnh'));
+    r.readAsDataURL(blob);
   });
 }
 
-async function seenFromOutside(url) {
-  const res = await fetch(url, { cache: 'no-store', mode: 'cors' });
-  if (!res.ok) throw new Error('Link ảnh chưa mở được từ bên ngoài');
-  const blob = await res.blob();
-  if (!blob.size) throw new Error('File logo trên Storage đang trống');
-  await new Promise((resolve, reject) => {
+function decodeImage(url) {
+  return new Promise((resolve, reject) => {
     const img = new Image();
-    const local = URL.createObjectURL(blob);
-    img.onload = () => { URL.revokeObjectURL(local); resolve(); };
-    img.onerror = () => { URL.revokeObjectURL(local); reject(new Error('Ảnh trên Storage không mở được')); };
-    img.src = local;
+    img.onload = () => resolve();
+    img.onerror = () => reject(new Error('Ảnh trên Firestore không mở được'));
+    img.src = url;
   });
+}
+
+function ruleError(err) {
+  const code = String((err && (err.code || err.message)) || '');
+  if (code.includes('permission-denied')) return new Error('Chưa có luật universities. Dán luật Firestore rồi Publish.');
+  return new Error(err.message || 'Không lưu được logo');
 }
 
 export async function addUniversity(name, file, onProgress = () => {}) {
@@ -107,34 +100,41 @@ export async function addUniversity(name, file, onProgress = () => {}) {
   const title = (name || '').trim();
   if (!title) throw new Error('Nhập tên trường.');
   if (!file) throw new Error('Chọn file logo.');
+  const db = firebaseDb();
+  if (!db) throw new Error('Firebase chưa sẵn sàng.');
   onProgress(8);
   const blob = await resizeImage(file);
-  onProgress(18);
+  onProgress(24);
+  const url = await blobToDataUrl(blob);
   const id = 'u' + Date.now().toString(36);
-  const fileRef = ref(storage(), `universities/${id}.jpg`);
+  onProgress(40);
   try {
-    await uploadFile(fileRef, blob, title, onProgress);
+    await setDoc(doc(db, 'universities', id), { name: title, url, updatedAt: Date.now() });
   } catch (err) {
-    const code = err && (err.code || err.message) || '';
-    if (String(code).includes('storage/unauthorized') || String(code).includes('storage/unauthenticated')) {
-      throw new Error('Storage chưa cho ghi. Dán rules rồi thử lại.');
-    }
-    if (String(code).includes('storage/bucket-not-found') || String(code).includes('404')) {
-      throw new Error('Chưa thấy bucket Storage. Tạo xong hãy tải lại trang.');
-    }
-    throw new Error(err.message || 'Không tải được lên Storage');
+    throw ruleError(err);
   }
-  onProgress(78);
-  const url = await getDownloadURL(fileRef);
+  onProgress(72);
+  let saved;
+  try {
+    saved = await getDocFromServer(doc(db, 'universities', id));
+  } catch (err) {
+    throw ruleError(err);
+  }
+  if (!saved.exists() || !saved.data().url) throw new Error('Server chưa thấy logo.');
   onProgress(88);
-  await seenFromOutside(url);
+  await decodeImage(saved.data().url);
   onProgress(100);
-  remember([...cache.filter((u) => u.id !== id), { id, name: title, url }]);
-  return { id, name: title, url };
+  remember([...cache.filter((u) => u.id !== id), { id, name: title, url: saved.data().url }]);
+  return { id, name: title, url: saved.data().url };
 }
 
 export async function removeUniversity(id) {
   if (!isAdminUser()) throw new Error('Chỉ quản trị viên được xóa logo.');
-  await deleteObject(ref(storage(), `universities/${id}.jpg`));
+  const db = firebaseDb();
+  try {
+    await deleteDoc(doc(db, 'universities', id));
+  } catch (err) {
+    throw ruleError(err);
+  }
   remember(cache.filter((u) => u.id !== id));
 }
