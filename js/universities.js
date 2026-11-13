@@ -1,9 +1,9 @@
-// ===== Logo trường — quản trị viên tải, server xác nhận rồi mới 100% =====
-import { doc, getDoc, getDocFromServer, setDoc } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
-import { firebaseDb, getCurrentUser, accountId, OWNER_ID } from './cloud.js';
+// ===== Logo trường trên Firebase Storage. 100% chỉ khi link ảnh mở được từ bên ngoài. =====
+import { getApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
+import { getStorage, ref, uploadBytesResumable, getDownloadURL, listAll, getMetadata, deleteObject } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-storage.js';
+import { firebaseApp, getCurrentUser, accountId, OWNER_ID } from './cloud.js';
 
 const KEY = 'ghn_unis';
-const SHARED = 'catalog';
 let cache = [];
 
 export function getUniversities() { return cache; }
@@ -13,10 +13,15 @@ export function isAdminUser() {
   return !!(user && accountId(user.uid) === OWNER_ID);
 }
 
+function storage() {
+  firebaseApp();
+  return getStorage(getApp());
+}
+
 function remember(list) {
   const map = new Map();
   for (const u of list || []) {
-    if (u && u.id && typeof u.url === 'string' && u.url.startsWith('data:image/')) {
+    if (u && u.id && typeof u.url === 'string' && u.url.startsWith('https://')) {
       map.set(u.id, { id: u.id, name: u.name || 'Trường', url: u.url });
     }
   }
@@ -25,28 +30,24 @@ function remember(list) {
   return cache;
 }
 
-function itemsOf(snap) {
-  if (!snap || !snap.exists()) return [];
-  const data = snap.data() || {};
-  if (Array.isArray(data.items)) return data.items;
-  if (Array.isArray(data.universityCatalog)) return data.universityCatalog;
-  return [];
-}
-
 export async function refreshUniversities() {
   try { remember(JSON.parse(localStorage.getItem(KEY) || '[]')); } catch {}
-  const db = firebaseDb();
-  const user = getCurrentUser();
-  if (!db) return cache;
-  const reads = [
-    getDoc(doc(db, 'users', SHARED)),
-    getDoc(doc(db, 'catalog', 'universities')),
-  ];
-  if (user) reads.push(getDoc(doc(db, 'users', user.uid)));
-  const settled = await Promise.allSettled(reads);
-  const merged = [];
-  for (const r of settled) if (r.status === 'fulfilled') merged.push(...itemsOf(r.value));
-  return remember(merged.length ? merged : cache);
+  try {
+    const listed = await listAll(ref(storage(), 'universities'));
+    const out = [];
+    await Promise.all(listed.items.map(async (item) => {
+      const [url, meta] = await Promise.all([getDownloadURL(item), getMetadata(item)]);
+      out.push({
+        id: item.name.replace(/\.jpg$/i, ''),
+        name: (meta.customMetadata && meta.customMetadata.name) || 'Trường',
+        url,
+      });
+    }));
+    if (out.length) remember(out);
+  } catch (e) {
+    console.warn(e);
+  }
+  return cache;
 }
 
 function resizeImage(file) {
@@ -54,7 +55,7 @@ function resizeImage(file) {
     const img = new Image();
     const blobUrl = URL.createObjectURL(file);
     img.onload = () => {
-      const max = 96;
+      const max = 128;
       const scale = Math.min(1, max / Math.max(img.width, img.height));
       const canvas = document.createElement('canvas');
       canvas.width = Math.max(1, Math.round(img.width * scale));
@@ -67,60 +68,38 @@ function resizeImage(file) {
         URL.revokeObjectURL(blobUrl);
         if (blob) resolve(blob);
         else reject(new Error('Không xử lý được ảnh'));
-      }, 'image/jpeg', 0.68);
+      }, 'image/jpeg', 0.72);
     };
     img.onerror = () => { URL.revokeObjectURL(blobUrl); reject(new Error('Ảnh không hợp lệ')); };
     img.src = blobUrl;
   });
 }
 
-function blobToDataUrl(blob) {
+function uploadFile(fileRef, blob, name, onProgress) {
   return new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = () => resolve(r.result);
-    r.onerror = () => reject(new Error('Không đọc được ảnh'));
-    r.readAsDataURL(blob);
+    const task = uploadBytesResumable(fileRef, blob, {
+      contentType: 'image/jpeg',
+      customMetadata: { name },
+    });
+    task.on('state_changed', (snap) => {
+      const ratio = snap.totalBytes ? snap.bytesTransferred / snap.totalBytes : 0;
+      onProgress(Math.min(70, Math.round(20 + ratio * 50)));
+    }, (err) => reject(err), () => resolve());
   });
 }
 
-function decodeImage(url) {
-  return new Promise((resolve, reject) => {
+async function seenFromOutside(url) {
+  const res = await fetch(url, { cache: 'no-store', mode: 'cors' });
+  if (!res.ok) throw new Error('Link ảnh chưa mở được từ bên ngoài');
+  const blob = await res.blob();
+  if (!blob.size) throw new Error('File logo trên Storage đang trống');
+  await new Promise((resolve, reject) => {
     const img = new Image();
-    img.onload = () => resolve();
-    img.onerror = () => reject(new Error('Ảnh trên server không mở được'));
-    img.src = url;
+    const local = URL.createObjectURL(blob);
+    img.onload = () => { URL.revokeObjectURL(local); resolve(); };
+    img.onerror = () => { URL.revokeObjectURL(local); reject(new Error('Ảnh trên Storage không mở được')); };
+    img.src = local;
   });
-}
-
-async function writeCatalog(items) {
-  const db = firebaseDb();
-  const user = getCurrentUser();
-  if (!db || !user) throw new Error('Bạn cần đăng nhập.');
-  const stamp = Date.now();
-  await setDoc(doc(db, 'users', user.uid), {
-    universityCatalog: items,
-    universityCatalogAt: stamp,
-  }, { merge: true });
-  const shared = { items, ownerUid: user.uid, updatedAt: stamp };
-  const results = await Promise.allSettled([
-    setDoc(doc(db, 'users', SHARED), shared),
-    setDoc(doc(db, 'catalog', 'universities'), shared),
-  ]);
-  return results.some((r) => r.status === 'fulfilled');
-}
-
-async function seenElsewhere(id) {
-  const db = firebaseDb();
-  const reads = await Promise.allSettled([
-    getDocFromServer(doc(db, 'users', SHARED)),
-    getDocFromServer(doc(db, 'catalog', 'universities')),
-  ]);
-  for (const r of reads) {
-    if (r.status !== 'fulfilled') continue;
-    const hit = itemsOf(r.value).find((u) => u.id === id);
-    if (hit) return hit;
-  }
-  return null;
 }
 
 export async function addUniversity(name, file, onProgress = () => {}) {
@@ -130,28 +109,32 @@ export async function addUniversity(name, file, onProgress = () => {}) {
   if (!file) throw new Error('Chọn file logo.');
   onProgress(8);
   const blob = await resizeImage(file);
-  onProgress(22);
-  const url = await blobToDataUrl(blob);
+  onProgress(18);
   const id = 'u' + Date.now().toString(36);
-  const item = { id, name: title, url };
-  const items = [...cache.filter((u) => u.id !== id), item];
-  onProgress(36);
-  const shared = await writeCatalog(items);
-  onProgress(64);
-  if (!shared) throw new Error('Chưa ghi được chỗ dùng chung. Logo chưa hiện cho tài khoản khác.');
-  const seen = await seenElsewhere(id);
-  onProgress(82);
-  if (!seen) throw new Error('Server chưa thấy logo ở chỗ dùng chung.');
-  await decodeImage(seen.url);
+  const fileRef = ref(storage(), `universities/${id}.jpg`);
+  try {
+    await uploadFile(fileRef, blob, title, onProgress);
+  } catch (err) {
+    const code = err && (err.code || err.message) || '';
+    if (String(code).includes('storage/unauthorized') || String(code).includes('storage/unauthenticated')) {
+      throw new Error('Storage chưa cho ghi. Dán rules rồi thử lại.');
+    }
+    if (String(code).includes('storage/bucket-not-found') || String(code).includes('404')) {
+      throw new Error('Chưa thấy bucket Storage. Tạo xong hãy tải lại trang.');
+    }
+    throw new Error(err.message || 'Không tải được lên Storage');
+  }
+  onProgress(78);
+  const url = await getDownloadURL(fileRef);
+  onProgress(88);
+  await seenFromOutside(url);
   onProgress(100);
-  remember(items);
-  return item;
+  remember([...cache.filter((u) => u.id !== id), { id, name: title, url }]);
+  return { id, name: title, url };
 }
 
 export async function removeUniversity(id) {
   if (!isAdminUser()) throw new Error('Chỉ quản trị viên được xóa logo.');
-  const items = cache.filter((u) => u.id !== id);
-  const shared = await writeCatalog(items);
-  if (!shared) throw new Error('Chưa xóa được trên server dùng chung.');
-  remember(items);
+  await deleteObject(ref(storage(), `universities/${id}.jpg`));
+  remember(cache.filter((u) => u.id !== id));
 }
