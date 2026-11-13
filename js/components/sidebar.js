@@ -8,6 +8,20 @@ import { mascotSVG, mascot, mascotMessage } from '../mascot.js';
 import { navigate, currentRoute } from '../router.js';
 import { openDayDetail } from './dayDetail.js';
 
+export const SIDEBAR_BLOCKS = [
+  { key: 'calendar', label: '📅 Lịch', on: true },
+  { key: 'progress', label: '📊 Tiến độ tuần', on: false },
+  { key: 'time', label: '⏱ Thời gian học', on: false },
+  { key: 'goal', label: '🎯 Mục tiêu', on: true },
+  { key: 'mascot', label: '🐱 Mèo Mochi', on: false },
+];
+
+export function sidebarOn(settings, key) {
+  const block = SIDEBAR_BLOCKS.find((b) => b.key === key);
+  const saved = settings && settings.sidebar ? settings.sidebar[key] : undefined;
+  return saved === undefined ? !!(block && block.on) : !!saved;
+}
+
 export const NAV = [
   { path: '/', icon: '🏠', label: 'Tổng quan', short: 'Hôm nay' },
   { path: '/week', icon: '📅', label: 'Kế hoạch tuần', short: 'Tuần' },
@@ -19,7 +33,7 @@ export const NAV = [
   { path: '/settings', icon: '⚙', label: 'Cài đặt' },
 ];
 
-let calMonth = null;
+let calMonth = null; // { year, month }
 
 export function renderSidebar() {
   const s = getState();
@@ -30,16 +44,20 @@ export function renderSidebar() {
   const route = currentRoute();
   const path = route ? route.path : '/';
   const maxMin = Math.max(30, ...week.perDay.map((d) => d.minutes));
+
+  // Mục tiêu
   const g = s.goal;
   const daysLeft = g.examDate ? daysBetween(todayKey(), g.examDate) : null;
   const goalPercent = goalProgressPercent();
+  const show = (key) => sidebarOn(s.settings, key);
 
   el.innerHTML = `
     <div class="sidebar-inner">
-      <section class="side-block" id="side-calendar">
+      ${show('calendar') ? `<section class="side-block" id="side-calendar">
         ${calendarHTML({ year: calMonth.year, month: calMonth.month, viewWeekKey: s.ui.viewWeek, showStatus: true })}
-      </section>
-      <section class="side-block" id="side-progress">
+      </section>` : ''}
+
+      ${show('progress') ? `<section class="side-block" id="side-progress">
         <h4 class="side-title">📊 TIẾN ĐỘ TUẦN</h4>
         <div class="mini-progress">
           ${week.perDay.map((d, i) => `
@@ -50,31 +68,36 @@ export function renderSidebar() {
             </div>`).join('')}
         </div>
         <div class="side-foot">${week.done}/${week.total} nhiệm vụ · ${week.percent}%</div>
-      </section>
-      <section class="side-block" id="side-time">
+      </section>` : ''}
+
+      ${show('time') ? `<section class="side-block" id="side-time">
         <h4 class="side-title">⏱ THỜI GIAN HỌC</h4>
         <div class="side-big">Tuần này<br><strong>${minutesToText(week.minutes)}</strong></div>
         <div class="mini-bars">
           ${week.perDay.map((d, i) => `<div class="mini-bar-col" title="${DAY_SHORT[i]}: ${minutesToText(d.minutes)}"><div class="mini-bar" style="height:${Math.max(4, (d.minutes / maxMin) * 100)}%"></div><span>${DAY_SHORT[i]}</span></div>`).join('')}
         </div>
-      </section>
-      <button class="side-block side-goal" id="side-goal" type="button">
+      </section>` : ''}
+
+      ${show('goal') ? `<button class="side-block side-goal" id="side-goal" type="button">
         <h4 class="side-title">🎯 MỤC TIÊU</h4>
         <div class="goal-name">${g.icon || '🏛️'} ${escapeHtml(g.name || 'Chưa đặt mục tiêu')}</div>
         <div class="goal-days">${daysLeft === null ? 'Chưa đặt ngày thi' : daysLeft >= 0 ? `Còn <strong>${daysLeft}</strong> ngày` : 'Đã qua ngày thi'}</div>
         ${progressBar(goalPercent, { color: 'var(--lavender-dark)', height: 8 })}
         <div class="side-foot">Tiến độ ${goalPercent}%</div>
-      </button>
-      <section class="side-block side-mascot" id="side-mascot">
+      </button>` : ''}
+
+      ${show('mascot') ? `<section class="side-block side-mascot" id="side-mascot">
         <div class="mascot-wrap mascot-${mascot.state}" id="sidebar-mascot">${mascotSVG(64)}</div>
         <p class="mascot-bubble" id="sidebar-mascot-msg">${mascotMessage(mascot.state, { userName: s.settings.userName, stable: true })}</p>
-      </section>
+      </section>` : ''}
+
       <nav class="side-nav" aria-label="Điều hướng">
         ${NAV.map((n) => `<a href="#${n.path}" class="nav-item ${path === n.path ? 'active' : ''}" data-path="${n.path}"><span class="nav-icon">${n.icon}</span>${n.label}</a>`).join('')}
       </nav>
     </div>`;
 
-  bindCalendar(el.querySelector('#side-calendar'), {
+  const cal = el.querySelector('#side-calendar');
+  if (cal) bindCalendar(cal, {
     onPick: (key) => {
       const monday = toKey(startOfWeek(key));
       update((st) => { st.ui.viewWeek = monday; st.ui.viewDay = key; }, { type: 'view' });
@@ -87,11 +110,14 @@ export function renderSidebar() {
       renderSidebar();
     },
   });
-  el.querySelector('#side-goal').onclick = () => navigate('/goals');
+  const goalBtn = el.querySelector('#side-goal');
+  if (goalBtn) goalBtn.onclick = () => navigate('/goals');
   el.querySelectorAll('.nav-item').forEach((a) => a.addEventListener('click', () => document.body.classList.remove('drawer-open')));
-  el.querySelector('#sidebar-mascot').onclick = () => mascot.poke();
+  const cat = el.querySelector('#sidebar-mascot');
+  if (cat) cat.onclick = () => mascot.poke();
 }
 
+/** Đồng bộ tháng lịch theo tuần đang xem */
 export function syncCalendarToWeek() {
   const s = getState();
   const d = fromKey(s.ui.viewWeek);

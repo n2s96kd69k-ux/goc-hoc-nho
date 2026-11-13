@@ -15,3 +15,5 @@
 
 /* Tick nhiệm vụ không được kéo cả trang theo */
 .main, .sidebar, .week-grid, .day-card { overflow-anchor: none; }
+
+.side-switches { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }

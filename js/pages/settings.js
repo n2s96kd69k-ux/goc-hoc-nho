@@ -7,6 +7,7 @@ import { confirmDialog } from '../components/modal.js';
 import { toast } from '../components/toast.js';
 import { openSubjectForm } from './subjects.js';
 import { navigate } from '../router.js';
+import { SIDEBAR_BLOCKS, sidebarOn } from '../components/sidebar.js';
 import { setupDurations } from '../timer.js';
 import { recomputeStreak } from '../gamification.js';
 
@@ -32,6 +33,19 @@ export function renderSettings(root) {
           </label>
           <div class="modal-actions"><button class="btn btn-primary" type="submit">Lưu cài đặt</button></div>
         </form>
+
+        <div class="paper">
+          <h4 class="side-title">📌 Thanh bên trái</h4>
+          <p class="small muted">Bật hoặc ẩn từng phần. Lịch và mục tiêu được bật sẵn.</p>
+          <div class="side-switches">
+            ${SIDEBAR_BLOCKS.map((b) => `
+              <label class="switch">
+                <input type="checkbox" data-side="${b.key}" ${sidebarOn(s.settings, b.key) ? 'checked' : ''}>
+                <span class="switch-track"></span>
+                <span>${b.label}</span>
+              </label>`).join('')}
+          </div>
+        </div>
 
         <div class="paper">
           <h4 class="side-title">📚 Môn học</h4>
@@ -78,6 +92,11 @@ export function renderSettings(root) {
     setupDurations();
     toast('Đã lưu cài đặt ✨');
   };
+  root.querySelectorAll('[data-side]').forEach((input) => {
+    input.onchange = () => update((st) => {
+      st.settings.sidebar = { ...(st.settings.sidebar || {}), [input.dataset.side]: input.checked };
+    }, { type: 'sidebar-ui' });
+  });
   root.querySelectorAll('[data-edit-sub]').forEach((b) => b.onclick = () => openSubjectForm(b.dataset.editSub));
   root.querySelector('#add-sub').onclick = () => openSubjectForm();
   root.querySelector('#go-goal').onclick = () => navigate('/goals');

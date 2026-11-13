@@ -1,6 +1,6 @@
 // ===== State trung tâm: nguồn dữ liệu duy nhất + pub/sub =====
 import { loadState, saveState } from './storage.js';
-import { createInitialState, isSampleTask } from './seed.js';
+import { createInitialState, isSampleTask, SIDEBAR_DEFAULT } from './seed.js';
 import { debounce, todayKey, startOfWeek, toKey } from './utils.js';
 import { migrateRoom } from './room.js';
 import { getCurrentUser, loadCloudState, saveCloudState } from './cloud.js';
@@ -10,8 +10,10 @@ const listeners = new Set();
 
 function migrate(s) {
   const base = createInitialState();
+  // Ghép các trường thiếu (giữ nguyên dữ liệu người dùng)
   const merged = { ...base, ...s };
   merged.settings = { ...base.settings, ...(s.settings || {}) };
+  merged.settings.sidebar = { ...SIDEBAR_DEFAULT, ...((s.settings && s.settings.sidebar) || {}) };
   merged.wallet = { ...base.wallet, ...(s.wallet || {}) };
   merged.streak = { ...base.streak, ...(s.streak || {}) };
   merged.mascot = { ...base.mascot, ...(s.mascot || {}) };
@@ -24,13 +26,14 @@ function migrate(s) {
   if (merged.settings.seeded !== false) {
     merged.tasks = merged.tasks.map((t) => (t && (t.sample || isSampleTask(t)) ? { ...t, sample: true } : t));
   }
-  delete merged.inventory;
+  delete merged.inventory; // v1 → đã chuyển vào room.owned
   return merged;
 }
 
 export function initState() {
   const saved = loadState();
   state = saved ? migrate(saved) : createInitialState();
+  // Tuần đang xem luôn reset về tuần hiện tại khi mở app
   state.ui.viewWeek = toKey(startOfWeek(todayKey()));
   state.ui.viewDay = todayKey();
   return state;
@@ -44,6 +47,7 @@ const persistCloud = debounce(() => {
   if (u) saveCloudState(u.uid, state).catch((e) => console.warn('Đồng bộ đám mây lỗi:', e));
 }, 1200);
 
+/** Thay đổi state qua hàm mutator, sau đó lưu và thông báo */
 export function update(mutator, meta = {}) {
   mutator(state);
   persist();
@@ -82,6 +86,7 @@ function emit(meta) {
   }
 }
 
+/** Lấy hoặc tạo bản ghi ngày */
 export function dayRecord(key) {
   if (!state.days[key]) state.days[key] = { minutes: 0, pomodoros: 0, mood: null, note: '' };
   return state.days[key];

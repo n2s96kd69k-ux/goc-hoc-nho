@@ -46,27 +46,35 @@ function renderCurrentPage(params) {
   const paint = () => {
     el.classList.remove('page-leave');
     fn(el, params || route.params);
+    // Chỉ animate cả trang khi chuyển route. Tick nhiệm vụ không được giật cả bảng tuần.
     if (!isNav) return;
     el.classList.remove('page-enter'); void el.offsetWidth;
     el.classList.add('page-enter');
   };
+  // Chuyển trang: trang cũ mờ + thu nhất nhẹ → trang mới materialize
   if (isNav && el.children.length && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
     el.classList.add('page-leave');
     setTimeout(paint, 140);
   } else paint();
 }
 
+/** Khi state đổi: vẽ lại phần cần thiết */
 function onStateChange(state, meta) {
   refreshHeaderStats();
   const type = meta.type || '';
+  // Những thay đổi nhỏ không cần vẽ lại toàn trang
   if (type === 'coins' || type === 'streak' || type === 'note') return;
   if (type === 'task-toggle') { patchTaskToggle(meta.id); return; }
+  if (type === 'sidebar-ui') { renderSidebar(); return; }
   if (type === 'mascot') { renderHeader(); }
   renderSidebar();
   const route = currentRoute();
+  // Trang Pomodoro tự quản lý timer; chỉ vẽ lại khi dữ liệu liên quan đổi
   if (route && route.path === '/pomodoro' && !['task-add', 'task-update', 'task-delete', 'task-toggle', 'settings', 'replace', 'pomodoro-complete'].includes(type)) return;
+  // Trang Góc học tự đồng bộ qua subscribe riêng (giữ mèo & scene sống), chỉ vẽ lại khi thay thế toàn bộ dữ liệu
   if (route && route.path === '/room' && type !== 'replace') return;
   renderCurrentPage();
+  // Hiệu ứng trượt khi đổi ngày trên mobile
   if (meta.slide) {
     const grid = document.getElementById('week-grid');
     if (grid) { grid.classList.add(`slide-${meta.slide}`); setTimeout(() => grid.classList.remove(`slide-${meta.slide}`), 300); }
@@ -79,13 +87,14 @@ function setupMascotSync() {
     setSidebarMascotState(state);
     document.querySelectorAll('#pomo-mascot').forEach((el) => { el.className = el.className.replace(/mascot-[\w-]+/g, '') + ` mascot-${state}`; });
   });
+  // Trạng thái nền theo giờ
   const tod = timeOfDay();
   if (tod === 'night') mascot.setState('sleepy');
 }
 
 function setupTimerPill() {
   const pill = document.getElementById('timer-pill');
-  onTimer((tm) => {
+  onTimer((tm, evt) => {
     const route = currentRoute();
     const onPomo = route && route.path === '/pomodoro';
     const show = tm.status !== 'idle' && !onPomo;
@@ -106,7 +115,10 @@ function setupCloudSync() {
   let lastUid = null;
   onCloudAuthChange(async (user) => {
     refreshHeaderAuth();
-    if (!user) { lastUid = null; return; }
+    if (!user) {
+      lastUid = null;
+      return;
+    }
     if (user.uid === lastUid) return;
     lastUid = user.uid;
     try {
@@ -126,6 +138,7 @@ function boot() {
   setupDurations();
   renderHeader();
   setupMascotSync();
+
   for (const p of Object.keys(PAGES)) registerRoute(p, (params) => renderCurrentPage(params));
   onRoute(() => {
     renderSidebar();
@@ -135,7 +148,10 @@ function boot() {
   subscribe(onStateChange);
   setupTimerPill();
   setupCloudSync();
+
+  // Drawer backdrop
   document.getElementById('drawer-backdrop').onclick = () => document.body.classList.remove('drawer-open');
+
   startRouter();
   document.body.classList.add('ready');
 }

@@ -71,6 +71,8 @@ export const SAMPLE_TASKS = [
   { title: 'Tổng kết tuần', subjectId: 'eng' },
 ];
 
+export const SIDEBAR_DEFAULT = { calendar: true, progress: false, time: false, goal: true, mascot: false };
+
 export function isSampleTask(task) {
   return !!(task && SAMPLE_TASKS.some((s) => s.title === task.title && s.subjectId === task.subjectId));
 }
@@ -79,7 +81,7 @@ export function isSampleTask(task) {
 export function createBlankState() {
   return {
     version: 2,
-    settings: { userName: 'Bạn nhỏ', focusMinutes: 25, breakMinutes: 5, sound: true, seeded: false },
+    settings: { userName: 'Bạn nhỏ', focusMinutes: 25, breakMinutes: 5, sound: true, seeded: false, sidebar: { ...SIDEBAR_DEFAULT } },
     subjects: createDefaultSubjects(),
     tasks: [],
     days: {},
@@ -104,13 +106,13 @@ export function createBlankState() {
 export function createInitialState() {
   return {
     version: 2,
-    settings: { userName: 'Bạn nhỏ', focusMinutes: 25, breakMinutes: 5, sound: true, seeded: true },
+    settings: { userName: 'Bạn nhỏ', focusMinutes: 25, breakMinutes: 5, sound: true, seeded: true, sidebar: { ...SIDEBAR_DEFAULT } },
     subjects: createDefaultSubjects(),
     tasks: createSeedTasks(),
-    days: createSeedDays(),
+    days: createSeedDays(),        // { 'YYYY-MM-DD': { minutes, pomodoros, mood, note } }
     wallet: { coins: 500, totalEarned: 500 },
     streak: { current: 0, longest: 5, lastDate: null, rewarded: {} },
-    room: starterRoom(),
+    room: starterRoom(),            // xem items.js — theme / owned / placed / presets
     mascot: { accessory: null, name: 'Mochi' },
     goal: { name: 'Học viện Cán bộ', examDate: '', targetScore: '', icon: '🏛️', note: '' },
     timer: { totalFocusMinutes: 0, totalPomodoros: 0 },
