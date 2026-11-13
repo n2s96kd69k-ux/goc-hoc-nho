@@ -1,7 +1,8 @@
 // ===== Trang /subjects =====
 import { getState } from '../state.js';
-import { escapeHtml, minutesToText } from '../utils.js';
+import { escapeHtml, minutesToText, todayKey } from '../utils.js';
 import { subjectStats, addSubject, updateSubject, deleteSubject, addScore, SUBJECT_COLORS, SUBJECT_ICONS, getSubject } from '../subjects.js';
+import { toggleTask } from '../tasks.js';
 import { progressBar } from '../components/progressRing.js';
 import { openModal, confirmDialog } from '../components/modal.js';
 import { openTaskForm } from '../components/taskForm.js';
@@ -80,14 +81,15 @@ function renderSubjectDetail(root, id) {
 
         <div class="paper span-2">
           <h4 class="side-title">✅ Nhiệm vụ của môn</h4>
-          ${tasks.length ? `<ul class="task-list compact">${tasks.map((t) => `<li class="task ${t.done ? 'done' : ''}"><span class="checkbox ${t.done ? 'checked' : ''} static"><span class="check-mark">✓</span></span><button type="button" class="task-title" data-edit="${t.id}">${escapeHtml(t.title)}<span class="task-meta">${t.date.slice(8)}/${t.date.slice(5, 7)} · ${t.minutes}p</span></button></li>`).join('')}</ul>` : '<p class="muted small">Chưa có nhiệm vụ cho môn này.</p>'}
+          ${tasks.length ? `<ul class="task-list compact">${tasks.map((t) => `<li class="task ${t.done ? 'done' : ''}"><button type="button" class="checkbox ${t.done ? 'checked' : ''}" data-toggle="${t.id}" aria-label="${t.done ? 'Bỏ đánh dấu' : 'Hoàn thành'}"><span class="check-mark">✓</span></button><button type="button" class="task-title" data-edit="${t.id}">${escapeHtml(t.title)}<span class="task-meta">${t.date.slice(8)}/${t.date.slice(5, 7)} · ${t.minutes}p</span></button></li>`).join('')}</ul>` : '<p class="muted small">Chưa có nhiệm vụ cho môn này.</p>'}
         </div>
       </div>
     </section>`;
 
-  root.querySelector('#add-task').onclick = () => openTaskForm({ date: new Date().toISOString().slice(0, 10) });
+  root.querySelector('#add-task').onclick = () => openTaskForm({ date: todayKey(), subjectId: id });
   root.querySelector('#edit-subject').onclick = () => openSubjectForm(id);
   root.querySelectorAll('[data-edit]').forEach((b) => b.onclick = () => openTaskForm({ taskId: b.dataset.edit }));
+  root.querySelectorAll('[data-toggle]').forEach((b) => b.onclick = () => toggleTask(b.dataset.toggle));
   root.querySelector('#chapter-form').onsubmit = (e) => {
     e.preventDefault();
     const inp = e.target.querySelector('input');
