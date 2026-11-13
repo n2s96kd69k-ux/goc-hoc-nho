@@ -29,3 +29,7 @@
 .uni-card.active { border-color: var(--brown-dark); box-shadow: 0 0 0 2px var(--butter); }
 .goal-logo { width: 84px; height: 84px; object-fit: contain; }
 .goal-mini { width: 18px; height: 18px; object-fit: contain; vertical-align: -3px; }
+.uni-progress { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.uni-progress .bar { flex: 1; height: 8px; }
+.uni-progress .bar-fill { transition: none; }
+.uni-progress strong { min-width: 3.2em; font-size: .82rem; }

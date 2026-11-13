@@ -118,12 +118,14 @@ export function openAuthModal({ welcome = false } = {}) {
       if (mine !== 'admin') return;
       roleBox.querySelectorAll('[data-drop]').forEach((b) => b.onclick = async () => {
         const id = b.dataset.drop;
+        const prev = book.members[id];
         delete book.members[id];
+        paintRoles(book);
         try {
           book = await saveRoleBook(user.uid, book);
-          paintRoles(book);
-          toast('Đã gỡ ' + id);
         } catch (e) {
+          if (prev) book.members[id] = prev;
+          paintRoles(book);
           toast('Không lưu được: ' + (e.message || 'lỗi quyền'), { kind: 'error' });
         }
       });
@@ -138,12 +140,16 @@ export function openAuthModal({ welcome = false } = {}) {
         if (id === OWNER_ID) { toast('Chủ đã là quản trị viên'); return; }
         const role = form.role.value === 'admin' ? 'admin' : 'member';
         const name = form.name.value.trim();
+        const prev = book.members[id];
         book.members[id] = { role, name, owner: false };
+        paintRoles(book);
         try {
           book = await saveRoleBook(user.uid, book);
-          paintRoles(book);
           toast(role === 'admin' ? 'Đã thêm quản trị viên' : 'Đã thêm thành viên');
         } catch (err) {
+          if (prev) book.members[id] = prev;
+          else delete book.members[id];
+          paintRoles(book);
           toast('Không lưu được: ' + (err.message || 'lỗi quyền'), { kind: 'error' });
         }
       };

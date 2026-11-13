@@ -63,6 +63,10 @@ export function renderGoals(root) {
                 <input id="uni-file" type="file" accept="image/*">
               </div>
               <button class="btn btn-soft btn-sm" id="uni-add" type="button">Tải logo lên</button>
+              <div class="uni-progress" id="uni-progress" hidden>
+                <div class="bar"><div class="bar-fill" id="uni-fill" style="width:0%"></div></div>
+                <strong id="uni-pct">0%</strong>
+              </div>
               <p class="small muted">Chỉ quản trị viên tải được. Logo mới hiện với mọi tài khoản.</p>
             </div>
           </fieldset>
@@ -130,15 +134,24 @@ export function renderGoals(root) {
   root.querySelector('#uni-add').onclick = async () => {
     const name = root.querySelector('#uni-name').value;
     const file = root.querySelector('#uni-file').files[0];
-    if (!file) { toast('Chọn file logo', { kind: 'error' }); return; }
     const btn = root.querySelector('#uni-add');
+    const box = root.querySelector('#uni-progress');
+    const fill = root.querySelector('#uni-fill');
+    const label = root.querySelector('#uni-pct');
+    const setPct = (n) => {
+      box.hidden = false;
+      fill.style.width = n + '%';
+      label.textContent = n + '%';
+    };
+    if (!file) { toast('Chọn file logo', { kind: 'error' }); return; }
     btn.disabled = true;
+    setPct(0);
     try {
-      await addUniversity(name, file);
+      await addUniversity(name, file, setPct);
       root.querySelector('#uni-name').value = '';
       root.querySelector('#uni-file').value = '';
       paintUnis();
-      toast('Đã tải logo. Mọi tài khoản sẽ thấy.');
+      toast('100% — tài khoản khác đã thấy logo.');
     } catch (err) {
       toast(err.message || 'Không tải được logo', { kind: 'error' });
     }
