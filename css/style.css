@@ -104,6 +104,7 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 }
 .header-streak { cursor: pointer; }
 .streak-row { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; font-weight: 700; }
+.streak-row + .bar { height: 8px; margin-top: 4px; }
 .streak-tasks { margin: 8px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
 .pill.big { font-size: 1rem; padding: 8px 16px; }
 .header-coins.bump { animation: bump .5s var(--ease); }
