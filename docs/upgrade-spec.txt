@@ -1,0 +1,2473 @@
+============================================================
+MASTER PROMPT — DIGITAL STUDY ROOM
+NÂNG CẤP MOTION + LIQUID GLASS + MASCOT + STUDY ROOM
++ SHOP + INVENTORY + DECORATION + PERSISTENT LOCAL STATE
+============================================================
+
+Hãy tiếp tục phát triển và nâng cấp project web hiện tại.
+
+ĐÂY LÀ YÊU CẦU NÂNG CẤP TRÊN PROJECT ĐANG CÓ.
+
+KHÔNG được tự ý xây lại toàn bộ project từ đầu.
+
+KHÔNG được xóa những tính năng hiện tại nếu chúng không liên quan trực tiếp đến phần cần nâng cấp.
+
+Giữ nguyên toàn bộ hệ thống hiện có:
+
+- Dashboard
+- Tổng quan
+- Kế hoạch tuần
+- Môn học
+- Pomodoro / Tập trung
+- Task
+- Mục tiêu
+- Tiến độ
+- Coins / Xu
+- Mascot
+- Góc học
+- Navigation
+- Responsive layout
+- Theme
+- Các chức năng hiện tại
+
+Mục tiêu lần nâng cấp này là biến web từ một planner dễ thương thành một:
+
+DIGITAL STUDY ROOM
+
+Một không gian học tập cá nhân có sự sống.
+
+Người dùng:
+
+HỌC
+↓
+TẬP TRUNG
+↓
+HOÀN THÀNH TASK / POMODORO
+↓
+NHẬN XU
+↓
+MUA ĐỒ
+↓
+ĐƯA ĐỒ VÀO KHO
+↓
+TRANG TRÍ PHÒNG
+↓
+MÈO TƯƠNG TÁC VỚI CĂN PHÒNG
+↓
+TẠO RA MỘT GÓC HỌC RIÊNG
+↓
+MUỐN QUAY LẠI HỌC
+
+Toàn bộ hệ thống phải hoạt động thống nhất.
+
+Không được làm từng tính năng rời rạc.
+
+============================================================
+1. PHONG CÁCH THỊ GIÁC
+============================================================
+
+GIỮ NGUYÊN PHONG CÁCH CUTE / COZY HIỆN TẠI.
+
+Không biến website thành:
+
+- cyberpunk
+- neon
+- gaming dashboard
+- futuristic neon UI
+- corporate dashboard
+- dark tech UI
+
+Phong cách chính:
+
+Cute
++
+Cozy
++
+Pastel
++
+Study
++
+Stationery
++
+Digital Room
++
+Soft Animation
++
+Premium Modern UI
+
+Bảng màu:
+
+- Cream / Beige
+- Cozy Coffee
+- Pastel Matcha
+- Soft Green
+- Warm Brown
+- Soft Pink
+- Soft Sunset
+- Off-white
+
+Các card hiện tại phải vẫn giữ cảm giác giống giấy / stationery / planner.
+
+Không làm mọi thứ thành kính.
+
+============================================================
+2. LIQUID GLASS-INSPIRED MOTION
+============================================================
+
+Nâng cấp animation toàn bộ website theo tinh thần chuyển động hiện đại kiểu Liquid Glass trên các giao diện Apple mới.
+
+KHÔNG sao chép trực tiếp giao diện Apple.
+
+Chỉ lấy cảm hứng từ:
+
+- fluid motion
+- spring animation
+- morphing
+- materialize
+- dematerialize
+- translucency
+- depth
+- parallax
+- responsive feedback
+- subtle blur
+- layered surfaces
+
+Mục tiêu:
+
+Giao diện phải có cảm giác:
+
+MƯỢT
++
+NHẸ
++
+CÓ CHIỀU SÂU
++
+CÓ TÍNH VẬT LÝ
++
+PHẢN HỒI NHANH
++
+CAO CẤP
+
+Không được dùng animation kiểu:
+
+display:none → display:block
+
+hoặc
+
+opacity: 0 → opacity: 1
+
+một cách thô.
+
+Nếu một thành phần xuất hiện, hãy tạo cảm giác nó materialize từ vị trí hợp lý.
+
+============================================================
+3. MICRO INTERACTION
+============================================================
+
+Mọi thao tác quan trọng phải có phản hồi nhỏ.
+
+BUTTON:
+
+Khi hover:
+
+- scale rất nhẹ
+- ánh sáng thay đổi nhẹ
+
+Khi press:
+
+- scale khoảng 0.97
+- sau đó spring trở lại
+
+CHECKBOX:
+
+Khi tick:
+
+- checkbox scale nhẹ
+- checkmark xuất hiện mượt
+- progress thay đổi mượt
+- sparkle nhỏ nếu phù hợp
+
+COINS:
+
+Khi nhận xu:
+
+- số xu tăng bằng animation
+- một coin nhỏ có thể bay nhẹ về khu vực coin counter
+- không spam particle
+
+TASK:
+
+Khi hoàn thành:
+
+- checkbox animate
+- task có transition
+- progress cập nhật
+- mascot có phản ứng
+
+Tất cả animation phải subtle.
+
+Không được làm UI nhảy múa liên tục.
+
+============================================================
+4. PAGE TRANSITION
+============================================================
+
+Khi chuyển giữa:
+
+- Dashboard
+- Weekly Planner
+- Subjects
+- Pomodoro
+- Study Room
+- Goals
+- Review
+
+Không tạo cảm giác reload cứng.
+
+Trang hiện tại:
+
+- scale rất nhẹ
+- opacity giảm
+
+Trang mới:
+
+- materialize
+- opacity tăng
+- translateY nhẹ
+
+Thời gian khoảng 250–400ms.
+
+Không được quá chậm.
+
+============================================================
+5. SIDEBAR
+============================================================
+
+Sidebar phải có cảm giác như một floating navigation layer.
+
+Khi mở:
+
+- xuất hiện từ cạnh trái
+- translate + scale nhẹ
+- background phía sau dim nhẹ
+- backdrop blur nhẹ nếu phù hợp
+- các item xuất hiện tuần tự rất ngắn
+
+Khi đóng:
+
+- animation đảo ngược tự nhiên
+
+Không được mở/đóng ngay lập tức.
+
+Không làm blur quá mạnh.
+
+============================================================
+6. LIQUID GLASS — CHỈ DÙNG CÓ CHỌN LỌC
+============================================================
+
+Không biến toàn bộ website thành glassmorphism.
+
+Các khu vực có thể dùng glass-inspired:
+
+- floating navigation
+- mobile bottom navigation
+- popup
+- modal
+- floating toolbar
+- một số control
+- coin counter
+- mascot status bubble
+
+Planner và content chính vẫn giữ:
+
+- cream
+- paper
+- pastel
+- card
+- stationery
+
+Glass chỉ là lớp hiện đại bổ sung.
+
+Không sử dụng nested glass quá nhiều.
+
+Không đặt một glass card bên trong một glass card khác nếu không cần thiết.
+
+Glass phải giữ độ tương phản tốt và nội dung dễ đọc.
+
+============================================================
+7. GÓC HỌC — STUDY ROOM
+============================================================
+
+Nâng cấp hoàn toàn trang:
+
+"GÓC HỌC"
+
+Hiện tại không được coi nó chỉ là một nơi đặt vài hình ảnh.
+
+Hãy biến nó thành:
+
+"MỘT CĂN PHÒNG HỌC NHỎ CÓ SỰ SỐNG."
+
+Căn phòng cần có:
+
+- tường
+- cửa sổ
+- rèm
+- ánh sáng
+- bàn học
+- ghế
+- kệ sách
+- cây
+- đèn
+- sách
+- đồ trang trí
+- mascot
+- các vật phẩm người dùng mua
+
+Cảm giác tổng thể giống:
+
+một cozy study room / lofi study environment
+
+nhưng phải tạo artwork và thiết kế RIÊNG cho project.
+
+KHÔNG sao chép trực tiếp nhân vật hoặc artwork của các thương hiệu / artwork có bản quyền.
+
+============================================================
+8. KIẾN TRÚC CĂN PHÒNG 2.5D
+============================================================
+
+Không bắt buộc dùng 3D WebGL nặng.
+
+Ưu tiên:
+
+- SVG
+- Canvas
+- CSS transforms
+- layered elements
+- parallax
+- depth shadow
+
+Chia phòng thành nhiều lớp.
+
+LAYER 1:
+
+Background wall
+
+LAYER 2:
+
+Window
+
+LAYER 3:
+
+Curtain
+
+LAYER 4:
+
+Wall decoration
+
+LAYER 5:
+
+Bookshelf
+
+LAYER 6:
+
+Desk
+
+LAYER 7:
+
+Chair
+
+LAYER 8:
+
+Desk objects
+
+LAYER 9:
+
+Cat
+
+LAYER 10:
+
+Foreground decoration
+
+LAYER 11:
+
+UI
+
+Các layer phải có depth khác nhau.
+
+============================================================
+9. PARALLAX
+============================================================
+
+Desktop:
+
+Khi di chuyển chuột:
+
+Background:
+1–2px
+
+Middle layer:
+3–5px
+
+Foreground:
+5–8px
+
+Mascot:
+chuyển động rất nhẹ
+
+Không được parallax quá mạnh.
+
+Mobile:
+
+Nếu thiết bị hỗ trợ device orientation thì có thể sử dụng chuyển động rất nhẹ.
+
+Nếu không:
+
+touch drag nhẹ.
+
+Không làm người dùng chóng mặt.
+
+============================================================
+10. THỜI GIAN TRONG CĂN PHÒNG
+============================================================
+
+Căn phòng phải thay đổi nhẹ theo thời gian trong ngày.
+
+BUỔI SÁNG:
+
+- ánh sáng sáng
+- cửa sổ sáng
+- mèo tỉnh táo
+
+BAN NGÀY:
+
+- ánh sáng tự nhiên
+- màu sáng
+- mèo học bình thường
+
+BUỔI CHIỀU:
+
+- ánh sáng ấm hơn
+- shadow thay đổi nhẹ
+
+BUỔI TỐI:
+
+- ngoài cửa sổ tối
+- đèn bàn bật
+- ánh sáng phòng ấm
+
+BAN ĐÊM:
+
+- phòng tối hơn
+- đèn bàn là nguồn sáng chính
+- mèo buồn ngủ
+
+Chuyển đổi phải từ từ.
+
+Không được thay đổi màu đột ngột.
+
+============================================================
+11. MASCOT — CON MÈO
+============================================================
+
+Đây là một trong những phần cần nâng cấp mạnh nhất.
+
+Mèo hiện tại không được đứng hoặc ngồi im như một PNG.
+
+Mèo phải trở thành:
+
+"MỘT DIGITAL COMPANION"
+
+Mèo cần có animation tự nhiên.
+
+Không cần 3D thật nặng.
+
+Có thể sử dụng:
+
+- SVG
+- Canvas
+- CSS
+- layered 2.5D
+- transform
+- animation state
+
+Mèo phải có nhiều trạng thái.
+
+Các STATE:
+
+IDLE
+STUDY
+FOCUS
+SLEEPY
+HAPPY
+CELEBRATE
+INTERACT
+WALK
+REST
+NIGHT
+
+============================================================
+12. MÈO — IDLE
+============================================================
+
+Khi không có hoạt động:
+
+Mèo phải:
+
+- thở nhẹ
+- chớp mắt
+- tai động nhẹ
+- đuôi chuyển động
+- đầu chuyển động rất nhẹ
+
+Animation không được lặp lại chính xác cùng một chu kỳ.
+
+Tạo một chút randomness.
+
+Mục tiêu:
+
+Mèo trông như đang sống.
+
+Không được chuyển động quá mạnh.
+
+============================================================
+13. MÈO — STUDY
+============================================================
+
+Khi người dùng bắt đầu học:
+
+Mèo:
+
+- ngồi vào bàn
+- mở sách hoặc laptop
+- nhìn về phía bàn
+- thỉnh thoảng viết
+- thỉnh thoảng gõ bàn phím
+- chỉnh headphone
+- chớp mắt
+
+============================================================
+14. MÈO — FOCUS
+============================================================
+
+Khi Pomodoro đang chạy:
+
+Mèo:
+
+- đeo headphone
+- ngồi học
+- sách mở
+- laptop hoạt động
+- đèn bàn bật
+
+Mèo có những animation nhỏ:
+
+- tay chuyển động
+- gõ bàn phím
+- viết
+- hơi nghiêng đầu
+- breathing
+- tail movement
+
+Không được animation quá nhanh.
+
+============================================================
+15. MÈO — SLEEPY
+============================================================
+
+Nếu người dùng không tương tác lâu hoặc đang vào ban đêm:
+
+Mèo:
+
+- ngáp
+- mắt lim dim
+- gục đầu
+- ngủ gật
+- xuất hiện "zzz" rất nhỏ
+
+============================================================
+16. MÈO — HAPPY
+============================================================
+
+Khi hoàn thành task:
+
+Mèo:
+
+- nhìn người dùng
+- vẫy tay
+- tai dựng lên
+- có một vài heart nhỏ
+
+Không spam hearts.
+
+============================================================
+17. MÈO — CELEBRATE
+============================================================
+
+Khi hoàn thành Pomodoro:
+
+Mèo:
+
+- đứng lên
+- stretch
+- nhảy nhẹ
+- vui vẻ
+- sparkle nhẹ
+
+Sau vài giây:
+
+→ quay về IDLE.
+
+============================================================
+18. MÈO — CLICK INTERACTION
+============================================================
+
+Người dùng có thể click/tap vào mèo.
+
+Mỗi lần click có thể tạo một phản ứng khác nhau.
+
+Ví dụ:
+
+Click 1:
+mèo nhìn trái
+
+Click 2:
+mèo nhìn phải
+
+Click 3:
+mèo vẫy tay
+
+Click 4:
+mèo chớp mắt
+
+Click 5:
+mèo vui vẻ
+
+Không lặp chính xác cùng một animation mỗi lần.
+
+Có cooldown.
+
+============================================================
+19. MÈO PHẢI NHẬN BIẾT ĐỒ TRONG PHÒNG
+============================================================
+
+Đây là điểm cực kỳ quan trọng.
+
+Mèo không được animation dựa trên những đồ vật hard-code cố định.
+
+Mèo phải phản ứng dựa trên những item thực sự đang tồn tại trong room.
+
+Ví dụ:
+
+Nếu có sofa:
+
+→ mèo có thể đi tới sofa
+→ nằm nghỉ
+
+Nếu có bookshelf:
+
+→ mèo có thể đứng gần bookshelf
+
+Nếu có plant:
+
+→ mèo có thể ngồi cạnh cây
+
+Nếu có desk:
+
+→ mèo có thể ngồi học tại desk
+
+Nếu có lamp:
+
+→ khi lamp bật, trạng thái lighting của mèo thay đổi
+
+Nếu có cat bed:
+
+→ mèo có thể ngủ trên cat bed
+
+Các interaction này chỉ xuất hiện nếu item thực sự tồn tại.
+
+============================================================
+20. STUDY ROOM PHẢI CÓ CẢM GIÁC “LIVING”
+============================================================
+
+Căn phòng không được tĩnh.
+
+Có các animation ambient nhỏ:
+
+- rèm hơi lay
+- cây rung nhẹ
+- ánh sáng thay đổi
+- bụi sáng / sparkle rất nhẹ nếu phù hợp
+- màn hình laptop có glow nhẹ
+- hơi nước từ cốc
+- mèo breathing
+- đồng hồ hoạt động
+
+Tất cả phải cực kỳ subtle.
+
+Mục tiêu:
+
+Người dùng nhìn vào phòng và cảm giác:
+
+"Phòng này đang sống."
+
+============================================================
+21. SHOP
+============================================================
+
+Xây lại logic Shop thành một hệ thống hoàn chỉnh.
+
+Categories:
+
+- Furniture
+- Plants
+- Study
+- Lighting
+- Decoration
+- Cat
+- Cute Items
+- Room Theme
+
+Mỗi item có:
+
+- id
+- name
+- category
+- price
+- currency
+- ownership
+- quantity
+- placement rules
+- size
+- layer
+- asset
+- position
+- rotation
+- scale
+
+Ví dụ:
+
+{
+  id: "plant_small_01",
+  name: "Chậu cây nhỏ",
+  category: "plant",
+  price: 120,
+  currency: "coins",
+  quantity: 1,
+  placementRules: {
+    allowedSurface: ["desk", "floor"],
+    canRotate: true,
+    canScale: false
+  }
+}
+
+Không nhất thiết phải dùng chính xác schema này nhưng phải có logic tương đương.
+
+============================================================
+22. SHOP ITEM STATE
+============================================================
+
+Mỗi item phải có trạng thái rõ:
+
+CHƯA SỞ HỮU:
+
+[ Mua ]
+
+ĐÃ SỞ HỮU:
+
+✓ Đã sở hữu
+
+ĐÃ SỞ HỮU NHIỀU:
+
+×2
+×3
+×4
+
+Không hiển thị nút mua lại nếu item chỉ được sở hữu một lần.
+
+============================================================
+23. MUA ITEM
+============================================================
+
+Khi bấm Mua:
+
+1. Kiểm tra item.
+2. Kiểm tra coins.
+3. Kiểm tra ownership.
+4. Trừ coins.
+5. Thêm item vào Inventory.
+6. Update state.
+7. Update UI.
+8. Hiển thị animation.
+
+Ví dụ:
+
+-120 Coins
+
+sau đó:
+
+"🌱 Chậu cây nhỏ đã được thêm vào Kho"
+
+Không dùng browser alert.
+
+Dùng toast đẹp, đồng bộ với giao diện.
+
+============================================================
+24. KHÔNG TỰ ĐỘNG ĐẶT ĐỒ SAU KHI MUA
+============================================================
+
+Đây là quy tắc bắt buộc.
+
+Mua đồ KHÔNG đồng nghĩa với đặt đồ.
+
+Flow:
+
+SHOP
+↓
+MUA
+↓
+INVENTORY
+↓
+DECORATE
+↓
+PLACE
+
+Sau khi mua có thể cho:
+
+[ Đặt ngay ]
+
+hoặc:
+
+[ Để vào kho ]
+
+Nhưng mặc định item phải vào Inventory.
+
+============================================================
+25. INVENTORY
+============================================================
+
+Inventory là cầu nối giữa Shop và Room.
+
+Inventory phải hiển thị những gì người dùng thực sự sở hữu.
+
+Ví dụ:
+
+🌱 Chậu cây ×2
+
+📚 Sách ×4
+
+💡 Đèn bàn ×1
+
+🧸 Gấu bông ×1
+
+Khi chọn item:
+
+[ Đặt vào phòng ]
+
+============================================================
+26. DECORATE MODE
+============================================================
+
+Mặc định Study Room là VIEW MODE.
+
+Không cho người dùng vô tình kéo đồ.
+
+Có nút:
+
+✨ TRANG TRÍ
+
+Khi bấm:
+
+→ chuyển sang DECORATE MODE.
+
+Animation chuyển mode phải mượt.
+
+Trong Decorate Mode:
+
+- Inventory xuất hiện
+- placement controls xuất hiện
+- item có thể kéo
+- grid ẩn xuất hiện rất nhẹ
+- selected item có highlight
+
+Khi thoát:
+
+→ quay về VIEW MODE.
+
+============================================================
+27. PLACEMENT SYSTEM
+============================================================
+
+Đây là phần phải làm thật chuyên nghiệp.
+
+Mỗi item có placement rules.
+
+Ví dụ:
+
+Đèn bàn:
+
+allowedSurface:
+DESK
+
+Sách:
+
+DESK
+SHELF
+
+Cây nhỏ:
+
+DESK
+FLOOR
+
+Ghế:
+
+FLOOR
+
+Tranh:
+
+WALL
+
+Đồng hồ:
+
+WALL
+
+Đèn trần:
+
+CEILING
+
+Không cho phép đặt item vào vị trí không hợp lệ.
+
+============================================================
+28. ROOM SURFACE SYSTEM
+============================================================
+
+Room có các surface:
+
+FLOOR
+DESK
+SHELF
+WALL
+CEILING
+BED
+SOFA
+CABINET
+
+Mỗi surface có:
+
+- bounds
+- anchor points
+- allowed categories
+- z-index
+- depth
+
+Khi kéo item đến surface phù hợp:
+
+→ item snap vào vị trí hợp lý.
+
+============================================================
+29. SMART SNAP
+============================================================
+
+Khi kéo item gần một surface hợp lệ:
+
+→ tự động snap.
+
+Ví dụ:
+
+Kéo đèn gần bàn.
+
+→ đèn tự động hút vào mặt bàn.
+
+Kéo tranh gần tường.
+
+→ tranh tự động snap vào tường.
+
+Kéo ghế gần bàn.
+
+→ ghế snap vào vùng hợp lý.
+
+Animation:
+
+DRAG
+↓
+SNAP
+↓
+SETTLE
+
+Có spring nhẹ.
+
+============================================================
+30. INVALID PLACEMENT
+============================================================
+
+Nếu vị trí không hợp lệ:
+
+- preview item trở nên hơi mờ
+- không cho thả
+- không làm rung mạnh
+- không hiện popup khó chịu
+
+Khi kéo về vị trí hợp lệ:
+
+→ preview trở lại bình thường.
+
+============================================================
+31. GHOST PREVIEW
+============================================================
+
+Khi đang kéo item:
+
+Không đặt item thật ngay.
+
+Hiện ghost preview.
+
+Ví dụ:
+
+🌱
+
+opacity khoảng 0.5–0.7
+
+Khi vị trí hợp lệ:
+
+→ snap.
+
+Khi release:
+
+→ chuyển ghost thành item thật.
+
+Animation:
+
+scale 0.96
+→
+1
+
+spring rất nhẹ.
+
+============================================================
+32. ITEM SIZE
+============================================================
+
+Mỗi item phải có kích thước hợp lý.
+
+Không cho tất cả item có cùng kích thước.
+
+Ví dụ:
+
+Laptop:
+80×50
+
+Lamp:
+35×60
+
+Book:
+25×35
+
+Plant:
+45×55
+
+Chair:
+80×90
+
+Cabinet:
+100×140
+
+Rug:
+220×120
+
+Kích thước phải tạo cảm giác tỷ lệ thật.
+
+============================================================
+33. COLLISION / OVERLAP
+============================================================
+
+Có hệ thống collision đơn giản.
+
+Không cho:
+
+- ghế xuyên qua bàn
+- tủ xuyên qua tường
+- item bay ngoài room
+- item nằm chồng sai vị trí
+
+Không cần physics phức tạp.
+
+Chỉ cần:
+
+2D bounding box
++
+placement rules
++
+surface bounds
+
+============================================================
+34. DEPTH / Z-INDEX
+============================================================
+
+Các object phải có depth chính xác.
+
+Ví dụ:
+
+Background
+↓
+Wall
+↓
+Wall Decoration
+↓
+Furniture
+↓
+Desk
+↓
+Desk Objects
+↓
+Cat
+↓
+Foreground Decoration
+↓
+UI
+
+Mèo phải đứng/ngồi đúng trước/sau đồ vật.
+
+Không được xảy ra tình trạng:
+
+mèo xuyên qua bàn
+hoặc
+mèo nằm phía sau vật thể sai cách.
+
+============================================================
+35. DRAG / MOVE / ROTATE
+============================================================
+
+Khi chọn item trong phòng:
+
+Hiện floating toolbar nhỏ:
+
+↔ Di chuyển
+↻ Xoay
+⬆ Đưa lên
+⬇ Đưa xuống
+📦 Cất
+
+Không tạo toolbar khổng lồ.
+
+Toolbar phải có animation:
+
+scale 0.96 → 1
+opacity 0 → 1
+
+============================================================
+36. STORE BACK TO INVENTORY
+============================================================
+
+Nếu người dùng chọn:
+
+📦 Cất vào kho
+
+Item:
+
+ROOM
+↓
+INVENTORY
+
+Không được xóa item khỏi tài khoản.
+
+Ví dụ:
+
+Inventory:
+
+Plant ×0
+
+Room:
+
+Plant ×1
+
+Bấm Cất:
+
+Room:
+
+Plant ×0
+
+Inventory:
+
+Plant ×1
+
+============================================================
+37. ROOM → INVENTORY → ROOM
+============================================================
+
+Phải đảm bảo flow:
+
+Mua
+↓
+Inventory
+↓
+Place
+↓
+Room
+↓
+Store
+↓
+Inventory
+↓
+Place lại
+
+hoạt động chính xác.
+
+Không được mất item.
+
+============================================================
+38. PERSISTENCE KHÔNG DÙNG BACKEND
+============================================================
+
+Vì project chạy trong môi trường không có backend persistent memory:
+
+Sử dụng:
+
+localStorage
+
+hoặc:
+
+IndexedDB
+
+để lưu:
+
+- coins
+- inventory
+- owned items
+- placed items
+- positions
+- rotation
+- scale
+- z-index
+- room theme
+- room configuration
+- progress liên quan đến reward
+- unlocked items
+
+Reload trang:
+
+→ dữ liệu phải còn.
+
+Thoát page:
+
+→ dữ liệu phải còn.
+
+Chuyển tab:
+
+→ dữ liệu phải còn.
+
+============================================================
+39. SINGLE SOURCE OF TRUTH
+============================================================
+
+Không được tạo nhiều state độc lập gây lệch dữ liệu.
+
+Có một roomState chính.
+
+Ví dụ:
+
+roomState:
+
+{
+  theme,
+  placedItems,
+  itemPositions,
+  itemRotations,
+  itemScales,
+  zIndexes
+}
+
+Shop đọc ownership từ state.
+
+Inventory đọc ownership từ state.
+
+Room đọc placedItems từ state.
+
+Như vậy:
+
+SHOP
++
+INVENTORY
++
+ROOM
+
+luôn đồng bộ.
+
+============================================================
+40. UNDO / REDO
+============================================================
+
+Thêm:
+
+↶ Undo
+
+↷ Redo
+
+Cho:
+
+- move
+- rotate
+- place
+- store
+- delete
+- theme change
+
+Không cần quá phức tạp nhưng phải hoạt động ổn định.
+
+============================================================
+41. RESPONSIVE MOBILE DECORATION
+============================================================
+
+Desktop:
+
+- mouse drag
+- hover
+- click
+- scroll
+
+Mobile:
+
+Tap
+→ select
+
+Long press
+→ drag
+
+Drag
+→ move
+
+Pinch
+→ zoom
+
+Two-finger drag
+→ pan
+
+Tap outside
+→ deselect
+
+Không bê nguyên interaction desktop sang mobile.
+
+============================================================
+42. ROOM SHOP ECONOMY
+============================================================
+
+Coins phải có nguồn rõ ràng.
+
+Ví dụ:
+
+Pomodoro 25 phút:
+
++25 Coins
+
+Task hoàn thành:
+
++10 Coins
+
+Daily Goal:
+
++50 Coins
+
+Weekly Goal:
+
++100 Coins
+
+Sau đó:
+
+STUDY
+↓
+COINS
+↓
+SHOP
+↓
+DECORATION
+
+Đây là core gameplay loop.
+
+============================================================
+43. ITEM PHẢI THAY ĐỔI PHÒNG THẬT
+============================================================
+
+Nếu mua:
+
+🌱 Plant
+
+→ cây phải xuất hiện trong room sau khi đặt.
+
+Nếu mua:
+
+💡 Lamp
+
+→ đèn xuất hiện.
+
+Nếu mua:
+
+📚 Books
+
+→ sách xuất hiện.
+
+Nếu mua:
+
+🧸 Bear
+
+→ gấu xuất hiện.
+
+Nếu mua:
+
+🖼 Poster
+
+→ poster xuất hiện trên tường.
+
+Không được chỉ cập nhật Inventory.
+
+Mọi item phải có visual representation trong Room.
+
+============================================================
+44. ITEM CÓ THỂ ẢNH HƯỞNG ĐẾN MÈO
+============================================================
+
+Nếu có:
+
+Desk
+
+→ mèo học ở desk.
+
+Lamp
+
+→ mèo có thể học vào ban đêm.
+
+Sofa
+
+→ mèo có thể nghỉ.
+
+Cat Bed
+
+→ mèo ngủ.
+
+Plant
+
+→ mèo có thể ngồi cạnh.
+
+Bookshelf
+
+→ mèo có thể tới gần.
+
+Headphone
+
+→ mèo có thể đeo.
+
+Những hành động này phải dựa trên item thực sự đang được đặt.
+
+============================================================
+45. CĂN PHÒNG PHẢI CÓ NHỮNG CHI TIẾT NHỎ
+============================================================
+
+Thêm ambient animation nhẹ:
+
+- rèm lay
+- cây rung
+- ánh sáng thay đổi
+- laptop glow
+- hơi nước từ cốc
+- đồng hồ hoạt động
+- mèo breathing
+- shadow nhẹ
+- particle cực ít nếu phù hợp
+
+Không spam animation.
+
+Mục tiêu:
+
+Room nhìn như một không gian đang sống.
+
+============================================================
+46. EASTER EGGS
+============================================================
+
+Một số object có thể click.
+
+Ví dụ:
+
+Window:
+→ rèm chuyển động
+
+Lamp:
+→ bật/tắt
+
+Plant:
+→ lá rung
+
+Book:
+→ mở
+
+Cup:
+→ hơi nước
+
+Clock:
+→ hiển thị giờ
+
+Cat:
+→ phản ứng
+
+Khoảng 5–10 Easter eggs.
+
+Không cần mọi object đều interactive.
+
+============================================================
+47. MODAL
+============================================================
+
+Modal không xuất hiện như popup cứng.
+
+Modal phải:
+
+- materialize
+- scale 0.96 → 1
+- blur background nhẹ
+- shadow tăng theo depth
+
+Nếu modal mở từ button:
+
+Có cảm giác modal xuất phát từ button.
+
+============================================================
+48. TOAST
+============================================================
+
+Không dùng browser alert.
+
+Tạo toast riêng:
+
+Ví dụ:
+
+✨ +25 Coins
+
+🌱 Chậu cây đã được thêm vào kho
+
+✓ Đã đặt vào phòng
+
+📦 Đã cất vào kho
+
+☕ Chưa đủ Coins
+
+Toast:
+
+- nhỏ
+- rounded
+- soft glass/paper
+- animation spring
+- tự biến mất
+
+============================================================
+49. EMPTY STATE
+============================================================
+
+Nếu Inventory trống:
+
+📦
+
+"KHO ĐỒ ĐANG TRỐNG"
+
+"Hoàn thành Focus Session để nhận Coins và mở khóa đồ mới."
+
+[ Đi đến Shop ]
+
+Nếu Room trống:
+
+🌱
+
+"Căn phòng vẫn đang chờ bạn."
+
+[ Mở Kho Đồ ]
+
+============================================================
+50. TIME-BASED ROOM
+============================================================
+
+Room phải thay đổi theo thời gian.
+
+Morning:
+bright
+
+Day:
+natural
+
+Afternoon:
+warm
+
+Evening:
+orange/warm
+
+Night:
+dark + desk lamp
+
+Mèo cũng thay đổi trạng thái theo thời gian.
+
+Không được chuyển cảnh đột ngột.
+
+============================================================
+51. OPTIONAL WEATHER
+============================================================
+
+Nếu không có weather API:
+
+Không cần gọi API.
+
+Có thể tạo:
+
+Sunny
+Cloudy
+Rain
+
+Nếu Rain:
+
+- giọt mưa ngoài cửa sổ
+- ánh sáng hơi tối
+- room cozy hơn
+- mèo học trong phòng
+
+Không cần weather system phức tạp.
+
+============================================================
+52. PERFORMANCE
+============================================================
+
+Ưu tiên:
+
+transform
+opacity
+scale
+translate
+
+Hạn chế animation gây layout recalculation liên tục.
+
+Không dùng WebGL nặng nếu không cần.
+
+Không render hàng trăm particles.
+
+Nếu Canvas:
+
+giữ số lượng object thấp.
+
+Mục tiêu:
+
+animation mượt trên thiết bị hiện đại.
+
+============================================================
+53. REDUCED MOTION
+============================================================
+
+Nếu:
+
+prefers-reduced-motion
+
+thì giảm:
+
+- parallax
+- bounce
+- particle
+- transition
+- excessive movement
+
+Nhưng vẫn giữ feedback cơ bản.
+
+============================================================
+54. CÁCH MÈO VÀ CĂN PHÒNG LIÊN KẾT VỚI NHAU
+============================================================
+
+Mèo không phải một animation layer độc lập.
+
+Mèo phải đọc roomState.
+
+Ví dụ:
+
+roomState.placedItems
+
+Nếu:
+
+desk exists
+
+→ cat có thể study.
+
+Nếu:
+
+sofa exists
+
+→ cat có thể rest.
+
+Nếu:
+
+catBed exists
+
+→ cat có thể sleep.
+
+Nếu:
+
+lamp exists
+
+và time = night
+
+→ lamp bật
+→ cat study trong ánh sáng.
+
+Nếu:
+
+plant exists
+
+→ cat có thể tương tác với plant.
+
+Điều này tạo cảm giác:
+
+Căn phòng và mèo là một hệ thống.
+
+============================================================
+55. MÈO KHÔNG ĐƯỢC TELEPORT VÔ LÝ
+============================================================
+
+Nếu mèo chuyển từ:
+
+Desk
+→ Sofa
+
+thì phải có animation chuyển động hợp lý.
+
+Không teleport từ vị trí này sang vị trí khác nếu không cần thiết.
+
+Có thể dùng:
+
+walk animation
+
+với path đơn giản.
+
+Nếu không cần walk:
+
+hãy dùng transition ngắn để tránh cảm giác teleport.
+
+============================================================
+56. CAT NAVIGATION
+============================================================
+
+Không cần pathfinding phức tạp.
+
+Chỉ cần các anchor points:
+
+CAT_DESK
+CAT_SOFA
+CAT_BED
+CAT_PLANT
+CAT_SHELF
+
+Khi cần interaction:
+
+cat → anchor point
+
+→ animation
+
+→ interaction
+
+→ return to previous state.
+
+============================================================
+57. DECORATION PRESET
+============================================================
+
+Cho phép người dùng lưu một số layout.
+
+Ví dụ:
+
+"Cozy Morning"
+
+"Night Study"
+
+"Minimal"
+
+"Plant Room"
+
+Không bắt buộc phải làm quá nhiều.
+
+Preset chỉ lưu:
+
+- theme
+- placed items
+- positions
+- lighting preference
+
+============================================================
+58. ROOM THEME
+============================================================
+
+Có thể cho người dùng thay:
+
+- wallpaper
+- floor
+- desk style
+- lighting
+- curtain
+- room accent
+
+Nhưng vẫn giữ style chung.
+
+Ví dụ:
+
+CREAM COZY
+
+MATCHA ROOM
+
+SUNSET ROOM
+
+NIGHT STUDY
+
+Không biến thành theme quá khác biệt.
+
+============================================================
+59. MOBILE UI
+============================================================
+
+Mobile phải ưu tiên:
+
+- bottom navigation
+- floating action
+- bottom sheet
+- compact toolbar
+
+Bottom navigation có thể dùng glass-inspired style.
+
+Các transition phải fluid.
+
+Khi mở Inventory:
+
+bottom sheet materialize từ bottom.
+
+Khi đóng:
+
+sheet trở lại vị trí ban đầu.
+
+============================================================
+60. DESKTOP UI
+============================================================
+
+Desktop:
+
+Main content nằm ở trung tâm.
+
+Sidebar dùng cho navigation và thông tin phụ.
+
+Study Room chiếm không gian lớn.
+
+Không nhồi quá nhiều card vào main content.
+
+Các thông tin phụ nên đặt vào sidebar hoặc floating panel.
+
+Giữ hierarchy rõ:
+
+MAIN CONTENT
+→ việc người dùng đang làm
+
+SIDEBAR
+→ thông tin phụ / navigation / status
+
+FLOATING UI
+→ action nhanh
+
+============================================================
+61. ANIMATION PRINCIPLE
+============================================================
+
+Không animation chỉ để “cho đẹp”.
+
+Mỗi animation phải có mục đích:
+
+Mua item
+→ feedback
+
+Place item
+→ confirmation
+
+Store item
+→ inventory transition
+
+Complete task
+→ reward
+
+Pomodoro complete
+→ celebration
+
+Open navigation
+→ spatial transition
+
+Change page
+→ continuity
+
+Click mascot
+→ personality
+
+Room interaction
+→ life
+
+============================================================
+62. KHÔNG LÀM QUÁ NHIỀU GLASS
+============================================================
+
+Liquid Glass-inspired animation chỉ nên là:
+
+LỚP UI HIỆN ĐẠI
+
+chứ không phải:
+
+TOÀN BỘ GIAO DIỆN LÀ KÍNH.
+
+Giữ:
+
+paper cards
++
+cream background
++
+pastel colors
++
+soft shadows
+
+và bổ sung:
+
+subtle glass
++
+fluid motion
++
+depth
++
+spring.
+
+============================================================
+63. CORE USER EXPERIENCE
+============================================================
+
+Người dùng phải cảm nhận được:
+
+"Mình không chỉ đang sử dụng một planner."
+
+Mà:
+
+"Mình đang chăm sóc một góc học nhỏ của riêng mình."
+
+Planner:
+
+→ nơi lập kế hoạch.
+
+Pomodoro:
+
+→ nơi tập trung.
+
+Task:
+
+→ việc cần hoàn thành.
+
+Coins:
+
+→ phần thưởng.
+
+Shop:
+
+→ nơi đổi phần thưởng.
+
+Inventory:
+
+→ nơi lưu tài sản.
+
+Study Room:
+
+→ nơi thể hiện thành quả.
+
+Cat:
+
+→ người bạn đồng hành.
+
+Decorations:
+
+→ dấu vết của quá trình học.
+
+Goal:
+
+→ lý do mình bắt đầu.
+
+============================================================
+64. CORE GAME LOOP
+============================================================
+
+Toàn bộ sản phẩm phải hình thành vòng lặp:
+
+PLAN
+↓
+FOCUS
+↓
+COMPLETE
+↓
+REWARD
+↓
+COINS
+↓
+SHOP
+↓
+INVENTORY
+↓
+DECORATE
+↓
+ROOM
+↓
+CAT INTERACTION
+↓
+PERSONALIZATION
+↓
+MOTIVATION
+↓
+PLAN AGAIN
+
+Đây là logic cốt lõi của sản phẩm.
+
+============================================================
+65. DATA FLOW
+============================================================
+
+Mọi dữ liệu phải nhất quán.
+
+Ví dụ:
+
+User có:
+
+500 Coins
+
+Mua:
+
+Plant = 120
+
+Sau mua:
+
+Coins = 380
+
+Inventory:
+
+Plant ×1
+
+Khi đặt:
+
+Coins = 380
+
+Inventory:
+
+Plant ×0
+
+Room:
+
+Plant ×1
+
+Khi cất:
+
+Inventory:
+
+Plant ×1
+
+Room:
+
+Plant ×0
+
+Không được tạo duplicate item.
+
+Không được làm mất item.
+
+Không được reset coins.
+
+Không được reset room.
+
+============================================================
+66. TEST FLOW BẮT BUỘC
+============================================================
+
+Sau khi code xong, hãy tự kiểm tra:
+
+TEST 1:
+
+500 Coins
+→ mua Plant 120
+→ còn 380
+
+TEST 2:
+
+Plant xuất hiện trong Inventory.
+
+TEST 3:
+
+Place Plant trên Desk.
+
+TEST 4:
+
+Plant snap đúng vị trí.
+
+TEST 5:
+
+Reload page.
+
+Plant vẫn ở đúng vị trí.
+
+TEST 6:
+
+Store Plant.
+
+Plant quay lại Inventory.
+
+TEST 7:
+
+Place lại Plant.
+
+TEST 8:
+
+Đặt Lamp vào Desk.
+
+TEST 9:
+
+Đặt Poster vào Wall.
+
+TEST 10:
+
+Thử đặt Chair lên Desk.
+
+→ phải bị từ chối.
+
+TEST 11:
+
+Thử đặt Poster xuống Floor.
+
+→ phải bị từ chối.
+
+TEST 12:
+
+Mèo nhận biết Desk.
+
+→ có thể study.
+
+TEST 13:
+
+Mua Sofa.
+
+→ Sofa vào Inventory.
+
+Place Sofa.
+
+→ mèo có thể rest.
+
+TEST 14:
+
+Chuyển sang Night.
+
+→ lighting thay đổi.
+
+TEST 15:
+
+Lamp tồn tại.
+
+→ Lamp bật.
+
+TEST 16:
+
+Pomodoro complete.
+
+→ Coins tăng.
+
+→ Mèo celebrate.
+
+============================================================
+67. KHÔNG ĐƯỢC FAKE TÍNH NĂNG
+============================================================
+
+Không chấp nhận:
+
+- fake inventory
+- fake coins
+- fake placement
+- hard-coded room items
+- item chỉ xuất hiện bằng animation nhưng không tồn tại trong state
+- reload mất dữ liệu
+- mua xong tự spawn đồ
+- đồ đặt sai surface
+- item xuyên nhau
+- mascot animation không liên quan đến room
+- animation chỉ để khoe hiệu ứng
+
+Mọi tính năng phải có logic thực sự.
+
+============================================================
+68. PERFORMANCE + CODE QUALITY
+============================================================
+
+Code phải được tổ chức thành các component/module rõ ràng.
+
+Tách logic:
+
+- Shop
+- Inventory
+- Room
+- Placement
+- Item data
+- Economy
+- Mascot
+- Animation
+- Persistence
+
+Không viết toàn bộ logic vào một component khổng lồ.
+
+Tái sử dụng component.
+
+Không duplicate logic.
+
+Không hard-code từng item nếu có thể dùng data-driven architecture.
+
+============================================================
+69. FINAL VISUAL DIRECTION
+============================================================
+
+Khi hoàn thành, sản phẩm phải có cảm giác:
+
+Một planner giấy pastel
++
+một cozy study room
++
+một digital pet
++
+một hệ thống decorating game nhẹ
++
+motion design hiện đại
++
+micro-interaction cao cấp.
+
+Không được mất chất:
+
+CUTE
+COZY
+PASTEL
+STUDY
+
+nhưng phải tăng mạnh:
+
+DEPTH
+MOTION
+INTERACTION
+PERSONALIZATION
+POLISH
+
+============================================================
+70. FINAL EXPERIENCE
+============================================================
+
+Khi người dùng mở website:
+
+Họ nhìn thấy một planner sạch và dễ sử dụng.
+
+Khi họ bắt đầu Pomodoro:
+
+Mèo bắt đầu học.
+
+Khi họ hoàn thành:
+
+Mèo phản ứng.
+
+Người dùng nhận Coins.
+
+Coins được dùng để mua đồ.
+
+Đồ đi vào Inventory.
+
+Người dùng vào Góc học.
+
+Bật Decorate Mode.
+
+Kéo đồ vào phòng.
+
+Hệ thống hiểu:
+
+đồ này đặt được ở đâu,
+đặt ở vị trí nào,
+layer nào,
+surface nào.
+
+Đồ snap vào vị trí.
+
+Người dùng lưu.
+
+Reload.
+
+Đồ vẫn còn.
+
+Mèo nhìn thấy căn phòng mới.
+
+Nếu có sofa:
+
+mèo có thể nghỉ.
+
+Nếu có desk:
+
+mèo học.
+
+Nếu có lamp:
+
+mèo học ban đêm.
+
+Nếu có cat bed:
+
+mèo ngủ.
+
+Căn phòng thay đổi theo thời gian.
+
+Animation diễn ra nhẹ nhàng.
+
+Navigation mượt.
+
+UI có spring.
+
+Floating controls có glass-inspired material.
+
+Không gian có parallax.
+
+Tất cả tạo thành một thế giới nhỏ.
+
+============================================================
+71. CẢM GIÁC CUỐI CÙNG
+============================================================
+
+Mục tiêu cuối cùng không phải:
+
+"một website có nhiều animation."
+
+Mục tiêu là:
+
+"MỘT GÓC HỌC KỸ THUẬT SỐ CÓ SỰ SỐNG."
+
+Planner giúp người dùng biết phải làm gì.
+
+Pomodoro giúp người dùng tập trung.
+
+Coins ghi nhận nỗ lực.
+
+Shop biến nỗ lực thành phần thưởng.
+
+Inventory lưu phần thưởng.
+
+Room thể hiện phần thưởng.
+
+Mascot đồng hành cùng người dùng.
+
+Animation khiến mọi thứ có cảm giác tự nhiên.
+
+Và tất cả dữ liệu phải kết nối với nhau thành một hệ thống hoàn chỉnh.
+
+============================================================
+72. ƯU TIÊN TRIỂN KHAI
+============================================================
+
+Nếu phải triển khai theo thứ tự, ưu tiên:
+
+PHASE 1:
+Sửa data/state architecture.
+
+PHASE 2:
+Sửa Shop → Inventory.
+
+PHASE 3:
+Sửa Inventory → Room placement.
+
+PHASE 4:
+Persistent local storage / IndexedDB.
+
+PHASE 5:
+Surface + snap + collision + layer.
+
+PHASE 6:
+Nâng cấp Study Room thành 2.5D.
+
+PHASE 7:
+Nâng cấp Mascot.
+
+PHASE 8:
+Kết nối Mascot với Room State.
+
+PHASE 9:
+Thêm Liquid Glass-inspired UI.
+
+PHASE 10:
+Thêm fluid animation + micro interaction.
+
+PHASE 11:
+Polish responsive mobile/desktop.
+
+PHASE 12:
+Test toàn bộ flow.
+
+KHÔNG ưu tiên animation trước logic.
+
+LOGIC PHẢI HOẠT ĐỘNG ĐÚNG TRƯỚC.
+
+Sau khi logic ổn định mới polish animation.
+
+============================================================
+73. QUY TẮC CUỐI CÙNG
+============================================================
+
+KHÔNG phá layout hiện tại nếu không cần.
+
+KHÔNG xóa tính năng cũ.
+
+KHÔNG biến toàn bộ UI thành glass.
+
+KHÔNG dùng backend API để lưu room state.
+
+KHÔNG hard-code item.
+
+KHÔNG fake inventory.
+
+KHÔNG fake placement.
+
+KHÔNG để item tự xuất hiện ngẫu nhiên.
+
+KHÔNG để mèo đứng im.
+
+KHÔNG để căn phòng là một background tĩnh.
+
+KHÔNG để animation quá mức.
+
+KHÔNG làm UI nặng.
+
+KHÔNG sao chép trực tiếp artwork hoặc mascot có bản quyền.
+
+Hãy tạo một mascot và study room có nhận diện riêng.
+
+============================================================
+FINAL GOAL
+============================================================
+
+Hãy biến project hiện tại thành:
+
+"CUTE DIGITAL STUDY ROOM"
+
+Một planner + Pomodoro + reward system + virtual companion + personal room.
+
+Cảm giác:
+
+COZY
++
+CUTE
++
+PASTEL
++
+ALIVE
++
+FLUID
++
+PERSONAL
++
+POLISHED
+
+Người dùng phải cảm thấy:
+
+"Đây là góc học của mình."
+
+Không phải:
+
+"Đây là một website quản lý task."
+
+Hãy ưu tiên tính ổn định và logic dữ liệu trước, sau đó mới tối đa hóa animation và visual polish.
+
+Mọi thay đổi phải được tích hợp trực tiếp vào hệ thống hiện tại và giữ nguyên những tính năng đang hoạt động tốt.

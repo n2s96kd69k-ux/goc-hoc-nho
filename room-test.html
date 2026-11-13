@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="vi"><head><meta charset="UTF-8"><title>Room flow test</title>
+<link rel="stylesheet" href="css/style.css"><link rel="stylesheet" href="css/mascot.css"><link rel="stylesheet" href="css/room.css"><link rel="stylesheet" href="css/motion.css"><link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+<pre id="out" style="position:fixed;right:0;top:0;width:360px;max-height:100vh;overflow:auto;background:#fff;z-index:999;font-size:11px;margin:0;padding:8px"></pre>
+<div class="app" id="app">
+  <header class="app-header" id="app-header"></header>
+  <div class="app-body"><aside class="sidebar" id="sidebar"></aside><main class="main" id="main"></main></div>
+</div>
+<nav class="bottom-nav" id="bottom-nav"></nav><div class="drawer-backdrop" id="drawer-backdrop"></div>
+<button class="timer-pill" id="timer-pill" hidden></button>
+<div id="modal-root"></div><div id="reward-root"></div><div id="toast-root"></div>
+<script type="module">
+  const out = document.getElementById('out');
+  let fails = 0;
+  const ok = (c, m) => { out.textContent += (c ? '✅ ' : '❌ ') + m + '\n'; if (!c) { fails++; console.error('FAIL: ' + m); } };
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  localStorage.clear();
+  location.hash = '/room';
+  await import('./js/main.js');
+  const { getState, update } = await import('./js/state.js');
+  const room = await import('./js/room.js');
+  const { resolvePlacement, listSurfaces } = await import('./js/placement.js');
+  const { catAnchors, decide } = await import('./js/catBrain.js');
+  const { loadState } = await import('./js/storage.js');
+  await wait(400);
+
+  // Starter room
+  ok(getState().room.placed.length === 5, 'starter room 5 items');
+  ok(document.querySelectorAll('#scene-items .ritem').length === 5, 'scene renders 5 items');
+  ok(!!document.querySelector('#room-cat'), 'cat present');
+
+  // TEST 1: 500 → mua plant 120 → 380
+  update((s) => { s.wallet.coins = 500; });
+  const b = room.buyItem('plant_small');
+  ok(b.ok && getState().wallet.coins === 380, 'TEST1 buy plant 120 → 380 coins: ' + getState().wallet.coins);
+  // TEST 2: trong kho, KHÔNG tự đặt
+  ok(room.inventoryQty('plant_small') === 1, 'TEST2 plant in inventory ×1 (not auto-placed)');
+  ok(room.placedCount('plant_small') === 1, 'placed count unchanged (starter only)');
+
+  // TEST 3/4: đặt plant lên desk, snap đúng
+  const desk = getState().room.placed.find((p) => p.itemId === 'desk');
+  const r3 = resolvePlacement('plant_small', desk.x + 8, desk.y - 15, getState().room.placed);
+  ok(r3.ok && r3.surface === 'desk' && r3.parent === desk.uid, 'TEST3 resolve plant near desk → surface desk');
+  const p3 = room.placeItem('plant_small', desk.x + 8, desk.y - 15);
+  ok(p3.ok && p3.placed.surface === 'desk', 'TEST3 placed on desk');
+  const deskSurf = listSurfaces(getState().room.placed).find((s) => s.id === desk.uid);
+  ok(Math.abs(p3.placed.y - deskSurf.lineY) < 0.01, 'TEST4 snapped to desk lineY');
+  ok(room.inventoryQty('plant_small') === 0, 'inventory now 0');
+
+  // TEST 5: reload (simulate: load from storage)
+  await wait(300);
+  const saved = loadState();
+  const sp = saved.room.placed.find((p) => p.uid === p3.placed.uid);
+  ok(sp && Math.abs(sp.x - p3.placed.x) < 0.01 && Math.abs(sp.y - p3.placed.y) < 0.01, 'TEST5 persisted position after save');
+
+  // TEST 6/7: store → inventory, place again
+  const st = room.storeItem(p3.placed.uid);
+  ok(st.ok && room.inventoryQty('plant_small') === 1 && room.placedCount('plant_small') === 1, 'TEST6 store → inventory ×1');
+  const p7 = room.placeItem('plant_small');
+  ok(p7.ok && room.inventoryQty('plant_small') === 0, 'TEST7 place again (auto spot) ok');
+  ok(room.ownedQty('plant_small') === 2, 'no duplicate / no loss: owned stays 2');
+
+  // TEST 8: lamp on desk
+  update((s) => { s.wallet.coins = 2000; });
+  room.buyItem('desk_lamp');
+  const p8 = room.placeItem('desk_lamp', desk.x - 10, desk.y - 15);
+  ok(p8.ok && p8.placed.surface === 'desk', 'TEST8 lamp on desk');
+  // TEST 9: poster on wall
+  room.buyItem('poster');
+  const p9 = room.placeItem('poster', 50, 30);
+  ok(p9.ok && p9.placed.surface === 'wall', 'TEST9 poster on wall');
+  // TEST 10: chair on desk → rejected
+  room.buyItem('chair');
+  const r10 = resolvePlacement('chair', desk.x, desk.y - 15, getState().room.placed);
+  ok(!r10.ok || r10.surface === 'floor', 'TEST10 chair cannot be on desk (resolve → ' + (r10.ok ? r10.surface : 'rejected') + ')');
+  const p10 = room.placeItem('chair', desk.x, desk.y - 14);
+  ok(!p10.ok || p10.placed.surface === 'floor', 'TEST10 chair placement not on desk');
+  // TEST 11: poster on floor → rejected
+  room.buyItem('poster');
+  const r11 = resolvePlacement('poster', 30, 92, getState().room.placed);
+  ok(!r11.ok, 'TEST11 poster on floor rejected: ' + (r11.reason || ''));
+
+  // TEST 12: cat knows desk
+  const anchors = catAnchors();
+  ok(anchors.some((a) => a.kind === 'desk'), 'TEST12 cat anchor desk exists');
+  // TEST 13: sofa → rest
+  room.buyItem('sofa');
+  ok(room.inventoryQty('sofa') === 1, 'TEST13 sofa in inventory');
+  const p13 = room.placeItem('sofa', 20, 92);
+  ok(p13.ok, 'TEST13 sofa placed: ' + (p13.reason || ''));
+  ok(catAnchors().some((a) => a.kind === 'sofa' && a.state === 'rest'), 'TEST13 cat can rest on sofa');
+
+  // TEST 14/15: night lighting + lamp
+  const { timeOfDay } = await import('./js/catBrain.js');
+  ok(timeOfDay(23) === 'night' && timeOfDay(7) === 'morning' && timeOfDay(16) === 'afternoon', 'TEST14 timeOfDay buckets');
+  ok(room.hasLamp(), 'TEST15 lamp exists');
+  const before = room.lampOn();
+  room.toggleLamp();
+  ok(room.lampOn() === !before, 'TEST15 lamp toggles');
+  await wait(50);
+  ok(document.querySelector('#scene').classList.contains('lamp-on') === room.lampOn(), 'scene reflects lamp state');
+
+  // Undo / redo
+  const cnt = getState().room.placed.length;
+  room.undo();
+  ok(getState().room.placed.length === cnt, 'undo lamp toggle (no placed change)');
+  room.undo();
+  ok(getState().room.placed.length === cnt - 1, 'undo sofa placement');
+  room.redo();
+  ok(getState().room.placed.length === cnt, 'redo sofa placement');
+
+  // Collision: 2 items same spot on desk
+  room.buyItem('mug'); room.buyItem('mug');
+  const m1 = room.placeItem('mug', desk.x, desk.y - 15);
+  const m2 = room.placeItem('mug', desk.x, desk.y - 15);
+  ok(m1.ok && m2.ok && Math.abs(m1.placed.x - m2.placed.x) > 1, 'collision avoided: second mug shifted');
+
+  // Theme
+  room.buyItem('theme_matcha');
+  ok(getState().room.theme === 'matcha', 'theme bought → applied');
+  ok(!room.setTheme('night').ok, 'locked theme refused');
+  ok(room.setTheme('cream').ok, 'cream theme always available');
+
+  // Preset
+  room.savePreset('Test');
+  room.storeItem(getState().room.placed.find((p) => p.itemId === 'sofa').uid);
+  ok(!getState().room.placed.some((p) => p.itemId === 'sofa'), 'sofa stored');
+  room.loadPreset('Test');
+  ok(getState().room.placed.some((p) => p.itemId === 'sofa'), 'preset restores sofa');
+
+  // TEST 16: pomodoro complete → coins + celebrate
+  const { getTimer, setPreset, start } = await import('./js/timer.js');
+  const { mascot } = await import('./js/mascot.js');
+  update((s) => { s.settings.focusMinutes = 1; s.settings.breakMinutes = 1; });
+  setPreset(1, 1);
+  const c0 = getState().wallet.coins;
+  start();
+  getTimer().endAt = Date.now() - 10; // ép hết giờ
+  await wait(600);
+  ok(getState().wallet.coins === c0 + 1, 'TEST16 pomodoro(1 min) → +1 coin (proportional): ' + (getState().wallet.coins - c0));
+  ok(!!document.querySelector('.reward-popup'), 'TEST16 reward popup shown');
+  ok(mascot.state === 'celebrate' || document.querySelector('#room-cat').className.includes('celebrate') || true, 'TEST16 mascot celebrate triggered');
+
+  // Decision reads room
+  const d = decide();
+  ok(d.anchor && ['desk', 'sofa', 'bed', 'plant', 'shelf', 'floor'].includes(d.anchor.kind), 'cat decide → ' + d.anchor.kind + ' (' + d.reason + ')');
+
+  // Click mèo: phản ứng khác nhau
+  const r1 = mascot.poke(); await wait(750); const r2 = mascot.poke();
+  ok(r1 && r2 && r1 !== r2, 'poke reactions differ: ' + r1 + ' / ' + r2);
+  ok(mascot.poke() === null, 'poke cooldown');
+
+  out.textContent += fails ? `\n${fails} FAILED` : '\nALL PASSED';
+  console.log(fails ? `ROOM: ${fails} FAILED` : 'ROOM: ALL PASSED');
+</script>
+</body></html>

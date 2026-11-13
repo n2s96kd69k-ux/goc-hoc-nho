@@ -1,0 +1,133 @@
+/* ============================================================
+   🐱 Mascot Mochi — digital companion
+   Class trên .mascot-wrap: mascot-idle | mascot-study | mascot-focus |
+   mascot-sleepy | mascot-rest | mascot-night | mascot-walk |
+   mascot-happy | mascot-celebrate | mascot-interact-*
+   Randomness: mỗi SVG có --blink / --tail / --sway / --delay riêng.
+   ============================================================ */
+
+.mascot-wrap { display: inline-block; line-height: 0; }
+.mascot-svg { overflow: visible; }
+
+/* Bộ phận phụ ẩn mặc định */
+.m-eyes-closed, .m-eyes-half, .m-mouth-open, .m-yawn, .m-book, .m-laptop, .m-pen,
+.m-zzz, .m-hearts, .m-sparkles, .m-auto-headphone { opacity: 0; }
+.m-hearts, .m-sparkles, .m-zzz { transition: opacity .3s; }
+
+/* ---- Nền: thở + đung đưa (không đồng bộ giữa các instance) ---- */
+.m-body-group { transform-origin: 50% 100%; animation: mIdleSway var(--sway, 4s) ease-in-out infinite; animation-delay: var(--delay, 0s); }
+@keyframes mIdleSway { 0%, 100% { transform: rotate(0) translateY(0); } 40% { transform: rotate(1.3deg) translateY(-1px); } 70% { transform: rotate(-.6deg) translateY(0); } }
+.m-body { transform-origin: 50px 86px; animation: mBreathe 3.4s ease-in-out infinite; animation-delay: var(--delay, 0s); }
+@keyframes mBreathe { 50% { transform: scale(1.025, 1.04); } }
+.m-tail { transform-origin: 72px 88px; animation: mTail var(--tail, 3s) ease-in-out infinite; animation-delay: var(--delay, 0s); }
+@keyframes mTail { 0%, 100% { transform: rotate(0); } 35% { transform: rotate(14deg); } 65% { transform: rotate(6deg); } }
+.m-head { transform-origin: 50px 70px; animation: mHeadIdle 6.5s ease-in-out infinite; animation-delay: var(--delay, 0s); }
+@keyframes mHeadIdle { 0%, 100% { transform: rotate(0); } 30% { transform: rotate(-1.5deg); } 60% { transform: rotate(1.2deg) translateY(.5px); } }
+.m-eyes { animation: mBlink var(--blink, 4.5s) infinite; transform-origin: 50px 56px; animation-delay: var(--delay, 0s); }
+@keyframes mBlink { 0%, 90%, 100% { transform: scaleY(1); } 93% { transform: scaleY(.08); } 96% { transform: scaleY(1); } }
+.m-pupils { transition: transform .25s cubic-bezier(.34, 1.3, .64, 1); }
+.m-ear { transform-origin: 50% 100%; }
+.m-ear-l { animation: mEar 7s ease-in-out infinite; animation-delay: var(--delay, 0s); }
+.m-ear-r { animation: mEar 9s ease-in-out infinite reverse; animation-delay: var(--delay, 0s); }
+@keyframes mEar { 0%, 78%, 100% { transform: rotate(0); } 83% { transform: rotate(-8deg); } 88% { transform: rotate(4deg); } }
+.m-arm { transform-origin: 50% 20%; transition: transform .3s; }
+
+/* ---- STUDY: sách, gật đầu, tay viết ---- */
+.mascot-study .m-book, .mascot-study .m-pen { opacity: 1; }
+.mascot-study .m-head { animation: mNod 3s ease-in-out infinite; }
+@keyframes mNod { 50% { transform: rotate(3deg) translateY(2px); } }
+.mascot-study .m-arm-r { animation: mWrite 1.6s ease-in-out infinite; }
+@keyframes mWrite { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(-8deg) translateX(-1px); } }
+
+/* ---- FOCUS (Pomodoro): tai nghe, laptop sáng, gõ phím ---- */
+.mascot-focus .m-laptop { opacity: 1; }
+.mascot-focus .m-auto-headphone { opacity: 1; }
+.mascot-focus .acc-headphone { opacity: 0; }
+.mascot-focus .m-screen { animation: mGlow 2.4s ease-in-out infinite; }
+@keyframes mGlow { 50% { fill: #E4F0FA; } }
+.mascot-focus .m-head { animation: mFocusHead 4s ease-in-out infinite; }
+@keyframes mFocusHead { 0%, 100% { transform: rotate(0) translateY(1px); } 50% { transform: rotate(2deg) translateY(2px); } }
+.mascot-focus .m-arm-l { animation: mType .5s ease-in-out infinite; }
+.mascot-focus .m-arm-r { animation: mType .5s ease-in-out infinite .25s; }
+@keyframes mType { 50% { transform: translateY(-1.6px); } }
+.mascot-focus .m-eyes { animation: mBlink 6s infinite; }
+
+/* ---- SLEEPY / NIGHT: mắt lim dim → nhắm, ngáp, gục, zzz ---- */
+.mascot-sleepy .m-eyes, .mascot-night .m-eyes { opacity: 0; animation: none; }
+.mascot-sleepy .m-eyes-closed { opacity: 1; }
+.mascot-night .m-eyes-half { opacity: 1; }
+.mascot-sleepy .m-head { animation: mDroop 3.5s ease-in-out infinite; }
+@keyframes mDroop { 0%, 100% { transform: rotate(-4deg) translateY(2px); } 50% { transform: rotate(-9deg) translateY(5px); } }
+.mascot-sleepy .m-mouth { animation: mYawnHide 6s infinite; }
+.mascot-sleepy .m-yawn { animation: mYawn 6s infinite; }
+@keyframes mYawnHide { 0%, 70%, 100% { opacity: 1; } 75%, 92% { opacity: 0; } }
+@keyframes mYawn { 0%, 70%, 100% { opacity: 0; } 76%, 90% { opacity: 1; } }
+.mascot-sleepy .m-zzz, .mascot-rest .m-zzz { opacity: 1; animation: mZzz 2.4s ease-in-out infinite; }
+@keyframes mZzz { 0% { transform: translate(0, 0); opacity: 0; } 30% { opacity: 1; } 100% { transform: translate(6px, -12px); opacity: 0; } }
+.mascot-night .m-head { animation: mHeadIdle 8s ease-in-out infinite; }
+
+/* ---- REST: nằm nghiêng trên sofa/ổ ---- */
+.mascot-rest .m-body-group { animation: mRest 4s ease-in-out infinite; transform-origin: 50% 100%; }
+@keyframes mRest { 0%, 100% { transform: rotate(-6deg) translateY(4px) scaleY(.94); } 50% { transform: rotate(-6deg) translateY(3px) scaleY(.97); } }
+.mascot-rest .m-eyes { opacity: 0; animation: none; }
+.mascot-rest .m-eyes-closed { opacity: 1; }
+.mascot-rest .m-tail { animation: mTail 5s ease-in-out infinite; }
+
+/* ---- WALK: nhún theo bước ---- */
+.mascot-walk .m-body-group { animation: mWalk .5s ease-in-out infinite; }
+@keyframes mWalk { 0%, 100% { transform: translateY(0) rotate(-1.5deg); } 50% { transform: translateY(-3px) rotate(1.5deg); } }
+.mascot-walk .m-tail { animation: mTail 1s ease-in-out infinite; }
+
+/* ---- HAPPY: nhìn người dùng, vẫy tay, tai dựng, tim ---- */
+.mascot-happy .m-body-group { animation: mHop .5s cubic-bezier(.34, 1.3, .64, 1) 2; }
+@keyframes mHop { 40% { transform: translateY(-8px) scaleY(1.04); } 100% { transform: none; } }
+.mascot-happy .m-mouth { opacity: 0; }
+.mascot-happy .m-mouth-open { opacity: 1; }
+.mascot-happy .m-arm-r { animation: mWave .4s ease-in-out 4; transform-origin: 70px 76px; }
+@keyframes mWave { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(-40deg) translateY(-6px); } }
+.mascot-happy .m-ear { animation: mEarUp .5s ease-out forwards; }
+@keyframes mEarUp { to { transform: rotate(0) scaleY(1.08); } }
+.mascot-happy .m-hearts, .mascot-celebrate .m-hearts { opacity: 1; }
+.m-heart { transform-origin: center; opacity: 0; }
+.mascot-happy .m-heart, .mascot-celebrate .m-heart { animation: mHeart 1.4s ease-out forwards; }
+.m-heart.h2 { animation-delay: .2s; } .m-heart.h3 { animation-delay: .4s; }
+@keyframes mHeart { 0% { transform: translateY(0) scale(.4); opacity: 0; } 20% { opacity: 1; } 100% { transform: translateY(-22px) scale(1.1); opacity: 0; } }
+
+/* ---- CELEBRATE: đứng lên, vươn vai, nhảy, sparkle ---- */
+.mascot-celebrate .m-body-group { animation: mJump .6s ease-in-out 3; }
+@keyframes mJump { 0%, 100% { transform: translateY(0) rotate(0) scaleY(1); } 20% { transform: translateY(2px) scaleY(.96); } 45% { transform: translateY(-12px) rotate(-3deg) scaleY(1.05); } 70% { transform: translateY(-4px) rotate(3deg); } }
+.mascot-celebrate .m-arm-l { animation: mStretchL .6s ease-in-out 3; transform-origin: 30px 76px; }
+.mascot-celebrate .m-arm-r { animation: mStretchR .6s ease-in-out 3; transform-origin: 70px 76px; }
+@keyframes mStretchL { 45% { transform: rotate(35deg) translateY(-8px); } }
+@keyframes mStretchR { 45% { transform: rotate(-35deg) translateY(-8px); } }
+.mascot-celebrate .m-mouth { opacity: 0; }
+.mascot-celebrate .m-mouth-open { opacity: 1; }
+.mascot-celebrate .m-ear { animation: mEarWiggle .4s ease-in-out 4; }
+@keyframes mEarWiggle { 50% { transform: rotate(-10deg); } }
+.mascot-celebrate .m-sparkles { opacity: 1; }
+.m-spark { transform-origin: center; transform-box: fill-box; }
+.mascot-celebrate .m-spark { animation: mSpark 1.2s ease-in-out infinite; }
+.m-spark.s2 { animation-delay: .4s; }
+@keyframes mSpark { 0%, 100% { transform: scale(.4) rotate(0); opacity: .3; } 50% { transform: scale(1.1) rotate(25deg); opacity: 1; } }
+
+/* ---- INTERACT (click) ---- */
+.mascot-interact-look-left .m-pupils { transform: translateX(-3px); }
+.mascot-interact-look-right .m-pupils { transform: translateX(3px); }
+.mascot-interact-look-left .m-head { animation: none; transform: rotate(-4deg); transition: transform .3s; }
+.mascot-interact-look-right .m-head { animation: none; transform: rotate(4deg); transition: transform .3s; }
+.mascot-interact-wave .m-arm-r { animation: mWave .4s ease-in-out 3; transform-origin: 70px 76px; }
+.mascot-interact-wave .m-mouth { opacity: 0; } .mascot-interact-wave .m-mouth-open { opacity: 1; }
+.mascot-interact-blink .m-eyes { animation: mBlinkFast .35s ease-in-out 2; }
+@keyframes mBlinkFast { 50% { transform: scaleY(.08); } }
+.mascot-interact-wiggle .m-ear-l, .mascot-interact-wiggle .m-ear-r { animation: mEarWiggle .3s ease-in-out 3; }
+.mascot-interact-wiggle .m-body-group { animation: mWiggle .3s ease-in-out 3; }
+@keyframes mWiggle { 50% { transform: rotate(3deg); } }
+
+/* Phụ kiện xuất hiện mềm */
+.acc { animation: accIn .5s cubic-bezier(.34, 1.3, .64, 1); transform-box: fill-box; transform-origin: center; }
+@keyframes accIn { from { transform: scale(0); opacity: 0; } to { transform: none; opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .mascot-wrap * { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
+  .m-eyes { animation: mBlink 5s infinite !important; animation-duration: 5s !important; }
+}

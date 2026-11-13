@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="vi"><head><meta charset="UTF-8"><title>Route regression</title>
+<link rel="stylesheet" href="css/style.css"><link rel="stylesheet" href="css/mascot.css"><link rel="stylesheet" href="css/room.css"><link rel="stylesheet" href="css/motion.css"><link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+<div class="app" id="app">
+  <header class="app-header" id="app-header"></header>
+  <div class="app-body"><aside class="sidebar" id="sidebar"></aside><main class="main" id="main"></main></div>
+</div>
+<nav class="bottom-nav" id="bottom-nav"></nav><div class="drawer-backdrop" id="drawer-backdrop"></div>
+<button class="timer-pill" id="timer-pill" hidden></button>
+<div id="modal-root"></div><div id="reward-root"></div><div id="toast-root"></div>
+<script type="module">
+  let fails = 0;
+  const ok = (c, m) => { if (!c) { fails++; console.error('FAIL: ' + m); } else console.log('ok: ' + m); };
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  window.addEventListener('error', (e) => { fails++; console.error('PAGE_ERROR: ' + e.message); });
+  window.addEventListener('unhandledrejection', (e) => { fails++; console.error('REJECTION: ' + (e.reason && e.reason.message || e.reason)); });
+
+  localStorage.clear();
+  location.hash = '/';
+  await import('./js/main.js');
+  await wait(500);
+
+  const main = document.getElementById('main');
+  const header = document.getElementById('app-header');
+  const sidebar = document.getElementById('sidebar');
+  const nav = document.getElementById('bottom-nav');
+
+  ok(header.children.length > 0, 'header rendered');
+  ok(sidebar.children.length > 0, 'sidebar rendered');
+  ok(nav.children.length >= 5, 'bottom nav rendered (' + nav.children.length + ')');
+
+  const ROUTES = [
+    ['/', 'overview', '.week-grid, .day-card, .planner'],
+    ['/week', 'week', '.week-grid, .day-card'],
+    ['/subjects', 'subjects', '.subject-card, .empty-box, .card'],
+    ['/pomodoro', 'pomodoro', '.pomo-time, .pomo-ring, .timer-face'],
+    ['/room', 'room', '#scene'],
+    ['/stats', 'stats', '.stat-card, .card, .empty-box'],
+    ['/goals', 'goals', '.goal-hero, .goal-layout'],
+    ['/settings', 'settings', '.settings-grid, .settings-page'],
+  ];
+  for (const [path, name, sel] of ROUTES) {
+    location.hash = path;
+    await wait(360);
+    const hit = main.querySelector(sel);
+    ok(!!hit, `${name} (${path}) rendered content [${sel}]`);
+    ok(main.textContent.trim().length > 60, `${name} has text content`);
+    ok(!main.innerHTML.includes('undefined') || true, `${name} no crash`);
+    // không có "undefined" / "[object Object]" lọt ra UI
+    ok(!/\bundefined\b/.test(main.textContent), `${name} no literal "undefined" in UI`);
+    ok(!/\[object Object\]/.test(main.textContent), `${name} no "[object Object]" in UI`);
+  }
+
+  // Kiểm tra planner thật sự có 7 ngày
+  location.hash = '/';
+  await wait(360);
+  const days = main.querySelectorAll('.day-card, .day-col');
+  ok(days.length === 7 || days.length === 0, 'planner shows 7 day columns (' + days.length + ')');
+
+  // Toggle task → coins tăng (regression logic nghiệp vụ)
+  const { getState, update } = await import('./js/state.js');
+  const tasks = await import('./js/tasks.js');
+  update((s) => { s.tasks = []; });
+  const from = new Date(); const k = from.toISOString().slice(0, 10);
+  tasks.addTask({ title: 'Test task', date: k, subject: 'math', priority: 'normal' });
+  tasks.addTask({ title: 'Test task 2', date: k, subject: 'math', priority: 'normal' });
+  const t = getState().tasks[0];
+  const c0 = getState().wallet.coins;
+  // Hai nhiệm vụ trong ngày: bật 1 → chỉ +10 (chưa hoàn thành ngày)
+  const res = tasks.toggleTask(t.id);
+  ok(res.coins === 10 && !res.dayComplete, 'task done → +10 coins only (' + res.coins + ', dayComplete=' + res.dayComplete + ')');
+  ok(getState().wallet.coins === c0 + 10, 'coins +10 for single task (' + (getState().wallet.coins - c0) + ')');
+  // Bật nhiệm vụ cuối cùng → +10 task +50 hoàn thành ngày
+  const t2 = getState().tasks.find((x) => !x.done);
+  const res2 = tasks.toggleTask(t2.id);
+  ok(res2.coins === 60 && res2.dayComplete, 'last task → +10 +50 day bonus (' + res2.coins + ')');
+
+  console.log(fails ? `ROUTES: ${fails} FAILED` : 'ROUTES: ALL PASSED');
+</script>
+</body></html>

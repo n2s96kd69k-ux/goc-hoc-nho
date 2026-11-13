@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>🌷 Góc Học Nhỏ — Một góc nhỏ cho những ngày cố gắng</title>
+  <meta name="description" content="Planner ôn thi theo tuần cute, cozy, có mascot đồng hành, Pomodoro và góc học ảo.">
+  <meta name="theme-color" content="#FFF8EC">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Nunito:wght@400;600;700;800&family=Patrick+Hand&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/mascot.css">
+  <link rel="stylesheet" href="css/room.css">
+  <link rel="stylesheet" href="css/motion.css">
+  <link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+  <div class="app" id="app">
+    <header class="app-header" id="app-header" aria-label="Đầu trang"></header>
+    <div class="app-body">
+      <aside class="sidebar" id="sidebar" aria-label="Thông tin phụ và điều hướng"></aside>
+      <main class="main" id="main" aria-live="polite"></main>
+    </div>
+  </div>
+
+  <nav class="bottom-nav" id="bottom-nav" aria-label="Điều hướng nhanh"></nav>
+  <div class="drawer-backdrop" id="drawer-backdrop" aria-hidden="true"></div>
+  <button class="timer-pill" id="timer-pill" type="button" hidden aria-label="Đồng hồ Pomodoro đang chạy"></button>
+
+  <div id="modal-root"></div>
+  <div id="reward-root"></div>
+  <div id="toast-root" aria-live="polite"></div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

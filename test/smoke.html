@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="vi"><head><meta charset="UTF-8"><title>Smoke test</title></head>
+<body>
+<pre id="out"></pre>
+<div id="modal-root"></div><div id="reward-root"></div><div id="toast-root"></div>
+<script type="module">
+import { initState, getState, replaceState, update } from '../js/state.js';
+import { addTask, toggleTask, updateTask, deleteTask, dayProgress, tasksOfDay } from '../js/tasks.js';
+import { addSubject, deleteSubject, subjectStats } from '../js/subjects.js';
+import { buyItem, recomputeStreak, treeStage } from '../js/gamification.js';
+import { placeItem, moveItem, removeFromRoom } from '../js/room.js';
+import { getTimer, start, pause, reset, setPreset, setupDurations } from '../js/timer.js';
+import { weekSummary, overallStats, totalMinutesAllTime, dayStatus } from '../js/statistics.js';
+import { parseImportFile, loadState } from '../js/storage.js';
+import { todayKey } from '../js/utils.js';
+
+const out = document.getElementById('out');
+let fails = 0;
+const ok = (cond, msg) => { out.textContent += (cond ? '✅ ' : '❌ ') + msg + '\n'; if (!cond) { fails++; console.error('FAIL: ' + msg); } };
+
+localStorage.clear();
+initState();
+const s = getState();
+ok(s.tasks.length === 11, 'seed 11 tasks');
+ok(s.subjects.length === 3, 'seed 3 subjects');
+ok(s.wallet.coins === 240, 'seed 240 coins');
+
+const t = todayKey();
+const before = getState().wallet.coins;
+const task = addTask({ title: 'Test task', subjectId: 'math', date: t, minutes: 20, pomodoros: 1, priority: 'high' });
+ok(tasksOfDay(t).some((x) => x.id === task.id), 'addTask visible in day');
+const res = toggleTask(task.id);
+ok(res.done && res.coins >= 5, 'toggleTask done, +coins');
+ok(getState().wallet.coins === before + res.coins, 'wallet updated');
+toggleTask(task.id);
+ok(!getState().tasks.find((x) => x.id === task.id).done, 'toggle back');
+updateTask(task.id, { title: 'Renamed' });
+ok(getState().tasks.find((x) => x.id === task.id).title === 'Renamed', 'updateTask');
+deleteTask(task.id);
+ok(!getState().tasks.find((x) => x.id === task.id), 'deleteTask');
+
+// Day complete bonus
+const dayTasks = tasksOfDay(t);
+const b2 = getState().wallet.coins;
+let last = null;
+dayTasks.filter((x) => !x.done).forEach((x) => { last = toggleTask(x.id); });
+ok(dayProgress(t).percent === 100 || dayTasks.length === 0, 'day 100%');
+ok(!last || last.dayComplete, 'day complete bonus flagged');
+ok(getState().wallet.coins > b2, 'coins increased');
+
+// Subjects
+const sub = addSubject({ name: 'Lịch sử', icon: '🏛️' });
+ok(getState().subjects.length === 4, 'addSubject');
+deleteSubject(sub.id);
+ok(getState().subjects.length === 3, 'deleteSubject');
+ok(typeof subjectStats('math').percent === 'number', 'subjectStats');
+
+// Streak
+const st = recomputeStreak();
+ok(st.current >= 1, 'streak >= 1 (today studied): ' + st.current);
+
+// Shop
+update((x) => { x.wallet.coins = 1000; });
+const buy = buyItem('cactus');
+ok(buy.ok && getState().inventory.includes('cactus'), 'buyItem cactus');
+ok(getState().room.placed.some((p) => p.itemId === 'cactus'), 'auto placed in room');
+ok(!buyItem('cactus').ok, 'cannot buy twice');
+update((x) => { x.wallet.coins = 10; });
+ok(!buyItem('lamp').ok, 'insufficient coins blocked');
+moveItem('cactus', 30, 40);
+ok(getState().room.placed.find((p) => p.itemId === 'cactus').x === 30, 'moveItem');
+removeFromRoom('cactus');
+ok(!getState().room.placed.some((p) => p.itemId === 'cactus'), 'removeFromRoom');
+placeItem('cactus', 50, 60);
+ok(getState().room.placed.some((p) => p.itemId === 'cactus'), 'placeItem');
+const mb = buyItem('headphone');
+ok(!mb.ok, 'headphone blocked (coins)');
+update((x) => { x.wallet.coins = 500; });
+ok(buyItem('headphone').ok && getState().mascot.accessory === 'headphone', 'buy accessory -> equipped');
+
+// Timer
+setPreset(25, 5);
+const tm = getTimer();
+ok(tm.remaining === 1500 && tm.mode === 'focus', 'preset 25/5');
+start(); ok(tm.status === 'running', 'timer start');
+pause(); ok(tm.status === 'paused', 'timer pause');
+reset(); ok(tm.status === 'idle' && tm.remaining === 1500, 'timer reset');
+
+// Stats
+const ws = weekSummary();
+ok(ws.perDay.length === 7, 'weekSummary 7 days');
+const os = overallStats();
+ok(os.totalMinutes >= 0 && os.subjects.length === 3, 'overallStats');
+ok(treeStage(0).stage === 1 && treeStage(700).stage === 4 && treeStage(2000).stage === 5, 'treeStage thresholds');
+ok(['good', 'partial', 'missed', 'none', 'future'].includes(dayStatus(t)), 'dayStatus');
+
+// Persistence
+await new Promise((r) => setTimeout(r, 300));
+const saved = loadState();
+ok(saved && saved.wallet.coins === getState().wallet.coins, 'persisted to localStorage');
+ok(saved.inventory.includes('cactus'), 'inventory persisted');
+
+// Import/export roundtrip
+const json = JSON.stringify({ app: 'goc-hoc-nho', version: 1, data: getState() });
+const parsed = parseImportFile(json);
+ok(parsed.tasks.length === getState().tasks.length, 'parseImportFile ok');
+let threw = false; try { parseImportFile('{"foo":1}'); } catch { threw = true; }
+ok(threw, 'parseImportFile rejects invalid');
+replaceState(parsed);
+ok(getState().wallet.coins === parsed.wallet.coins, 'replaceState');
+
+out.textContent += fails ? `\n${fails} FAILED` : '\nALL PASSED';
+console.log(fails ? `SMOKE: ${fails} FAILED` : 'SMOKE: ALL PASSED');
+</script>
+</body></html>

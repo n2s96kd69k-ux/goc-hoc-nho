@@ -1,0 +1,148 @@
+/* ============================================================
+   Responsive — tablet & mobile
+   ============================================================ */
+
+/* Desktop rộng vừa: co nhẹ card */
+@media (max-width: 1400px) {
+  .day-card { padding: 12px 10px 10px; }
+  .task-title { font-size: .82rem; }
+}
+
+/* Tablet ngang: vẫn 7 cột, gọn hơn */
+@media (max-width: 1200px) {
+  :root { --sidebar-w: 224px; }
+  .main { padding: 18px 18px 60px; }
+  .week-grid { gap: 8px; }
+  .day-card { min-height: 380px; }
+  .day-progress .ring { width: 64px !important; height: 64px !important; }
+  .day-progress .ring svg { width: 64px; height: 64px; }
+  .planner-head .page-title { font-size: 1.25rem; }
+}
+
+/* Tablet dọc: 7 cột không còn đủ chỗ -> 4 + 3 hàng */
+@media (max-width: 1024px) and (min-width: 769px) {
+  .week-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .day-card { min-height: 320px; }
+}
+
+/* ---------- MOBILE ---------- */
+@media (max-width: 768px) {
+  :root { --header-h: 60px; }
+  body { padding-bottom: 72px; }
+
+  .app-header { padding: 0 12px; gap: 8px; }
+  .menu-btn { display: inline-grid; }
+  .brand-tag { display: none; }
+  .brand-name { font-size: 1rem; }
+  .header-right { gap: 6px; }
+  .header-right .pill { padding: 5px 9px; font-size: .75rem; }
+  #settings-btn { display: none; }
+
+  /* Sidebar -> drawer */
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; height: 100vh; z-index: 60;
+    width: min(300px, 86vw); flex-basis: auto;
+    transform: translateX(-104%); transition: transform .3s cubic-bezier(.34, 1.2, .64, 1);
+    box-shadow: var(--shadow-lg);
+  }
+  body.drawer-open .sidebar { transform: none; }
+  .drawer-backdrop { display: block; position: fixed; inset: 0; background: rgba(79, 60, 52, .35); z-index: 55; opacity: 0; pointer-events: none; transition: opacity .25s; }
+  body.drawer-open .drawer-backdrop { opacity: 1; pointer-events: auto; }
+  .sidebar-inner { padding-top: 18px; }
+
+  .main { padding: 14px 12px 40px; }
+
+  /* Today bar */
+  .today-bar { padding: 12px 14px; gap: 10px; }
+  .today-main { gap: 6px 12px; font-size: .85rem; }
+  .today-side { width: 100%; justify-content: space-between; }
+  .today-side .btn { flex: 1; }
+
+  /* Planner head */
+  .planner-head { gap: 10px; }
+  .planner-head .page-title { font-size: 1.15rem; flex-basis: 100%; }
+  .week-nav { flex: 1; justify-content: space-between; }
+  .week-nav .btn-sm { padding: 6px 10px; font-size: .75rem; }
+  .week-range { min-width: 0; font-size: .95rem; padding: 6px 10px; }
+  #add-task-btn { width: 100%; }
+  .filter-row { overflow-x: auto; flex-wrap: nowrap; padding-bottom: 4px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .filter-row::-webkit-scrollbar { display: none; }
+  .filter-row .chip { flex: 0 0 auto; }
+
+  /* Thanh chọn ngày */
+  .day-tabs {
+    display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 12px;
+    background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 5px;
+  }
+  .day-tab {
+    display: flex; flex-direction: column; align-items: center; padding: 6px 0 4px; border-radius: 12px;
+    font-weight: 800; font-size: .78rem; color: var(--brown-soft); position: relative; transition: all .2s;
+    line-height: 1.1;
+  }
+  .day-tab small { font-size: .68rem; font-weight: 700; opacity: .8; }
+  .day-tab.today { color: var(--peach-dark); }
+  .day-tab.active { background: var(--brown-dark); color: #fff; }
+  .tab-done { position: absolute; top: -4px; right: 2px; font-size: .55rem; background: var(--matcha-dark); color: #fff; border-radius: 50%; width: 13px; height: 13px; display: grid; place-items: center; font-style: normal; }
+
+  /* Chỉ hiện 1 card ngày */
+  .week-grid { display: block; }
+  .day-card { display: none; min-height: 0; }
+  .day-card.is-active { display: flex; }
+  .day-card:hover { transform: none; }
+  .day-progress .ring { width: 84px !important; height: 84px !important; }
+  .day-progress .ring svg { width: 84px; height: 84px; }
+  .ring-label { font-size: 1.1rem; }
+  .task-title { font-size: .95rem; }
+  .task { padding: 8px 6px; }
+  .checkbox { width: 26px; height: 26px; border-radius: 9px; }
+  .day-name { font-size: .95rem; }
+  .day-card .tape { display: none; }
+
+  /* Bottom nav */
+  .bottom-nav {
+    display: grid; grid-template-columns: repeat(5, 1fr);
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 45;
+    background: rgba(255, 248, 236, .96); border-top: 1px solid var(--line);
+    padding: 6px 6px calc(6px + env(safe-area-inset-bottom)); backdrop-filter: blur(8px);
+  }
+  .bnav-item { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 6px 2px; border-radius: 12px; font-size: 1.25rem; color: var(--brown-soft); transition: all .2s; }
+  .bnav-item small { font-size: .6rem; font-weight: 700; }
+  .bnav-item.active { background: var(--matcha); color: var(--brown-dark); }
+  .timer-pill { bottom: 82px; right: 12px; }
+  #toast-root { bottom: 86px; }
+
+  /* Pages */
+  .page-title { font-size: 1.25rem; }
+  .page-head { flex-direction: column; align-items: stretch; }
+  .page-head .btn, .page-head .btn-row { width: 100%; }
+  .page-head .btn-row .btn { flex: 1; }
+  .pomo-layout, .goal-layout { grid-template-columns: 1fr; }
+  .pomo-time { font-size: 2.5rem; }
+  .pomo-ring svg { width: 210px; height: 210px; }
+  .pomo-state { margin-top: 68px; }
+  .stat-grid { grid-template-columns: repeat(2, 1fr); }
+  .chart-grid { grid-template-columns: 1fr; }
+  .subject-bars .mini-row { grid-template-columns: 80px 1fr 36px; }
+  .field-row { grid-template-columns: 1fr 1fr; }
+  .modal-backdrop { align-items: flex-end; padding: 0; }
+  .modal { border-radius: 22px 22px 0 0; max-height: 92vh; }
+  .modal-md, .modal-lg, .modal-sm { max-width: none; }
+  .left-actions, .right-actions { width: 100%; }
+  .right-actions .btn { flex: 1; }
+  .settings-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 400px) {
+  .header-streak { display: none; }
+  .today-main { font-size: .8rem; }
+  .mood-mini-btn { width: 26px; height: 26px; font-size: .9rem; }
+  .day-tab { font-size: .72rem; }
+  .field-row { grid-template-columns: 1fr; }
+  .stat-grid { gap: 8px; }
+  .shop-grid, .inv-grid { grid-template-columns: repeat(2, 1fr) !important; }
+}
+
+/* Không cho hover-lift trên thiết bị cảm ứng */
+@media (hover: none) {
+  .day-card:hover, .btn:hover, .subject-card:hover { transform: none; }
+}

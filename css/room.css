@@ -1,0 +1,204 @@
+/* ============================================================
+   🏡 STUDY ROOM 2.5D — lớp, ánh sáng theo giờ, thời tiết, ambient
+   Tọa độ item: left/top = anchor giữa cạnh dưới (translate(-50%, -100%))
+   ============================================================ */
+
+.scene {
+  position: relative; aspect-ratio: 4 / 3; width: 100%;
+  border-radius: var(--radius); overflow: hidden;
+  background: var(--wall);
+  box-shadow: var(--shadow-lg), inset 0 0 0 1px var(--line);
+  user-select: none; -webkit-user-select: none; touch-action: none;
+  transition: filter 2s ease;
+  --floor-y: 68%;
+  --warm: 0;      /* 0..1 độ ấm */
+  --dark: 0;      /* 0..1 độ tối */
+}
+.scene .L { position: absolute; inset: 0; will-change: transform; transition: transform .4s cubic-bezier(.2, .8, .2, 1); pointer-events: none; }
+.scene .L-items, .scene .L-cat, .scene .L-window { pointer-events: none; }
+.scene .L-items > *, .scene .L-cat > *, .scene .L-window .window { pointer-events: auto; }
+
+/* ---- L1 tường ---- */
+.wall-paper {
+  position: absolute; inset: 0 0 calc(100% - var(--floor-y)) 0;
+  background: linear-gradient(180deg, var(--wall), var(--wall2));
+  background-image: linear-gradient(180deg, var(--wall), var(--wall2)), repeating-linear-gradient(90deg, transparent 0 46px, rgba(255, 255, 255, .28) 46px 48px);
+  background-blend-mode: normal, soft-light;
+}
+.wall-base { position: absolute; left: 0; right: 0; top: calc(var(--floor-y) - 10px); height: 10px; background: rgba(255, 255, 255, .55); border-bottom: 1px solid rgba(111, 85, 71, .12); }
+
+/* ---- L3 sàn ---- */
+.floor-board {
+  position: absolute; left: 0; right: 0; top: var(--floor-y); bottom: 0;
+  background: linear-gradient(180deg, var(--floor), var(--floor2));
+  background-image: linear-gradient(180deg, var(--floor), var(--floor2)), repeating-linear-gradient(90deg, rgba(111, 85, 71, .09) 0 1px, transparent 1px 64px), repeating-linear-gradient(180deg, transparent 0 22px, rgba(111, 85, 71, .05) 22px 23px);
+}
+.baseboard { position: absolute; left: 0; right: 0; top: var(--floor-y); height: 3px; background: rgba(0, 0, 0, .08); }
+
+/* ---- L2 cửa sổ + rèm ---- */
+.window {
+  position: absolute; left: 7%; top: 9%; width: 27%; aspect-ratio: 1 / .95;
+  border-radius: 10px; overflow: hidden; border: 0; padding: 0; cursor: pointer;
+  box-shadow: 0 10px 24px rgba(111, 85, 71, .14), inset 0 0 0 6px #fff;
+  background: #C8DDEE;
+}
+.sky { position: absolute; inset: 6px; background: linear-gradient(180deg, #DDEBF7, #C8DDEE); transition: background 2s ease; overflow: hidden; }
+.sun { position: absolute; right: 16%; top: 16%; width: 22%; aspect-ratio: 1; border-radius: 50%; background: #F3D993; box-shadow: 0 0 18px 6px rgba(243, 217, 147, .55); transition: all 2s ease; }
+.moon { position: absolute; right: 18%; top: 14%; width: 18%; aspect-ratio: 1; border-radius: 50%; background: #FFF8EC; box-shadow: inset -5px -3px 0 0 #DED9EA, 0 0 14px 4px rgba(255, 248, 236, .4); opacity: 0; transition: opacity 2s ease; }
+.cloud { position: absolute; width: 32%; height: 16%; border-radius: 999px; background: rgba(255, 255, 255, .85); animation: cloudDrift 28s linear infinite; }
+.cloud::before { content: ''; position: absolute; left: 22%; top: -55%; width: 45%; height: 130%; border-radius: 50%; background: inherit; }
+.cloud.c1 { top: 30%; left: -40%; } .cloud.c2 { top: 56%; left: -70%; width: 24%; animation-duration: 36s; animation-delay: -12s; }
+@keyframes cloudDrift { to { transform: translateX(480%); } }
+.stars { position: absolute; inset: 0; opacity: 0; transition: opacity 2s; background-image: radial-gradient(#fff 1px, transparent 1.5px), radial-gradient(#fff .8px, transparent 1.2px); background-size: 28px 24px, 17px 19px; background-position: 4px 6px, 10px 2px; }
+.rain { position: absolute; inset: 6px; opacity: 0; transition: opacity 1.5s; pointer-events: none; }
+.rain i { position: absolute; top: -20%; width: 1.5px; height: 18%; background: linear-gradient(rgba(255, 255, 255, 0), rgba(255, 255, 255, .8)); animation: rainFall 1.1s linear infinite; }
+.rain i:nth-child(1) { left: 8%; animation-delay: 0s; } .rain i:nth-child(2) { left: 20%; animation-delay: .3s; } .rain i:nth-child(3) { left: 33%; animation-delay: .6s; } .rain i:nth-child(4) { left: 45%; animation-delay: .15s; }
+.rain i:nth-child(5) { left: 58%; animation-delay: .8s; } .rain i:nth-child(6) { left: 70%; animation-delay: .45s; } .rain i:nth-child(7) { left: 82%; animation-delay: .95s; } .rain i:nth-child(8) { left: 93%; animation-delay: .25s; }
+@keyframes rainFall { to { transform: translateY(700%); } }
+.frame { position: absolute; inset: 6px; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 5px; pointer-events: none; }
+.frame i { border: 0; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .5); }
+.frame::before, .frame::after { content: ''; position: absolute; background: #fff; }
+.frame::before { left: 50%; top: 0; bottom: 0; width: 5px; transform: translateX(-50%); }
+.frame::after { top: 50%; left: 0; right: 0; height: 5px; transform: translateY(-50%); }
+.sill { position: absolute; left: -4%; right: -4%; bottom: 0; height: 6px; background: #fff; box-shadow: 0 3px 6px rgba(111, 85, 71, .15); }
+.curtain {
+  position: absolute; top: 6.5%; width: 7%; height: 40%; background: var(--curtain);
+  border-radius: 6px 6px 40% 40% / 6px 6px 12% 12%; opacity: .9;
+  transform-origin: top center; animation: curtainSway 6s ease-in-out infinite;
+  background-image: repeating-linear-gradient(90deg, rgba(255, 255, 255, .25) 0 3px, transparent 3px 9px);
+  box-shadow: 2px 4px 10px rgba(111, 85, 71, .1);
+}
+.curtain.cl { left: 4.5%; } .curtain.cr { left: 31%; animation-delay: -3s; }
+@keyframes curtainSway { 0%, 100% { transform: skewX(0) scaleX(1); } 50% { transform: skewX(1.2deg) scaleX(1.03); } }
+.scene.curtain-wave .curtain { animation: curtainWave 1.2s cubic-bezier(.34, 1.3, .64, 1); }
+@keyframes curtainWave { 30% { transform: skewX(6deg) scaleX(1.12); } 60% { transform: skewX(-3deg) scaleX(.97); } }
+.window-light {
+  position: absolute; left: 10%; top: 48%; width: 36%; height: 42%;
+  background: linear-gradient(180deg, rgba(255, 248, 220, .45), rgba(255, 248, 220, 0));
+  clip-path: polygon(0 0, 100% 0, 130% 100%, -30% 100%); opacity: .7; transition: opacity 2s;
+  mix-blend-mode: soft-light;
+}
+
+/* ---- Items ---- */
+.ritem {
+  position: absolute; transform: translate(-50%, -100%);
+  display: block; line-height: 0;
+  filter: drop-shadow(0 4px 4px rgba(111, 85, 71, .18));
+  transition: transform .25s cubic-bezier(.34, 1.3, .64, 1), opacity .2s, filter .3s;
+}
+.ritem .item-svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.ritem .item-emoji { display: grid; place-items: center; width: 100%; height: 100%; font-size: clamp(14px, 4.2cqw, 56px); line-height: 1; }
+.scene { container-type: inline-size; }
+.ritem.flipped .item-svg, .ritem.flipped .item-emoji { transform: scaleX(-1); }
+.ritem.surf-ceiling { transform: translate(-50%, 0); } /* anchor treo từ trần: top = h → dịch về 0 */
+.ritem.surf-ceiling { top: 0 !important; }
+.ritem.layer-rug { filter: none; }
+.ritem.sway .art-sway { transform-origin: 50% 90%; animation: plantSway 5s ease-in-out infinite; }
+@keyframes plantSway { 0%, 100% { transform: rotate(-1.5deg); } 50% { transform: rotate(1.5deg); } }
+.ritem.poke .art-sway, .ritem.poke .item-emoji { animation: pokeWiggle .5s cubic-bezier(.34, 1.3, .64, 1); }
+@keyframes pokeWiggle { 30% { transform: rotate(6deg) scale(1.06); } 60% { transform: rotate(-4deg); } }
+.ritem.settle { animation: settleIn .45s cubic-bezier(.34, 1.4, .64, 1); }
+@keyframes settleIn { 0% { transform: translate(-50%, -100%) scale(.94); } 60% { transform: translate(-50%, -100%) scale(1.03); } 100% { transform: translate(-50%, -100%) scale(1); } }
+.ritem.has-steam .art-steam { animation: steam 2.6s ease-in-out infinite; transform-origin: 50% 100%; }
+.ritem.has-steam .art-steam path:last-child { animation-delay: .8s; }
+@keyframes steam { 0% { transform: translateY(0) scaleX(1); opacity: .7; } 100% { transform: translateY(-6px) scaleX(1.3); opacity: 0; } }
+.ritem.is-glow .art-screen { animation: screenGlow 3s ease-in-out infinite; }
+@keyframes screenGlow { 50% { fill: #E4F0FA; } }
+.art-bulb { animation: twinkleBulb 1.8s ease-in-out infinite; }
+.art-bulb.b1 { animation-delay: .4s; } .art-bulb.b2 { animation-delay: .9s; } .art-bulb.b3 { animation-delay: 1.3s; }
+@keyframes twinkleBulb { 50% { opacity: .45; } }
+.art-hand-s { transform-origin: 30px 30px; animation: clockSec 60s linear infinite; }
+.art-hand-m { transform-origin: 30px 30px; animation: clockMin 3600s linear infinite; }
+@keyframes clockSec { to { transform: rotate(360deg); } }
+@keyframes clockMin { to { transform: rotate(360deg); } }
+
+/* ---- Đèn ---- */
+.art-lamp-glow { transition: opacity 1.5s ease; }
+.art-lamp-bulb { transition: fill 1s; }
+.scene.lamp-on .is-lamp .art-lamp-glow { opacity: .55; }
+.scene.lamp-on .is-lamp .art-lamp-bulb { fill: #FFF0B0; filter: drop-shadow(0 0 6px #F3D993); }
+.scene.lamp-on .is-lamp { filter: drop-shadow(0 0 14px rgba(243, 217, 147, .7)) drop-shadow(0 4px 4px rgba(111, 85, 71, .18)); }
+.lamp-glow {
+  position: absolute; inset: 0; opacity: 0; transition: opacity 1.6s ease;
+  /* vũng sáng ấm đổ xuống khu vực bàn học */
+  background:
+    radial-gradient(ellipse 30% 22% at 52% 62%, rgba(255, 226, 150, .55), rgba(255, 226, 150, 0) 72%),
+    radial-gradient(ellipse 46% 38% at 52% 66%, rgba(255, 214, 130, .3), rgba(255, 214, 130, 0) 74%),
+    radial-gradient(ellipse 70% 60% at 52% 60%, rgba(255, 200, 120, .14), rgba(255, 200, 120, 0) 78%);
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+.scene.lamp-on .lamp-glow { opacity: 1; }
+/* ban ngày đèn chỉ là chút hơi ấm, ban đêm rực rõ */
+.scene.tod-day.lamp-on .lamp-glow,
+.scene.tod-morning.lamp-on .lamp-glow { opacity: .45; }
+
+/* ---- Mèo ---- */
+.room-cat {
+  position: absolute; transform: translate(-50%, -100%); width: 14%; border: 0; background: none; padding: 0; cursor: pointer;
+  filter: drop-shadow(0 6px 5px rgba(111, 85, 71, .2));
+}
+.room-cat .mascot-svg { width: 100%; height: auto; transform: scaleX(var(--flip, 1)); transition: transform .3s; }
+.cat-shadow { position: absolute; left: 50%; bottom: -2%; width: 70%; height: 8%; background: radial-gradient(ellipse, rgba(111, 85, 71, .25), transparent 70%); transform: translateX(-50%); pointer-events: none; }
+
+/* ---- Ánh sáng tổng theo giờ ---- */
+.ambient { position: absolute; inset: 0; transition: background 2.5s ease, opacity 2.5s ease; pointer-events: none; mix-blend-mode: multiply; }
+.dust { position: absolute; inset: 0; pointer-events: none; }
+.dust i { position: absolute; width: 3px; height: 3px; border-radius: 50%; background: rgba(255, 248, 220, .9); opacity: 0; animation: dustFloat 9s ease-in-out infinite; }
+.dust i:nth-child(1) { left: 18%; top: 50%; animation-delay: 0s; } .dust i:nth-child(2) { left: 26%; top: 62%; animation-delay: 2s; } .dust i:nth-child(3) { left: 14%; top: 70%; animation-delay: 4s; } .dust i:nth-child(4) { left: 32%; top: 56%; animation-delay: 6s; } .dust i:nth-child(5) { left: 22%; top: 76%; animation-delay: 8s; }
+@keyframes dustFloat { 0%, 100% { opacity: 0; transform: translate(0, 0); } 20%, 80% { opacity: .7; } 50% { transform: translate(6px, -14px); } }
+
+.scene.tod-morning .sky { background: linear-gradient(180deg, #FBE6D6, #DDEBF7); }
+.scene.tod-morning .ambient { background: rgba(255, 236, 200, .18); }
+.scene.tod-day .ambient { background: transparent; }
+.scene.tod-afternoon .sky { background: linear-gradient(180deg, #F6D3BF, #F3D993); }
+.scene.tod-afternoon .sun { background: #F3C98C; right: 12%; top: 32%; }
+.scene.tod-afternoon .ambient { background: rgba(243, 200, 150, .22); }
+.scene.tod-afternoon .window-light { opacity: 1; background: linear-gradient(180deg, rgba(243, 200, 150, .5), transparent); }
+.scene.tod-evening .sky { background: linear-gradient(180deg, #7A6A80, #D9A48A); }
+.scene.tod-evening .sun { opacity: 0; } .scene.tod-evening .moon { opacity: 1; }
+.scene.tod-evening .ambient { background: rgba(140, 110, 120, .3); }
+.scene.tod-evening .window-light { opacity: .2; }
+.scene.tod-night .sky { background: linear-gradient(180deg, #3E3A55, #5B5478); }
+.scene.tod-night .sun { opacity: 0; } .scene.tod-night .moon { opacity: 1; } .scene.tod-night .stars { opacity: .9; }
+.scene.tod-night .ambient { background: rgba(70, 60, 95, .48); }
+.scene.tod-night .window-light { opacity: 0; }
+.scene.tod-night .cloud { opacity: .3; }
+.scene.tod-night .dust i, .scene.tod-evening .dust i { animation-play-state: paused; opacity: 0; }
+/* đèn bật làm phòng sáng ấm lại vào tối/đêm */
+.scene.tod-night.lamp-on .ambient { background: rgba(90, 70, 80, .3); }
+.scene.tod-evening.lamp-on .ambient { background: rgba(160, 120, 110, .18); }
+
+/* ---- Thời tiết ---- */
+.scene.weather-cloudy .sun { opacity: .5; box-shadow: none; }
+.scene.weather-cloudy .cloud { background: rgba(255, 255, 255, .95); }
+.scene.weather-cloudy .ambient { background: rgba(160, 165, 180, .14); }
+.scene.weather-rain .rain { opacity: 1; }
+.scene.weather-rain .sun { opacity: 0; }
+.scene.weather-rain .sky { background: linear-gradient(180deg, #A9B4C2, #C8D3DE); }
+.scene.weather-rain .cloud { background: rgba(230, 234, 240, .95); }
+.scene.weather-rain .ambient { background: rgba(140, 150, 170, .22); }
+.scene.weather-rain .window-light { opacity: .15; }
+
+/* ---- Decorate mode ---- */
+.grid-overlay { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .35s; background-image: linear-gradient(rgba(111, 85, 71, .08) 1px, transparent 1px), linear-gradient(90deg, rgba(111, 85, 71, .08) 1px, transparent 1px); background-size: 5% 5%; }
+.scene.decorate .grid-overlay { opacity: 1; }
+.scene.decorate .ritem.editable { cursor: grab; }
+.scene.decorate .ritem.editable:hover { filter: drop-shadow(0 6px 8px rgba(111, 85, 71, .25)) brightness(1.04); }
+.ritem.selected { filter: drop-shadow(0 0 0 2.5px rgba(145, 181, 138, .95)) drop-shadow(0 6px 10px rgba(111, 85, 71, .25)) !important; }
+.ritem.lifting { transform: translate(-50%, -103%) scale(1.04); }
+.ritem.dragging { opacity: .35; transition: none; }
+.scene.decorate .room-cat { opacity: .85; }
+.ghost { position: absolute; transform: translate(-50%, -100%); pointer-events: none; z-index: 200; line-height: 0; opacity: .62; transition: left .12s cubic-bezier(.2, .8, .2, 1), top .12s cubic-bezier(.2, .8, .2, 1); }
+.ghost .item-svg { width: 100%; height: 100%; overflow: visible; }
+.ghost .item-emoji { display: grid; place-items: center; width: 100%; height: 100%; font-size: clamp(14px, 4.2cqw, 56px); }
+.ghost.ok { filter: drop-shadow(0 0 0 2px rgba(145, 181, 138, .9)); }
+.ghost.bad { opacity: .35; filter: grayscale(.6) drop-shadow(0 0 0 2px rgba(227, 162, 158, .9)); }
+.scene-empty { position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%); text-align: center; font-size: 1.8rem; display: flex; flex-direction: column; gap: 4px; align-items: center; background: rgba(255, 248, 236, .85); padding: 14px 20px; border-radius: 16px; backdrop-filter: blur(4px); }
+.scene-empty strong { font-size: .95rem; font-family: var(--font-head); color: var(--brown-dark); }
+.scene-empty span { font-size: .75rem; color: var(--brown-soft); }
+
+@media (prefers-reduced-motion: reduce) {
+  .scene .L { transition: none; }
+  .curtain, .cloud, .dust i, .ritem.sway .art-sway, .rain i { animation: none !important; }
+}
