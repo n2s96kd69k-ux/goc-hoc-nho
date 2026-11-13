@@ -32,7 +32,6 @@ export function updateSubject(id, patch) {
 export function deleteSubject(id) {
   update((s) => {
     s.subjects = s.subjects.filter((x) => x.id !== id);
-    // task của môn bị xóa chuyển sang môn đầu tiên (nếu còn) hoặc null
     const fallback = s.subjects[0] ? s.subjects[0].id : null;
     s.tasks.forEach((t) => { if (t.subjectId === id) t.subjectId = fallback; });
   }, { type: 'subject-delete' });
@@ -47,15 +46,12 @@ export function addScore(id, score, note) {
   }, { type: 'subject-update' });
 }
 
-/** Thống kê một môn */
 export function subjectStats(id) {
   const s = getState();
   const tasks = s.tasks.filter((t) => t.subjectId === id);
   const done = tasks.filter((t) => t.done);
-  const minutes = done.reduce((a, t) => a + (t.minutes || 0), 0)
-    + (s.timer.bySubject && s.timer.bySubject[id] ? s.timer.bySubject[id] : 0);
-  const pomodoros = done.reduce((a, t) => a + (t.pomodoros || 0), 0)
-    + (s.timer.pomosBySubject && s.timer.pomosBySubject[id] ? s.timer.pomosBySubject[id] : 0);
+  const minutes = (s.timer.bySubject && s.timer.bySubject[id]) || 0;
+  const pomodoros = (s.timer.pomosBySubject && s.timer.pomosBySubject[id]) || 0;
   return {
     total: tasks.length,
     done: done.length,

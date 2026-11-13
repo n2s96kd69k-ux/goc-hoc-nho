@@ -22,7 +22,6 @@ export function dayProgress(key) {
   return { total: list.length, done, percent: pct(done, list.length) };
 }
 
-/** Môn chính của ngày: môn có nhiều task nhất */
 export function mainSubjectOfDay(key) {
   const list = tasksOfDay(key);
   if (!list.length) return null;
@@ -68,10 +67,6 @@ export function deleteTask(id) {
   update((s) => { s.tasks = s.tasks.filter((t) => t.id !== id); }, { type: 'task-delete', id });
 }
 
-/**
- * Bật/tắt hoàn thành. Trả về thông tin phần thưởng để UI hiển thị.
- * @returns {{done:boolean, coins:number, dayComplete:boolean, streakEvents:Array}}
- */
 export function toggleTask(id) {
   const s = getState();
   const t = s.tasks.find((x) => x.id === id);
@@ -83,7 +78,6 @@ export function toggleTask(id) {
     const task = st.tasks.find((x) => x.id === id);
     task.done = nowDone;
     task.completedAt = nowDone ? Date.now() : null;
-    // Đảm bảo bản ghi ngày tồn tại (để lịch tháng có màu)
     dayRecord(t.date);
   }, { type: 'task-toggle', id, done: nowDone });
 
@@ -101,12 +95,18 @@ export function toggleTask(id) {
     weekBonus = checkWeekComplete(t.date);
     if (dayComplete) { sounds.fanfare(); mascot.react('celebrate'); }
     else { sounds.pop(); mascot.react('happy'); }
+  } else {
+    coins -= REWARDS.TASK;
+    const after = dayProgress(t.date);
+    if (before.total > 0 && before.done === before.total && after.done !== after.total) {
+      coins -= REWARDS.DAY_COMPLETE;
+    }
+    addCoins(coins, 'task-undo');
   }
   const { events } = recomputeStreak();
   return { done: nowDone, coins, dayComplete, weekBonus, streakEvents: events };
 }
 
-/** Chuyển task sang ngày khác */
 export function moveTask(id, newDate) {
   updateTask(id, { date: newDate });
 }

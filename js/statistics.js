@@ -3,21 +3,15 @@ import { getState } from './state.js';
 import { weekKeys, startOfWeek, todayKey, toKey, addDays, pct } from './utils.js';
 import { subjectStats } from './subjects.js';
 
-/** Phút học trong ngày = phút từ Pomodoro/ghi tay + phút dự kiến của task đã hoàn thành */
+/** Phút học thật trong ngày: chỉ Pomodoro và phút ghi tay, không cộng phút dự kiến của task. */
 export function minutesOfDay(key) {
-  const s = getState();
-  const d = s.days[key];
-  const fromTimer = d ? d.minutes || 0 : 0;
-  const fromTasks = s.tasks.filter((t) => t.date === key && t.done).reduce((a, t) => a + (t.minutes || 0), 0);
-  return fromTimer + fromTasks;
+  const d = getState().days[key];
+  return d && d.minutes ? d.minutes : 0;
 }
 
 export function pomodorosOfDay(key) {
-  const s = getState();
-  const d = s.days[key];
-  const fromTimer = d ? d.pomodoros || 0 : 0;
-  const fromTasks = s.tasks.filter((t) => t.date === key && t.done).reduce((a, t) => a + (t.pomodoros || 0), 0);
-  return fromTimer + fromTasks;
+  const d = getState().days[key];
+  return d && d.pomodoros ? d.pomodoros : 0;
 }
 
 export function weekSummary(monday = startOfWeek(todayKey())) {
@@ -35,7 +29,6 @@ export function weekSummary(monday = startOfWeek(todayKey())) {
   return { keys, perDay, total, done, percent: pct(done, total), minutes, pomodoros };
 }
 
-/** Tổng phút học mọi thời gian (dùng cho cây tiến độ) */
 export function totalMinutesAllTime() {
   const s = getState();
   const days = Object.keys(s.days);
@@ -67,7 +60,6 @@ export function overallStats() {
   };
 }
 
-/** 14 ngày gần nhất */
 export function lastNDays(n = 14) {
   const t = todayKey();
   const out = [];
@@ -80,7 +72,6 @@ export function lastNDays(n = 14) {
   return out;
 }
 
-/** Trạng thái ngày cho lịch tháng: good | partial | missed | future | none */
 export function dayStatus(key) {
   const t = todayKey();
   if (key > t) return 'future';
