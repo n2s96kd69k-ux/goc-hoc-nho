@@ -173,8 +173,21 @@ function shownExams() {
 
 function nearestDate(list) {
   const today = todayKey();
-  const dates = list.map((e) => e.date).filter(Boolean).sort();
+  const dates = list.flatMap((e) => e.dates || []).filter(Boolean).sort();
   return dates.find((d) => d >= today) || '';
+}
+
+function dayText(date, today) {
+  if (!date) return 'Chưa chốt';
+  const n = daysBetween(today, date);
+  if (n > 0) return `${n} ngày`;
+  if (n === 0) return 'Hôm nay';
+  return 'Đã thi';
+}
+
+function roundRow(id, date, index, admin) {
+  if (!admin) return `<div class="exam-round"><span class="round-label">Đợt ${index + 1}</span><span class="exam-date">${formatDMY(date)}</span></div>`;
+  return `<div class="exam-round"><span class="round-label">Đợt ${index + 1}</span><input class="exam-date" type="date" data-exam="${id}" value="${escapeHtml(date || '')}"><button type="button" class="round-del" data-del-round aria-label="Xóa đợt">×</button></div>`;
 }
 
 function paintExams() {
@@ -188,15 +201,35 @@ function paintExams() {
   board.innerHTML = `${legend ? legend.outerHTML : '<legend>Lịch thi</legend>'}
     <ul class="exam-list">
       ${list.map((e) => `
-        <li>
+        <li class="exam-row" data-id="${e.id}">
           <label class="exam-pick"><input type="checkbox" data-show="${e.id}" ${picked.has(e.id) ? 'checked' : ''}><span class="exam-name">${escapeHtml(e.name)}</span></label>
-          ${admin
-            ? `<input class="exam-date" type="date" data-exam="${e.id}" value="${escapeHtml(e.date || '')}">`
-            : `<span class="exam-date">${e.date ? formatDMY(e.date) : 'Chưa chốt'}</span>`}
+          <div class="exam-rounds">
+            ${(e.dates || []).map((d, i) => roundRow(e.id, d, i, admin)).join('')}
+            ${!(e.dates || []).length && !admin ? '<span class="exam-date">Chưa chốt</span>' : ''}
+            ${admin ? '<button type="button" class="link-btn" data-add-round>Thêm đợt</button>' : ''}
+          </div>
         </li>`).join('')}
     </ul>
     ${admin ? '<button type="button" class="btn btn-soft btn-sm" id="exam-save">Lưu lịch thi</button>' : '<p class="small muted">Tích để hiện kỳ đó trên mục tiêu.</p>'}
   `;
+  const renumber = (row) => row.querySelectorAll('.round-label').forEach((el, i) => { el.textContent = `Đợt ${i + 1}`; });
+  board.onclick = (e) => {
+    const add = e.target.closest('[data-add-round]');
+    if (add) {
+      const row = add.closest('.exam-row');
+      const box = row.querySelector('.exam-rounds');
+      const hold = document.createElement('div');
+      hold.innerHTML = roundRow(row.dataset.id, '', box.querySelectorAll('.exam-round').length, true);
+      box.insertBefore(hold.firstElementChild, add);
+      renumber(row);
+      return;
+    }
+    const del = e.target.closest('[data-del-round]');
+    if (!del) return;
+    const row = del.closest('.exam-row');
+    del.closest('.exam-round').remove();
+    renumber(row);
+  };
   board.querySelectorAll('[data-show]').forEach((el) => el.onchange = () => {
     const ids = [...board.querySelectorAll('[data-show]:checked')].map((x) => x.dataset.show);
     const visible = getExamSchedule().filter((e) => ids.includes(e.id));
@@ -209,12 +242,14 @@ function paintExams() {
   const save = board.querySelector('#exam-save');
   if (save) save.onclick = async () => {
     const dates = {};
-    board.querySelectorAll('[data-exam]').forEach((el) => { dates[el.dataset.exam] = el.value; });
+    board.querySelectorAll('.exam-row').forEach((row) => {
+      dates[row.dataset.id] = [...row.querySelectorAll('[data-exam]')].map((el) => el.value).filter(Boolean);
+    });
     save.disabled = true;
     try {
       await saveExamSchedule(dates);
-      const visible = shownExams();
-      update((s) => { s.goal.examDate = nearestDate(visible); }, { type: 'sidebar-ui' });
+      update((s) => { s.goal.examDate = nearestDate(shownExams()); }, { type: 'sidebar-ui' });
+      toast('Đã cập nhật lịch thi');
       paintShown();
       save.disabled = false;
     } catch (err) {
@@ -242,9 +277,10 @@ function paintShown() {
     <h4 class="side-title">Đếm ngược</h4>
     <div class="count-grid">
       ${list.map((e) => {
-        const n = e.date ? daysBetween(today, e.date) : null;
-        const text = n === null ? 'Chưa chốt' : n > 0 ? `${n} ngày` : n === 0 ? 'Hôm nay' : 'Đã thi';
-        return `<div class="count-card"><small>${escapeHtml(e.name)}</small><strong>${text}</strong></div>`;
+        const dates = e.dates || [];
+        const next = dates.filter((d) => d >= today).sort()[0] || '';
+        const lines = dates.length ? dates.map((d, i) => `<div class="round-line ${d === next ? 'is-next' : ''}"><span>Đợt ${i + 1}</span><strong>${dayText(d, today)}</strong></div>`).join('') : '<strong>Chưa chốt</strong>';
+        return `<div class="count-card"><small>${escapeHtml(e.name)}</small>${lines}</div>`;
       }).join('')}
     </div>`;
 }

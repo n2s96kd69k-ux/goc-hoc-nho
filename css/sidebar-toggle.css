@@ -34,7 +34,7 @@
 .goal-main { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .goal-hero .goal-meta { grid-template-columns: 1fr 1fr; }
 #exam-board .exam-list { gap: 8px; }
-#exam-board .exam-list li {
+#exam-board .exam-list li.exam-row {
   display: grid;
   grid-template-columns: 18px minmax(0, 1fr) auto;
   align-items: center;
@@ -44,6 +44,13 @@
   border-radius: 12px;
   padding: 8px 10px;
 }
+#exam-board .exam-rounds { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.exam-round { display: flex; align-items: center; gap: 6px; }
+.round-label { font-size: .72rem; font-weight: 800; color: var(--brown-soft); min-width: 3.2em; }
+.round-del { border: 0; background: transparent; color: var(--brown-soft); font-size: 1rem; line-height: 1; padding: 0 2px; cursor: pointer; }
+.round-line { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.round-line strong { font-size: .95rem; }
+.round-line.is-next strong { font-size: 1.15rem; }
 #exam-board .exam-pick { display: contents; }
 #exam-board input[type="checkbox"] {
   width: 18px; height: 18px; margin: 0; padding: 0;

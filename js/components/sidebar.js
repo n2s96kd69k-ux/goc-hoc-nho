@@ -129,9 +129,13 @@ function goalCountdowns(g) {
   const list = getExamSchedule().filter((e) => ids.includes(e.id));
   if (!list.length) return '<p class="goal-days">Chưa chọn kỳ thi</p>';
   return `<ul class="side-counts">${list.map((e) => {
-    const n = e.date ? daysBetween(today, e.date) : null;
-    const text = n === null ? 'Chưa chốt' : n > 0 ? `${n} ngày` : n === 0 ? 'Hôm nay' : 'Đã thi';
-    return `<li><span>${escapeHtml(e.name)}</span><strong>${text}</strong></li>`;
+    const dates = (e.dates || []).filter(Boolean).sort();
+    const next = dates.find((d) => d >= today) || '';
+    const dot = next ? dates.indexOf(next) + 1 : 0;
+    const n = next ? daysBetween(today, next) : null;
+    const text = !dates.length ? 'Chưa chốt' : n === null ? 'Đã thi' : n === 0 ? 'Hôm nay' : `${n} ngày`;
+    const label = next ? `${escapeHtml(e.name)} · Đợt ${dot}` : escapeHtml(e.name);
+    return `<li><span>${label}</span><strong>${text}</strong></li>`;
   }).join('')}</ul>`;
 }
 
