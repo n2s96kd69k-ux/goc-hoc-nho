@@ -25,6 +25,10 @@ export function renderHeader() {
       <span class="brand-name">🌷 GÓC HỌC NHỎ</span>
       <span class="brand-tag">“Một góc nhỏ cho những ngày cố gắng.”</span>
     </a>
+    <button class="live-study" id="live-study" type="button" title="Học cùng mọi người ngay!">
+      <span class="live-dot" aria-hidden="true"></span>
+      <span class="live-copy">Đang có <strong class="live-count" data-live-count>${liveCount}</strong> bạn đang học bài</span>
+    </button>
     <div class="header-right">
       <button class="pill glass header-streak" id="streak-btn" type="button" title="Xem việc cần làm để giữ chuỗi">🔥 ${s.streak.current} ngày</button>
       <span class="pill glass header-coins" title="Xu của bạn">🪙 ${s.wallet.coins} xu</span>
@@ -34,10 +38,12 @@ export function renderHeader() {
     </div>`;
   el.querySelector('#settings-btn').onclick = () => navigate('/settings');
   el.querySelector('#streak-btn').onclick = () => openStreakPanel();
+  el.querySelector('#live-study').onclick = () => openLiveRoom();
   el.querySelector('#auth-btn').onclick = () => openAuthModal();
   el.querySelector('#header-mascot').onclick = () => { mascot.poke(); if (location.hash !== '#/room') navigate('/room'); };
   shownCoins = s.wallet.coins;
   bindSidebarToggle(el.querySelector('#menu-btn'));
+  startLiveCount();
 }
 
 const SIDEBAR_KEY = 'ghn_sidebar_collapsed';
@@ -74,6 +80,38 @@ export function refreshHeaderAuth() {
 }
 
 let shownCoins = null;
+let liveCount = 142;
+let liveTimer = null;
+
+function startLiveCount() {
+  if (liveTimer) return;
+  liveTimer = setInterval(() => {
+    const step = Math.random() < 0.75 ? (Math.random() < 0.5 ? -1 : 1) : (Math.random() < 0.5 ? -2 : 2);
+    liveCount = Math.min(168, Math.max(118, liveCount + step));
+    document.querySelectorAll('[data-live-count]').forEach((el) => { el.textContent = String(liveCount); });
+  }, 15000);
+}
+
+function openLiveRoom() {
+  const desks = ['Toán', 'Ngữ văn', 'Tiếng Anh', 'Lý', 'Hóa'].map((name, i) => {
+    const n = 8 + ((liveCount + i * 17) % 28);
+    return `<li><span>${name}</span><strong>${n} bạn</strong></li>`;
+  }).join('');
+  const modal = openModal({
+    title: 'Phòng học chung',
+    content: `
+      <button class="live-study live-study-in" type="button" tabindex="-1">
+        <span class="live-dot" aria-hidden="true"></span>
+        <span class="live-copy">Đang có <strong class="live-count" data-live-count>${liveCount}</strong> bạn đang học bài</span>
+      </button>
+      <p class="page-sub">Thư viện đang mở. Mọi người học trong yên lặng, bạn có thể vào học cùng.</p>
+      <ul class="live-desks">${desks}</ul>
+      <div class="modal-actions">
+        <button class="btn btn-primary" type="button" id="live-join">Học cùng mọi người</button>
+      </div>`,
+  });
+  modal.el.querySelector('#live-join').onclick = () => { modal.close(); navigate('/pomodoro'); };
+}
 let coinRaf = null;
 /** Cập nhật nhanh xu/chuỗi — số xu đếm mượt tới giá trị mới */
 export function refreshHeaderStats() {

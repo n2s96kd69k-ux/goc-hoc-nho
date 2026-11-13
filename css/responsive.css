@@ -36,6 +36,7 @@
   .brand-name { font-size: 1rem; }
   .header-right { gap: 6px; }
   .header-right .pill { padding: 5px 9px; font-size: .75rem; }
+  .live-study { display: none; }
   #settings-btn { display: none; }
 
   /* Sidebar -> drawer */
