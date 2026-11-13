@@ -42,10 +42,10 @@ export function renderGoals(root) {
           <div class="tape"></div>
           <div class="goal-icon-big">${goalMark(g)}</div>
           <h2>${escapeHtml(g.name || 'Chưa đặt mục tiêu')}</h2>
-          <div class="exam-board" id="exam-board"></div>
+          <div id="exam-shown"></div>
           <div class="goal-meta">
             <div><small>Điểm mục tiêu</small><strong>${g.targetScore || '____'}</strong></div>
-            <div><small>Còn</small><strong>${daysLeft === null ? '—' : daysLeft >= 0 ? `${daysLeft} ngày` : 'Đã thi'}</strong></div>
+            <div><small>Còn</small><strong id="goal-left">${daysLeft === null ? '—' : daysLeft >= 0 ? `${daysLeft} ngày` : 'Đã thi'}</strong></div>
           </div>
           ${progressBar(percent, { color: 'var(--lavender-dark)', height: 12 })}
           <div class="goal-pct">Tiến độ nhiệm vụ: ${percent}%</div>
@@ -74,10 +74,10 @@ export function renderGoals(root) {
               <p class="small muted">Chỉ quản trị viên tải được. Logo mới hiện với mọi tài khoản.</p>
             </div>
           </fieldset>
-          <div class="field-row">
-            <label class="field"><span>Ngày thi</span><input type="date" name="examDate" value="${g.examDate || ''}"></label>
-            <label class="field"><span>Điểm mục tiêu</span><input name="targetScore" maxlength="10" value="${escapeHtml(g.targetScore)}" placeholder="27.5"></label>
-          </div>
+          <fieldset class="field" id="exam-board">
+            <legend>Lịch thi</legend>
+          </fieldset>
+          <label class="field"><span>Điểm mục tiêu</span><input name="targetScore" maxlength="10" value="${escapeHtml(g.targetScore)}" placeholder="27.5"></label>
           <label class="field"><span>Lời nhắn cho mình</span><textarea name="note" rows="2" maxlength="160" placeholder="Một câu để nhớ vì sao mình bắt đầu…">${escapeHtml(g.note || '')}</textarea></label>
           <div class="modal-actions"><button class="btn btn-primary" type="submit">Lưu mục tiêu</button></div>
         </form>
@@ -166,36 +166,46 @@ export function renderGoals(root) {
   };
 }
 
+function shownExams() {
+  const ids = getState().goal.examShows || [];
+  return getExamSchedule().filter((e) => ids.includes(e.id));
+}
+
+function nearestDate(list) {
+  const today = todayKey();
+  const dates = list.map((e) => e.date).filter(Boolean).sort();
+  return dates.find((d) => d >= today) || '';
+}
+
 function paintExams() {
   const board = document.querySelector('#exam-board');
   const count = document.querySelector('#exam-count');
   if (!board || !count) return;
   const list = getExamSchedule();
-  const today = todayKey();
+  const picked = new Set(getState().goal.examShows || []);
   const admin = isAdminUser();
-  board.innerHTML = `
-    <p class="exam-label">Lịch thi</p>
+  const legend = board.querySelector('legend');
+  board.innerHTML = `${legend ? legend.outerHTML : '<legend>Lịch thi</legend>'}
     <ul class="exam-list">
       ${list.map((e) => `
         <li>
-          <span>${escapeHtml(e.name)}</span>
+          <label class="exam-pick"><input type="checkbox" data-show="${e.id}" ${picked.has(e.id) ? 'checked' : ''}> ${escapeHtml(e.name)}</label>
           ${admin
             ? `<input type="date" data-exam="${e.id}" value="${escapeHtml(e.date || '')}">`
             : `<strong>${e.date ? formatDMY(e.date) : 'Chưa chốt'}</strong>`}
         </li>`).join('')}
     </ul>
-    ${admin ? '<button type="button" class="btn btn-soft btn-sm" id="exam-save">Lưu lịch thi</button>' : ''}
+    ${admin ? '<button type="button" class="btn btn-soft btn-sm" id="exam-save">Lưu lịch thi</button>' : '<p class="small muted">Tích để hiện kỳ đó trên mục tiêu.</p>'}
   `;
-  count.innerHTML = `
-    <h4 class="side-title">Đếm ngược</h4>
-    <div class="count-grid">
-      ${list.map((e) => {
-        const left = e.date ? daysBetween(today, e.date) : null;
-        const text = left === null ? 'Chưa chốt' : left > 0 ? `${left} ngày` : left === 0 ? 'Hôm nay' : 'Đã thi';
-        return `<div class="count-card"><small>${escapeHtml(e.name)}</small><strong>${text}</strong></div>`;
-      }).join('')}
-    </div>
-  `;
+  board.querySelectorAll('[data-show]').forEach((el) => el.onchange = () => {
+    const ids = [...board.querySelectorAll('[data-show]:checked')].map((x) => x.dataset.show);
+    const visible = getExamSchedule().filter((e) => ids.includes(e.id));
+    update((s) => {
+      s.goal.examShows = ids;
+      s.goal.examDate = nearestDate(visible);
+    }, { type: 'sidebar-ui' });
+    paintShown();
+  });
   const save = board.querySelector('#exam-save');
   if (save) save.onclick = async () => {
     const dates = {};
@@ -203,12 +213,41 @@ function paintExams() {
     save.disabled = true;
     try {
       await saveExamSchedule(dates);
+      const visible = shownExams();
+      update((s) => { s.goal.examDate = nearestDate(visible); }, { type: 'sidebar-ui' });
       toast('Đã cập nhật lịch thi');
+      paintShown();
+      save.disabled = false;
     } catch (err) {
       toast(err.message || 'Không lưu được lịch thi', { kind: 'error' });
       save.disabled = false;
     }
   };
+  paintShown();
+}
+
+function paintShown() {
+  const box = document.querySelector('#exam-shown');
+  const count = document.querySelector('#exam-count');
+  const left = document.querySelector('#goal-left');
+  if (!box || !count) return;
+  const list = shownExams();
+  const today = todayKey();
+  box.innerHTML = list.length ? `<ul class="exam-list exam-shown">${list.map((e) => `
+    <li><span>${escapeHtml(e.name)}</span><strong>${e.date ? formatDMY(e.date) : 'Chưa chốt'}</strong></li>`).join('')}</ul>` : '';
+  const next = nearestDate(list);
+  const days = next ? daysBetween(today, next) : null;
+  if (left) left.textContent = days === null ? '—' : days >= 0 ? `${days} ngày` : 'Đã thi';
+  count.hidden = !list.length;
+  count.innerHTML = list.length ? `
+    <h4 class="side-title">Đếm ngược</h4>
+    <div class="count-grid">
+      ${list.map((e) => {
+        const n = e.date ? daysBetween(today, e.date) : null;
+        const text = n === null ? 'Chưa chốt' : n > 0 ? `${n} ngày` : n === 0 ? 'Hôm nay' : 'Đã thi';
+        return `<div class="count-card"><small>${escapeHtml(e.name)}</small><strong>${text}</strong></div>`;
+      }).join('')}
+    </div>` : '';
 }
 
 function goalMark(g) {
