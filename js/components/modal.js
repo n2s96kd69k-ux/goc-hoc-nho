@@ -3,10 +3,6 @@ import { h } from '../utils.js';
 
 const root = () => document.getElementById('modal-root');
 
-/**
- * Mở modal. content: HTML string hoặc Element.
- * Trả về { el, close }.
- */
 export function openModal({ title = '', content = '', size = 'md', onClose = null, hideClose = false } = {}) {
   const wrap = h(`
     <div class="modal-backdrop" role="dialog" aria-modal="true" aria-label="${title || 'Hộp thoại'}">
@@ -31,16 +27,17 @@ export function openModal({ title = '', content = '', size = 'md', onClose = nul
       if (onClose) onClose();
     }, 200);
   };
-  wrap.addEventListener('click', (e) => { if (e.target === wrap) close(); });
+  if (!hideClose) {
+    wrap.addEventListener('click', (e) => { if (e.target === wrap) close(); });
+    const esc = (e) => { if (e.key === 'Escape') { close(); document.removeEventListener('keydown', esc); } };
+    document.addEventListener('keydown', esc);
+  }
   const closeBtn = wrap.querySelector('.modal-close');
   if (closeBtn) closeBtn.addEventListener('click', close);
-  const esc = (e) => { if (e.key === 'Escape') { close(); document.removeEventListener('keydown', esc); } };
-  document.addEventListener('keydown', esc);
   requestAnimationFrame(() => wrap.classList.add('open'));
   return { el: wrap, body, close };
 }
 
-/** Hộp xác nhận. Trả về Promise<boolean> */
 export function confirmDialog({ title = 'Bạn chắc chứ?', message = '', okText = 'Đồng ý', cancelText = 'Hủy', danger = false } = {}) {
   return new Promise((resolve) => {
     const m = openModal({
