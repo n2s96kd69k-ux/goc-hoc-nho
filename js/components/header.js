@@ -4,13 +4,13 @@ import { mascotSVG, mascot } from '../mascot.js';
 import { navigate } from '../router.js';
 import { getCurrentUser } from '../cloud.js';
 import { openAuthModal } from './authModal.js';
-import { esc } from '../utils.js';
+import { escapeHtml } from '../utils.js';
 
 function authButtonText(user) {
   if (!user) return '☁️ Đăng nhập';
   const raw = user.displayName || (user.email ? user.email.split('@')[0] : 'Tài khoản');
   const short = raw.length > 14 ? raw.slice(0, 12) + '…' : raw;
-  return `☁️ ${esc(short)}`;
+  return `☁️ ${escapeHtml(short)}`;
 }
 
 export function renderHeader() {

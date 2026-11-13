@@ -11,13 +11,13 @@ import {
   saveCloudState,
   friendlyAuthError,
 } from '../cloud.js';
-import { esc } from '../utils.js';
+import { escapeHtml } from '../utils.js';
 
 export function openAuthModal() {
   const user = getCurrentUser();
   if (user) {
-    const label = esc(user.displayName || user.email || 'Tài khoản');
-    const email = esc(user.email || '');
+    const label = escapeHtml(user.displayName || user.email || 'Tài khoản');
+    const email = escapeHtml(user.email || '');
     const m = openModal({
       title: '☁️ Tài khoản đồng bộ',
       size: 'sm',
