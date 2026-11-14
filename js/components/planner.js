@@ -125,12 +125,12 @@ function taskItemHTML(t) {
   const pr = PRIORITIES.find((p) => p.id === t.priority);
   return `
     <li class="task ${t.done ? 'done' : ''} pr-${t.priority}" data-id="${t.id}">
-      <button class="checkbox ${t.done ? 'checked' : ''}" type="button" data-toggle="${t.id}" aria-label="${t.done ? 'Bỏ đánh dấu' : 'Hoàn thành'}: ${escapeHtml(t.title)}" aria-pressed="${t.done}">
+      <button class="checkbox ${t.done ? 'checked' : ''}" type="button" data-toggle="${t.id}" aria-label="${t.done ? 'Bỏ đánh dấu' : 'Hoàn thành'}: ${escapeHtml(t.title)}" aria-pressed="${t.done ? 'true' : 'false'}">
         <span class="check-mark">✓</span>
       </button>
       <button class="task-title" type="button" data-edit="${t.id}" title="${escapeHtml(t.note || t.title)}">
         ${escapeHtml(t.title)}
-        <span class="task-meta">${sub ? `<i class="subject-dot" style="background:${sub.color}"></i>${escapeHtml(sub.name)}` : ''}${t.minutes ? ` · ${t.minutes}p` : ''}${t.priority === 'high' ? ' 🌷' : ''}</span>
+        <span class="task-meta">${sub ? `<i class="subject-dot" style="background:${sub.color}"></i>${escapeHtml(sub.name)}` : ''}${t.minutes ? ` · ${t.minutes}p` : ''}${t.priority === 'high' ? ` · ${pr ? pr.label : 'Ưu tiên cao'}` : ''}</span>
       </button>
     </li>`;
 }
@@ -138,9 +138,7 @@ function taskItemHTML(t) {
 function emptyDayHTML(key) {
   return `
     <div class="empty-day">
-      <div class="empty-mascot">${mascotSVG(56, { state: 'sleepy' })}</div>
       <p>Chưa có kế hoạch ${key === todayKey() ? 'hôm nay' : 'ngày này'}.</p>
-      <small>Nào, thêm một nhiệm vụ đầu tiên nhé?</small>
       <button type="button" class="btn btn-soft btn-sm" data-add="${key}">+ Thêm nhiệm vụ</button>
     </div>`;
 }
