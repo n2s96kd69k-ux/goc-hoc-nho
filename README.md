@@ -223,3 +223,4 @@ Thời gian học của một ngày = phút Pomodoro thực + phút dự kiến 
 
 ## 🚀 Triển khai
 Site tĩnh thuần — mở `index.html` hoặc publish qua **Publish tab**. Không cần cấu hình server.
+
