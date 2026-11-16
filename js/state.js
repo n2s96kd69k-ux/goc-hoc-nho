@@ -1,3 +1,4 @@
+import { mergeState, readSyncBase, writeSyncBase } from './sync.js';
 // ===== State trung tâm: nguồn dữ liệu duy nhất + pub/sub =====
 import { loadState, saveState } from './storage.js';
 import { createInitialState, isSampleTask, SIDEBAR_DEFAULT } from './seed.js';
@@ -41,10 +42,24 @@ export function initState() {
 
 export function getState() { return state; }
 
-const persist = debounce(() => saveState(state), 120);
-const persistCloud = debounce(() => {
-  const u = getCurrentUser();
-  if (u) saveCloudState(u.uid, state).catch((e) => console.warn('Đồng bộ đám mây lỗi:', e));
+let syncedUid = null;
+let syncing = null;
+let saving = false;
+let saveAgain = false;
+const persist = () => saveState(state);
+const persistCloud = debounce(async () => {
+  const user = getCurrentUser();
+  if (!user) return;
+  if (saving) { saveAgain = true; return; }
+  saving = true;
+  try {
+    if (syncedUid !== user.uid) await syncCloudForUser(user);
+    else await saveCloudState(user.uid, state);
+  } catch (e) { console.warn('Đồng bộ đám mây lỗi:', e); }
+  finally {
+    saving = false;
+    if (saveAgain) { saveAgain = false; persistCloud(); }
+  }
 }, 1200);
 
 /** Thay đổi state qua hàm mutator, sau đó lưu và thông báo */
@@ -57,6 +72,8 @@ export function update(mutator, meta = {}) {
 
 export function replaceState(newState, { skipCloud = false } = {}) {
   state = migrate(newState);
+  const user = getCurrentUser();
+  if (user) state._syncUid = user.uid;
   state.ui.viewWeek = toKey(startOfWeek(todayKey()));
   state.ui.viewDay = todayKey();
   saveState(state);
@@ -66,13 +83,30 @@ export function replaceState(newState, { skipCloud = false } = {}) {
 
 export async function syncCloudForUser(user) {
   if (!user) return null;
-  const remote = await loadCloudState(user.uid);
-  if (remote) {
-    replaceState(remote, { skipCloud: true });
-    return 'loaded';
-  }
-  await saveCloudState(user.uid, state);
-  return 'uploaded';
+  if (syncing) { await syncing; if (syncedUid === user.uid) return 'loaded'; }
+  syncedUid = null;
+  const job = (async () => {
+    const remote = await loadCloudState(user.uid);
+    if (getCurrentUser()?.uid !== user.uid) return null;
+    const base = readSyncBase(user.uid);
+    // Read local state AFTER the request so edits made while loading survive.
+    const local = state;
+    // Keep a recoverable copy before the first sync of legacy/unowned data.
+    if (remote && !base) localStorage.setItem('goc-hoc-nho:before-first-sync:' + user.uid, JSON.stringify(local));
+    const sameAccount = local._syncUid === user.uid;
+    const next = remote ? (sameAccount && base ? mergeState(base, local, remote) : remote) : local;
+    writeSyncBase(user.uid, remote || next);
+    replaceState({ ...next, _syncUid: user.uid }, { skipCloud: true });
+    await saveCloudState(user.uid, state);
+    syncedUid = user.uid;
+    return remote ? 'loaded' : 'uploaded';
+  })();
+  syncing = job;
+  try { return await job; } finally { if (syncing === job) syncing = null; }
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', () => { syncedUid = null; persistCloud(); });
 }
 
 export function subscribe(fn) {

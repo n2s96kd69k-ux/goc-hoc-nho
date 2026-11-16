@@ -1,3 +1,4 @@
+import { getCurrentUser } from '../cloud.js';
 // ===== Trang /settings =====
 import { getState, update, replaceState } from '../state.js';
 import { escapeHtml } from '../utils.js';
@@ -13,6 +14,8 @@ import { recomputeStreak } from '../gamification.js';
 
 export function renderSettings(root) {
   const s = getState();
+  let beforeSync = null;
+  try { beforeSync = JSON.parse(localStorage.getItem('goc-hoc-nho:before-first-sync:' + getCurrentUser()?.uid)); } catch {}
   root.innerHTML = `
     <section class="page settings-page">
       <h1 class="page-title">⚙ CÀI ĐẶT</h1>
@@ -60,9 +63,10 @@ export function renderSettings(root) {
 
         <div class="paper">
           <h4 class="side-title">💾 Sao lưu</h4>
-          <p class="small muted">Dữ liệu chỉ nằm trên trình duyệt này. Xuất file JSON để giữ lại hoặc chuyển sang máy khác.</p>
+          <p class="small muted">Xuất file JSON để giữ một bản sao dữ liệu hoặc chuyển sang máy khác.</p>
           <div class="btn-row">
             <button type="button" class="btn btn-soft" id="export-btn">📤 Xuất dữ liệu</button>
+            ${beforeSync ? '<button type="button" class="btn btn-soft" id="export-before-sync">Tải bản sao trước đồng bộ lần đầu</button>' : ''}
             <label class="btn btn-soft" for="import-file">📥 Nhập dữ liệu</label>
             <input type="file" id="import-file" accept="application/json,.json" hidden>
           </div>
@@ -79,6 +83,7 @@ export function renderSettings(root) {
       </div>
     </section>`;
 
+  root.querySelector('#export-before-sync')?.addEventListener('click', () => exportToFile(beforeSync));
   const form = root.querySelector('#settings-form');
   form.sound.onchange = () => { root.querySelector('#sound-label').textContent = form.sound.checked ? 'BẬT' : 'TẮT'; };
   form.onsubmit = (e) => {

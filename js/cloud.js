@@ -1,3 +1,4 @@
+import { mergeState, readSyncBase, writeSyncBase } from './sync.js';
 // ===== Đồng bộ đám mây với Firebase (Auth + Firestore) =====
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
 import {
@@ -14,6 +15,7 @@ import {
   doc,
   getDoc,
   setDoc,
+  runTransaction,
 } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
 const firebaseConfig = {
@@ -154,14 +156,24 @@ export async function loadCloudState(uid) {
 
 export async function saveCloudState(uid, state) {
   if (!db || !uid || !state) return false;
+  if (state._syncUid && state._syncUid !== uid) throw new Error('Dữ liệu thuộc tài khoản khác.');
   const ref = doc(db, 'users', uid);
+  const snapshot = JSON.parse(JSON.stringify(state));
+  const base = readSyncBase(uid);
   const patch = {
     publicId: accountId(uid),
-    state: JSON.parse(JSON.stringify(state)),
+    state: snapshot,
     updatedAt: new Date().toISOString(),
   };
   if (accountId(uid) === OWNER_ID) patch.role = 'admin';
-  await setDoc(ref, patch, { merge: true });
+  await runTransaction(db, async (transaction) => {
+    const remote = await transaction.get(ref);
+    const existing = remote.exists() ? remote.data().state : null;
+    // An unknown baseline must not silently overwrite an existing account.
+    if (existing && !base) throw new Error('Cần tải dữ liệu tài khoản trước khi lưu.');
+    transaction.set(ref, { ...patch, state: existing ? mergeState(base, snapshot, existing) : snapshot }, { merge: true });
+  });
+  writeSyncBase(uid, snapshot);
   return true;
 }
 

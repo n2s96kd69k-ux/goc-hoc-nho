@@ -1,7 +1,7 @@
 // ===== Đồng hồ Pomodoro (chạy nền, độc lập với trang đang mở) =====
-import { getState, update, dayRecord } from './state.js';
+import { getState, update, dayRecord, subscribe } from './state.js';
 import { todayKey } from './utils.js';
-import { addCoins, pomodoroReward, recomputeStreak } from './gamification.js';
+import { pomodoroReward, recomputeStreak } from './gamification.js';
 import { sounds } from './sounds.js';
 import { mascot } from './mascot.js';
 
@@ -15,13 +15,47 @@ const timer = {
   endAt: null,          // timestamp kết thúc (dùng Date để chính xác khi tab ẩn)
   taskId: null,
   subjectId: null,
+  sessionId: null,
   interval: null,
 };
 
 export function getTimer() { return timer; }
 
 export function onTimer(fn) { listeners.add(fn); return () => listeners.delete(fn); }
-function emit(evt = 'tick') { for (const fn of listeners) fn(timer, evt); }
+function sessionSnapshot() {
+  const { interval, ...session } = timer;
+  return session;
+}
+function emit(evt = 'tick') {
+  if (evt !== 'tick') update(s => { s.timer.session = sessionSnapshot(); }, { silent: true, type: 'timer-session' });
+  for (const fn of listeners) fn(timer, evt);
+}
+
+/** Restore from the same persisted state as study totals and rewards. */
+export function restoreTimer() {
+  clearInterval(timer.interval);
+  const saved = getState().timer.session;
+  const valid = saved && ['focus', 'break'].includes(saved.mode)
+    && ['running', 'paused', 'idle'].includes(saved.status)
+    && Number.isFinite(saved.duration) && saved.duration > 0
+    && Number.isFinite(saved.remaining) && saved.remaining >= 0
+    && (saved.status !== 'running' || Number.isFinite(saved.endAt));
+  if (!valid) {
+    Object.assign(timer, { status: 'idle', mode: 'focus', taskId: null, subjectId: null, sessionId: null, endAt: null });
+    setupDurations();
+    return;
+  }
+  for (const key of ['mode', 'status', 'duration', 'remaining', 'endAt', 'taskId', 'subjectId', 'sessionId']) timer[key] = saved[key];
+  if (timer.status === 'running') {
+    timer.remaining = Math.max(0, Math.ceil((timer.endAt - Date.now()) / 1000));
+    if (timer.remaining === 0) { complete(); return; }
+    timer.interval = setInterval(tick, 250);
+    mascot.setState(timer.mode === 'focus' ? 'focus' : 'rest');
+  } else mascot.setState('idle');
+  document.dispatchEvent(new CustomEvent('study:presence', { detail: { on: timer.status === 'running' && timer.mode === 'focus' } }));
+  emit('restore');
+}
+subscribe((s, meta) => { if (meta.type === 'replace') restoreTimer(); });
 
 export function setupDurations() {
   const s = getState().settings;
@@ -55,7 +89,10 @@ export function attachTask(taskId, subjectId) {
 
 export function start() {
   if (timer.status === 'running') return;
-  if (timer.status === 'idle') setupDurations();
+  if (timer.status === 'idle') {
+    setupDurations();
+    timer.sessionId = globalThis.crypto.randomUUID();
+  }
   timer.endAt = Date.now() + timer.remaining * 1000;
   timer.status = 'running';
   clearInterval(timer.interval);
@@ -98,10 +135,20 @@ function complete() {
   timer.status = 'idle';
   const finishedMode = timer.mode;
   const minutes = Math.round(timer.duration / 60);
+  const coins = finishedMode === 'focus' ? pomodoroReward(minutes) : 0;
+  if (timer.sessionId && getState().timer.lastCompletedSession === timer.sessionId) {
+    timer.mode = finishedMode === 'focus' ? 'break' : 'focus';
+    setupDurations();
+    return;
+  }
 
   if (finishedMode === 'focus') {
     const key = todayKey();
     update((s) => {
+      s.timer.lastCompletedSession = timer.sessionId;
+      s.timer.session = { ...sessionSnapshot(), mode: 'break', status: 'idle' };
+      s.wallet.coins = (s.wallet.coins || 0) + coins;
+      s.wallet.totalEarned = (s.wallet.totalEarned || 0) + coins;
       const d = dayRecord(key);
       if (typeof d.pomoMinutes !== 'number') d.pomoMinutes = d.pomodoros ? (d.minutes || 0) : 0;
       d.minutes += minutes;
@@ -116,8 +163,6 @@ function complete() {
         s.timer.pomosBySubject[timer.subjectId] = (s.timer.pomosBySubject[timer.subjectId] || 0) + 1;
       }
     }, { type: 'pomodoro-complete', minutes });
-    const coins = pomodoroReward(minutes);
-    addCoins(coins, 'pomodoro');
     recomputeStreak();
     sounds.ting();
     mascot.react('celebrate');

@@ -4,7 +4,7 @@ import { registerRoute, startRouter, onRoute, currentRoute } from './router.js';
 import { renderHeader, refreshHeaderStats, refreshHeaderAuth, setHeaderMascotState } from './components/header.js';
 import { renderSidebar, renderBottomNav, setSidebarMascotState } from './components/sidebar.js';
 import { mascot } from './mascot.js';
-import { onTimer, getTimer, setupDurations } from './timer.js';
+import { onTimer, getTimer, restoreTimer } from './timer.js';
 import { recomputeStreak } from './gamification.js';
 import { pomodoroCompletePopup } from './components/reward.js';
 import { toast } from './components/toast.js';
@@ -137,7 +137,6 @@ function setupCloudSync() {
 function boot() {
   initState();
   recomputeStreak();
-  setupDurations();
   renderHeader();
   setupMascotSync();
 
@@ -155,6 +154,7 @@ function boot() {
   document.getElementById('drawer-backdrop').onclick = () => document.body.classList.remove('drawer-open');
 
   startRouter();
+  restoreTimer();
   document.body.classList.add('ready');
   refreshUniversities().then(() => renderSidebar()).catch(() => {});
 }
