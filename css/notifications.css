@@ -12,10 +12,16 @@
 .notification-banner { display:grid; grid-template-rows:0fr; opacity:0; transition:grid-template-rows .3s ease, opacity .3s ease; }
 .notification-banner.visible { grid-template-rows:1fr; opacity:1; }
 .notification-banner-inner { overflow:hidden; min-height:0; }
-.notification-banner-bar { margin:8px 16px 0; padding:2px 8px 2px 14px; min-height:36px; display:flex; align-items:center; justify-content:space-between; gap:12px; background:#fff5cf; color:#704724; border-radius:12px; font-size:13px; }
-.notification-banner-bar span { min-width:0; overflow-wrap:anywhere; }
-.notification-banner-bar button { flex-shrink:0; border-radius:10px; transition:background .2s; }
-.notification-banner-bar button:hover { background:#ffebac; }
+
+.notification-banner-bar { margin:8px 28px 0; padding:8px 10px; min-height:46px; display:grid; grid-template-columns:30px auto minmax(0,1fr) 28px; align-items:center; gap:10px; background:linear-gradient(100deg,rgba(254,230,164,.92),#fff4e8 56%,rgba(255,227,170,.84)); color:#573315; border:1px solid rgba(231,175,67,.65); border-left:4px solid #e5a13d; border-radius:14px; box-shadow:0 3px 10px rgba(153,101,31,.09); }
+.notification-banner-icon { display:grid; place-items:center; width:30px; height:30px; color:#fff; background:#d99531; border-radius:9px; box-shadow:0 2px 5px rgba(157,96,21,.15); animation:banner-nudge 4s ease-in-out 2; }
+.notification-banner-label { justify-self:start; padding:3px 10px; border-radius:999px; background:rgba(248,210,121,.65); color:#704215; font-size:11px; font-weight:900; letter-spacing:.07em; white-space:nowrap; }
+.notification-banner-content { min-width:0; overflow-wrap:anywhere; white-space:pre-wrap; font-size:14px; font-weight:700; line-height:1.5; }
+.notification-banner-close { display:grid; place-items:center; width:28px; height:28px; border-radius:50%; color:#8a551e; font-size:21px; line-height:1; transition:background .2s,color .2s; }
+.notification-banner-close:hover { background:rgba(248,210,121,.7); color:#4c2a10; }
+.notification-banner-close:focus-visible { outline:2px solid #9c601c; outline-offset:2px; }
 .notification-banner:not(.visible) button { visibility:hidden; }
-@media(max-width:600px) { .notification-panel { right:12px; } .notification-banner-bar { margin:8px 8px 0; } .header-right { gap:6px; } }
-@media(prefers-reduced-motion:reduce) { .notification-banner,.notification-banner-bar button { transition:none; } }
+@keyframes banner-nudge { 0%,12%,100% { transform:rotate(0); } 3%,9% { transform:rotate(-8deg); } 6% { transform:rotate(8deg); } }
+@media(max-width:1200px) { .notification-banner-bar { margin-inline:18px; } }
+@media(max-width:600px) { .notification-panel { right:12px; } .notification-banner-bar { margin:8px 12px 0; grid-template-columns:30px minmax(0,1fr) 28px; gap:5px 9px; } .notification-banner-icon { grid-row:1 / 3; } .notification-banner-label { grid-column:2; grid-row:1; } .notification-banner-content { grid-column:2; grid-row:2; } .notification-banner-close { grid-column:3; grid-row:1 / 3; } .header-right { gap:6px; } }
+@media(prefers-reduced-motion:reduce) { .notification-banner,.notification-banner-close { transition:none; } .notification-banner-icon { animation:none; } }
