@@ -9,7 +9,6 @@ import { progressRing } from './progressRing.js';
 import { openTaskForm } from './taskForm.js';
 import { floatCoins, sparkleAt, streakPopup } from './reward.js';
 import { toast } from './toast.js';
-import { mascotSVG } from '../mascot.js';
 import { syncCalendarToWeek } from './sidebar.js';
 
 const MAX_VISIBLE = 6;
@@ -138,7 +137,6 @@ function taskItemHTML(t) {
 function emptyDayHTML(key) {
   return `
     <div class="empty-day">
-      <div class="empty-mascot">${mascotSVG(56, { state: 'sleepy' })}</div>
       <p>Chưa có kế hoạch ${key === todayKey() ? 'hôm nay' : 'ngày này'}.</p>
       <small>Nào, thêm một nhiệm vụ đầu tiên nhé?</small>
       <button type="button" class="btn btn-soft btn-sm" data-add="${key}">+ Thêm nhiệm vụ</button>
