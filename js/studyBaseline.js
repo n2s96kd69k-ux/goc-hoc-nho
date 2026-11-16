@@ -1,6 +1,6 @@
 // Shared simulation, not real attendance. Seeded by Vietnam calendar day so
-// reloads, accounts and browser timezones all replay the same 8-second walk.
-const STEP = 8000, DAY = 86400000, VN = 7 * 3600000;
+// reloads, accounts and browser timezones all replay the same 12-second walk.
+const STEP = 12000, DAY = 86400000, VN = 7 * 3600000;
 const curves = [[0,40],[2,25],[4.5,13],[5,25],[8,40],[10,52],[12,55],[13,65],[15,85],[17.5,115],[18.5,170],[20.5,255],[22,220],[23,165],[23.5,50],[24,40]];
 const cache = new Map();
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
@@ -28,12 +28,12 @@ function dailyWalk(day) {
   let value = 40, burst = 0, beats = 0;
   for (let i = 0; i < values.length; i++) {
     const hour = i * STEP / 3600000, base = target(hour);
-    // A 15% chance when no burst is running. Spread surges/drops over 3 beats.
-    if (!beats && random() < 0.15) {
+    // Occasional gentle waves: drops spread over 15 beats (3 minutes).
+    if (!beats && random() < 0.04) {
       burst = random() < 0.5 ? 15 + Math.floor(random() * 16) : -(10 + Math.floor(random() * 6));
-      beats = 3;
+      beats = burst < 0 ? 15 : 8;
     }
-    let delta = clamp(Math.floor(random() * 8) - 3 + Math.round((base - value) * 0.12), -3, 4);
+    let delta = clamp(Math.floor(random() * 4) - 1 + Math.round((base - value) * 0.08), -1, 2);
     if (beats) {
       delta = Math.round(burst / beats);
       burst -= delta; beats--;
@@ -42,7 +42,10 @@ function dailyWalk(day) {
     value = clamp(value + delta, lo, hi);
     // Meet at midnight without a daily seed-reset jump.
     const fade = Math.min(1, i * STEP / 120000, (DAY - i * STEP) / 120000);
-    values[i] = Math.round(clamp(base + (value - base) * fade, lo, hi));
+    const desired = Math.round(clamp(base + (value - base) * fade, lo, hi));
+    // Also limit boundary corrections; changing time bands must not cause a cliff.
+    // Band limits are targets: allow a short settling period at their edges.
+    values[i] = i ? clamp(desired, values[i - 1] - 2, values[i - 1] + 4) : desired;
   }
   return values;
 }

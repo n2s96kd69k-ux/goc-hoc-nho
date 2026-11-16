@@ -1,6 +1,6 @@
 # Số tài khoản đang học
 
-Số hiển thị = nền mô phỏng theo giờ Việt Nam của `studyBaseline.js` + số tài khoản tập trung từ Firestore. Mỗi ngày theo giờ Việt Nam có một chuỗi random walk dùng seed chung, cập nhật mỗi 8 giây. Sáng 05–08h: 20–45; chiều 13–17:30: 60–120; tối 18:30–23h: 150–280; khuya 23:30–04:30: 10–50. Các khoảng chuyển tiếp được nội suy. Nhịp thường dịch -3 đến +4 về phía đường cong mục tiêu; mỗi nhịp chưa có đợt biến động có xác suất 15% khởi tạo tăng 15–30 hoặc giảm 10–15, chia trong 3 nhịp. Giới hạn khung giờ có thể cắt bớt đợt tăng/giảm. Hai phút quanh nửa đêm làm dịu dao động để đổi seed không nhảy số. Cache tối đa hai ngày, không lưu số ngẫu nhiên riêng theo tài khoản. Mọi tài khoản có cùng thời gian sẽ nhận cùng số nền; không cộng riêng tài khoản hiện tại lần nữa. Sai lệch đồng hồ thiết bị hoặc độ trễ mạng vẫn có thể gây chênh lệch tạm thời. Đây là số mô phỏng kết hợp người học thực, không phải số người thực hoàn toàn.
+Số hiển thị = nền mô phỏng theo giờ Việt Nam của `studyBaseline.js` + số tài khoản tập trung từ Firestore. Mỗi ngày theo giờ Việt Nam có một chuỗi random walk dùng seed chung, cập nhật mỗi 12 giây. Sáng 05–08h: 20–45; chiều 13–17:30: 60–120; tối 18:30–23h: 150–280; khuya 23:30–04:30: 10–50. Các khoảng chuyển tiếp được nội suy. Nhịp thường dịch -1 đến +2 về phía đường cong mục tiêu; mỗi nhịp chưa có đợt biến động có xác suất 4% khởi tạo tăng 15–30 trong 8 nhịp hoặc giảm 10–15 trong 15 nhịp (3 phút). Mọi nhịp, kể cả chuyển khung giờ, giảm tối đa 2 và tăng tối đa 4. Giới hạn khung giờ là mục tiêu, có thể cần vài nhịp để tiến vào khoảng mới. Hai phút quanh nửa đêm làm dịu dao động để đổi seed không nhảy số. Cache tối đa hai ngày, không lưu số ngẫu nhiên riêng theo tài khoản. Mọi tài khoản có cùng thời gian sẽ nhận cùng số nền; không cộng riêng tài khoản hiện tại lần nữa. Sai lệch đồng hồ thiết bị hoặc độ trễ mạng vẫn có thể gây chênh lệch tạm thời. Đây là số mô phỏng kết hợp người học thực, không phải số người thực hoàn toàn.
 
 `js/studyPresence.js` theo dõi timer và Firebase Auth. Mỗi trang ghi một document `studyPresence/{uid}_{pageId}` gồm `uid`, `updatedAt` (server timestamp), `expiresAt`, `focusEndsAt`. Không lưu tên/email hay nội dung nhiệm vụ trong presence.
 
@@ -37,7 +37,7 @@ const paint = () => {
   });
 };
 const unsubscribe = startStudyPresence(count => { active = count; paint(); });
-const interval = setInterval(paint, 1000); // Kiểm tra mốc; số nền đổi mỗi 8 giây.
+const interval = setInterval(paint, 1000); // Kiểm tra mốc; số nền đổi mỗi 12 giây.
 // Khi hủy app/header vĩnh viễn: unsubscribe(); clearInterval(interval);
 ```
 
