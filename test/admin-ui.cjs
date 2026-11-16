@@ -31,6 +31,7 @@ const fixtureService=`
  try{
   for(const role of ['admin','member']){
    const context=await browser.newContext({viewport:{width:1440,height:1000}}),page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+   await page.route('**/js/studyPresence.js',r=>r.fulfill({contentType:'application/javascript',body:'export const startStudyPresence=fn=>{fn(0);return ()=>{};};'}));
    await page.route('**/js/cloud.js',r=>r.fulfill({contentType:'application/javascript',body:fixtureCloud(role)}));
    await page.route('**/js/admin/announcements.js',r=>r.fulfill({contentType:'application/javascript',body:`const items=[];export const listAnnouncements=async()=>items;export const publishAnnouncement=async(id,content)=>{items.push({id,content,createdAt:{toDate:()=>new Date()}})};export const deleteAnnouncement=async(id)=>{items.splice(items.findIndex(i=>i.id===id),1)};`}));
    await page.route('**/js/admin/service.js',r=>r.fulfill({contentType:'application/javascript',body:fixtureService}));

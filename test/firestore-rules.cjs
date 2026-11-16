@@ -1,7 +1,7 @@
 const {test,before,after,beforeEach}=require('node:test');
 const fs=require('node:fs'),path=require('node:path');
 const {initializeTestEnvironment,assertSucceeds,assertFails}=require('@firebase/rules-unit-testing');
-const {doc,collection,getDoc,getDocs,setDoc,updateDoc,deleteDoc,writeBatch,serverTimestamp,runTransaction}=require('firebase/firestore');
+const {doc,collection,getDoc,getDocs,setDoc,updateDoc,deleteDoc,writeBatch,serverTimestamp,runTransaction,Timestamp}=require('firebase/firestore');
 let env;
 before(async()=>{env=await initializeTestEnvironment({projectId:'demo-goc-hoc-nho',firestore:{rules:fs.readFileSync(path.join(__dirname,'../firestore.rules'),'utf8')}});});
 after(async()=>{await env?.cleanup();});
@@ -90,4 +90,18 @@ test('existing primary owner keeps admin access without role or owner fields',as
  await assertSucceeds(getDocs(collection(dbFor(uid),'adminLogs')));
  await assertSucceeds(setDoc(doc(dbFor(uid),'universities','owner-test'),{name:'School'}));
  await assertFails(audited(dbFor('admin'),uid,{status:'banned'},'status'));
+});
+
+test('study presence is visible to others but only its owner can write/delete',async()=>{
+ const data={uid:'student',updatedAt:serverTimestamp(),expiresAt:Timestamp.fromMillis(Date.now()+90000),focusEndsAt:Timestamp.fromMillis(Date.now()+1500000)};
+ await assertSucceeds(setDoc(doc(dbFor('student'),'studyPresence','session-a'),data));
+ await assertSucceeds(getDocs(collection(dbFor('admin'),'studyPresence')));
+ await assertSucceeds(getDocs(collection(dbFor(null),'studyPresence')));
+ await assertFails(setDoc(doc(dbFor('admin'),'studyPresence','session-a'),{...data,uid:'admin'}));
+ await assertFails(deleteDoc(doc(dbFor('admin'),'studyPresence','session-a')));
+ await assertFails(setDoc(doc(dbFor('student'),'studyPresence','fake-user'),{...data,uid:'owner'}));
+ await assertFails(setDoc(doc(dbFor(null),'studyPresence','anonymous'),data));
+ await assertFails(setDoc(doc(dbFor('banned'),'studyPresence','banned'),{...data,uid:'banned'}));
+ await assertFails(setDoc(doc(dbFor('student'),'studyPresence','permanent'),{...data,expiresAt:Timestamp.fromMillis(Date.now()+3600000)}));
+ await assertSucceeds(deleteDoc(doc(dbFor('student'),'studyPresence','session-a')));
 });

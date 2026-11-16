@@ -76,6 +76,23 @@ service cloud.firestore {
         && get(userPath(uid)).data.get('status', 'active') != 'banned');
       allow write: if admin();
     }
+    match /studyPresence/{session} {
+      allow read: if true;
+      allow create, update: if signedIn()
+        && exists(userPath(request.auth.uid))
+        && get(userPath(request.auth.uid)).data.get('status', 'active') != 'banned'
+        && request.resource.data.keys().hasOnly(['uid', 'updatedAt', 'expiresAt', 'focusEndsAt'])
+        && request.resource.data.uid == request.auth.uid
+        && (!exists(/databases/$(database)/documents/studyPresence/$(session)) || resource.data.uid == request.auth.uid)
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.expiresAt is timestamp
+        && request.resource.data.expiresAt > request.time
+        && request.resource.data.expiresAt <= request.time + duration.value(120, 's')
+        && request.resource.data.focusEndsAt is timestamp
+        && request.resource.data.focusEndsAt > request.time
+        && request.resource.data.focusEndsAt <= request.time + duration.value(24, 'h');
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+    }
     match /{document=**} { allow read, write: if false; }
   }
 }

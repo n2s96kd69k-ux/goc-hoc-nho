@@ -1,3 +1,4 @@
+import { startStudyPresence } from '../studyPresence.js';
 import { bellHTML, bindBell } from '../notifications/ui.js';
 // ===== Header gọn =====
 import { getState } from '../state.js';
@@ -82,63 +83,20 @@ export function refreshHeaderAuth() {
   btn.textContent = authButtonText(getCurrentUser());
 }
 
-function vnNow() {
-  const now = new Date();
-  return new Date(now.getTime() + now.getTimezoneOffset() * 60000 + 7 * 3600000);
-}
-
-function studyBaseline(at = vnNow()) {
-  const h = at.getHours() + at.getMinutes() / 60;
-  const anchors = [[0, 82], [2, 46], [4, 22], [5.5, 12], [7.5, 34], [9.5, 56], [11.5, 44], [13.5, 52], [16, 64], [17.5, 98], [19, 156], [20.5, 208], [22, 170], [23.5, 112], [24, 82]];
-  for (let i = 1; i < anchors.length; i++) {
-    const [h0, n0] = anchors[i - 1];
-    const [h1, n1] = anchors[i];
-    if (h <= h1) {
-      const t = (h - h0) / (h1 - h0);
-      return Math.round(n0 + (n1 - n0) * t);
-    }
-  }
-  return anchors[0][1];
-}
-
 let shownCoins = null;
-let crowdCount = studyBaseline();
-let liveTimer = null;
-let selfStudying = false;
-
-function liveTotal() { return crowdCount + (selfStudying ? 1 : 0); }
-
+let crowdCount = null;
+let stopLiveCount = null;
+function liveTotal() { return crowdCount === null ? '…' : crowdCount; }
 function paintLiveCount() {
-  const n = String(liveTotal());
-  document.querySelectorAll('[data-live-count]').forEach((el) => { el.textContent = n; });
+  document.querySelectorAll('[data-live-count]').forEach(el => { el.textContent = String(liveTotal()); });
+  document.querySelectorAll('.live-study').forEach(el => { el.title = crowdCount === null ? 'Đang kết nối bộ đếm người học' : 'Số tài khoản đang chạy Pomodoro tập trung'; });
 }
-
 function startLiveCount() {
-  if (liveTimer) return;
-  document.addEventListener('study:presence', (e) => {
-    const on = !!(e.detail && e.detail.on);
-    if (on === selfStudying) return;
-    selfStudying = on;
-    paintLiveCount();
-  });
-  liveTimer = setInterval(() => {
-    const target = studyBaseline();
-    const gap = target - crowdCount;
-    if (Math.random() < 0.1) crowdCount += (Math.random() < 0.5 ? -1 : 1) * (5 + Math.floor(Math.random() * 8));
-    else if (gap) crowdCount += Math.sign(gap) * (Math.random() < 0.4 ? 0 : 1);
-    else if (Math.random() < 0.35) crowdCount += Math.random() < 0.5 ? -1 : 1;
-    if (crowdCount > target + 18) crowdCount -= 1;
-    if (crowdCount < target - 18) crowdCount += 1;
-    crowdCount = Math.max(6, Math.min(240, crowdCount));
-    paintLiveCount();
-  }, 12000);
+  if (stopLiveCount) return;
+  stopLiveCount = startStudyPresence(count => { crowdCount = count; paintLiveCount(); });
 }
 
 function openLiveRoom() {
-  const desks = ['Toán', 'Ngữ văn', 'Tiếng Anh', 'Lý', 'Hóa'].map((name, i) => {
-    const n = 8 + ((liveTotal() + i * 17) % 28);
-    return `<li><span>${name}</span><strong>${n} bạn</strong></li>`;
-  }).join('');
   const modal = openModal({
     title: 'Phòng học chung',
     content: `
@@ -147,7 +105,7 @@ function openLiveRoom() {
         <span class="live-copy">Đang có <strong class="live-count" data-live-count>${liveTotal()}</strong> bạn đang học bài</span>
       </button>
       <p class="page-sub">Thư viện đang mở. Mọi người học trong yên lặng, bạn có thể vào học cùng.</p>
-      <ul class="live-desks">${desks}</ul>
+      <p class="small muted">Mỗi tài khoản được tính một lần khi đang chạy phiên tập trung. Tạm dừng hoặc chuyển sang nghỉ sẽ không được tính.</p>
       <div class="modal-actions">
         <button class="btn btn-primary" type="button" id="live-join">Học cùng mọi người</button>
       </div>`,
