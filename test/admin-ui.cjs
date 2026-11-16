@@ -26,21 +26,32 @@ const fixtureService=`
  export const adminError=e=>e.message;
 `;
 (async()=>{
- await new Promise(r=>server.listen(0,'127.0.0.1',r));
- const origin='http://127.0.0.1:'+server.address().port;
+ await new Promise(r=>server.listen(4319,'127.0.0.1',r));
  const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH,headless:true,args:['--no-sandbox']});
  try{
   for(const role of ['admin','member']){
    const context=await browser.newContext({viewport:{width:1440,height:1000}}),page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
    await page.route('**/js/cloud.js',r=>r.fulfill({contentType:'application/javascript',body:fixtureCloud(role)}));
+   await page.route('**/js/admin/announcements.js',r=>r.fulfill({contentType:'application/javascript',body:`const items=[];export const listAnnouncements=async()=>items;export const publishAnnouncement=async(id,content)=>{items.push({id,content,createdAt:{toDate:()=>new Date()}})};export const deleteAnnouncement=async(id)=>{items.splice(items.findIndex(i=>i.id===id),1)};`}));
    await page.route('**/js/admin/service.js',r=>r.fulfill({contentType:'application/javascript',body:fixtureService}));
-   await page.route('https://www.gstatic.com/**',r=>r.fulfill({contentType:'application/javascript',body:`export const collection=()=>({}),doc=()=>({}),getDocs=async()=>({docs:[]}),getDocFromServer=async()=>({exists:()=>false}),setDoc=async()=>{},deleteDoc=async()=>{},onSnapshot=()=>()=>{};`}));
+   await page.route('https://www.gstatic.com/**',r=>r.fulfill({contentType:'application/javascript',body:`export const query=x=>x,orderBy=()=>({}),limit=()=>({});export const collection=()=>({}),doc=()=>({}),getDocs=async()=>({docs:[]}),getDocFromServer=async()=>({exists:()=>false}),setDoc=async()=>{},deleteDoc=async()=>{},onSnapshot=()=>()=>{};`}));
    await page.route('https://fonts.**',r=>r.abort());
-   await page.goto(origin+'/#/admin');
+   await page.goto('http://127.0.0.1:4319/#/admin');
    if(role==='member'){
     await page.waitForURL('**/#/');assert.equal(await page.locator('.nav-admin').count(),0);assert.equal(await page.locator('.admin-shell').count(),0);console.log('PASS: member direct route redirects and management menu stays hidden');
    }else{
     await page.locator('.admin-table tbody tr').first().waitFor();assert.equal(await page.locator('.nav-admin').innerText(),'Quản Lý');
+    await page.locator('.admin-nav a[href="#/admin?tab=announcements"]').click();
+    await page.locator('#announcement-form textarea').fill('Chúc mọi người học tốt <b>nhé</b>!');
+    await page.locator('#announcement-form [type="submit"]').click();
+    await page.locator('#announcement-list td').filter({hasText:'Chúc mọi người học tốt'}).waitFor();
+    assert.equal(await page.locator('#announcement-list b').count(),0);
+    await page.locator('[data-delete-announcement]').click();
+    await page.locator('.modal [data-act="ok"]').click();
+    await page.locator('#announcement-list .admin-empty').filter({hasText:'Chưa có thông báo'}).waitFor();
+    console.log('PASS: publish announcement, safely render content and confirm deletion');
+    await page.locator('.admin-nav a[href="#/admin?tab=users"]').click();
+    await page.locator('.admin-table tbody tr').first().waitFor();
     await page.locator('[data-index="1"][data-action="coins"]').click();await page.locator('#admin-change [name="amount"]').fill('80');await page.locator('#admin-change [name="reason"]').fill('Điều chỉnh kiểm thử');await page.locator('#admin-change [type="submit"]').click();await page.locator('.admin-table .admin-number').filter({hasText:'80'}).waitFor();
     await page.locator('.admin-nav a[href="#/admin?tab=coins"]').click();await page.locator('#admin-grant [name="target"]').fill('student@example.test');await page.locator('#admin-grant [name="amount"]').fill('20');await page.locator('#admin-grant [name="reason"]').fill('Thưởng sự kiện');await page.locator('#admin-grant [type="submit"]').click();await page.locator('#admin-change [type="submit"]').click();await page.waitForFunction(()=>!document.querySelector('#admin-change'));
     await page.locator('.admin-nav a[href="#/admin?tab=activity"]').click();await page.locator('.admin-table tbody tr').first().waitFor();assert.equal(await page.locator('.admin-table tbody tr').count(),2);

@@ -1,12 +1,13 @@
+import { listAnnouncements, publishAnnouncement, deleteAnnouncement } from '../admin/announcements.js';
 import { requireAdmin, getCurrentUser, getAccountAccess } from '../cloud.js';
 import { navigate, currentRoute } from '../router.js';
 import { escapeHtml as esc } from '../utils.js';
-import { openModal } from '../components/modal.js';
+import { openModal, confirmDialog } from '../components/modal.js';
 import { toast } from '../components/toast.js';
 import { listUsers, resolveUser, changeUser, listActivity, adminError } from '../admin/service.js';
 import { canChangeAccess, validateReason, coinChange } from '../admin/policy.js';
 
-const tabs = { users: 'Người dùng', coins: 'Phát xu', activity: 'Nhật ký' };
+const tabs = { users: 'Người dùng', coins: 'Phát xu', announcements: 'Thông báo', activity: 'Nhật ký' };
 const typeNames = { 'coins-add': 'Cộng xu', 'coins-set': 'Sửa số dư', role: 'Đổi quyền', status: 'Khóa / mở khóa' };
 let generation = 0;
 let activeModal = null;
@@ -32,7 +33,7 @@ export async function renderAdmin(root, params = {}) {
         <div class="admin-nav-foot"><span class="admin-status-dot"></span> Quản trị viên<a href="#/">Trở về góc học ↗</a></div>
       </aside>
       <div class="admin-content">
-        <header class="admin-page-head"><div><p class="admin-eyebrow">QUẢN LÝ / ${tabs[tab].toUpperCase()}</p><h1>${tabs[tab]}</h1><p>${tab === 'users' ? 'Tra cứu tài khoản, phân quyền và quản lý trạng thái truy cập.' : tab === 'coins' ? 'Phát xu sự kiện cho từng tài khoản, có xác nhận và lịch sử.' : 'Lịch sử các thay đổi quản trị đã được lưu trên máy chủ.'}</p></div><span class="admin-badge">${getAccountAccess().owner ? 'Chủ hệ thống' : 'Quản trị viên'}</span></header>
+        <header class="admin-page-head"><div><p class="admin-eyebrow">QUẢN LÝ / ${tabs[tab].toUpperCase()}</p><h1>${tabs[tab]}</h1><p>${tab === 'users' ? 'Tra cứu tài khoản, phân quyền và quản lý trạng thái truy cập.' : tab === 'coins' ? 'Phát xu sự kiện cho từng tài khoản, có xác nhận và lịch sử.' : tab === 'announcements' ? 'Soạn và phát thông báo chung cho Góc Học Nhỏ.' : 'Lịch sử các thay đổi quản trị đã được lưu trên máy chủ.'}</p></div><span class="admin-badge">${getAccountAccess().owner ? 'Chủ hệ thống' : 'Quản trị viên'}</span></header>
         <div class="admin-view" id="admin-view"></div>
       </div>
     </section>`;
@@ -40,6 +41,7 @@ export async function renderAdmin(root, params = {}) {
   const alive = () => run === generation && currentRoute()?.path === '/admin';
   if (tab === 'users') usersView(view, alive);
   else if (tab === 'coins') coinsView(view, alive);
+  else if (tab === 'announcements') announcementsView(view, alive);
   else activityView(view, alive);
 }
 function usersView(view, alive) {
@@ -125,4 +127,44 @@ async function activityView(view, alive) {
     view.innerHTML = `<section class="admin-panel"><div class="admin-panel-head"><h2>Thao tác gần đây</h2><button class="admin-button secondary" id="admin-log-refresh">Làm mới</button></div><p class="admin-caption">30 thao tác mới nhất · Giờ Việt Nam</p>${rows.length ? `<div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Thời gian</th><th>Thao tác</th><th>Người thực hiện</th><th>Tài khoản nhận</th><th>Trước → Sau</th><th>Lý do</th></tr></thead><tbody>${rows.map(row => `<tr><td>${esc(dateLabel(row.createdAt))}</td><td>${esc(typeNames[row.type] || row.type)}</td><td>${esc(row.actorEmail || row.actorUid)}</td><td><code>${esc(row.targetUid)}</code></td><td>${esc(row.before)} → ${esc(row.after)}</td><td>${esc(row.reason)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="admin-empty">Chưa có thao tác quản trị nào.</p>'}</section>`;
     view.querySelector('#admin-log-refresh').onclick = () => activityView(view, alive);
   } catch (e) { if (alive()) view.innerHTML = `<p class="admin-error" role="alert">${esc(adminError(e))}</p>`; }
+}
+
+function announcementsView(view, alive) {
+  let pending = null, request = 0;
+  view.innerHTML = `<section class="admin-panel admin-form-panel"><h2>Gửi một lời nhắn đến mọi người</h2><p class="admin-caption">Thông báo xuất hiện trên banner và trong chuông của tất cả người học. Mỗi lần phát là một thông báo mới.</p><form class="admin-form" id="announcement-form"><label>Nội dung thông báo<textarea name="content" rows="4" required maxlength="1000" placeholder="Ví dụ: Cuối tuần này cùng hoàn thành mục tiêu học tập nhé!"></textarea></label><p class="admin-error" role="alert" id="announcement-error"></p><button class="admin-button" type="submit">Phát thông báo cho mọi người</button></form></section><section class="admin-panel" style="margin-top:20px"><div class="admin-panel-head"><h2>Thông báo đã phát</h2><button class="admin-button secondary" id="refresh-announcements">Làm mới</button></div><p class="admin-caption">30 thông báo gần nhất. Xóa sẽ ngừng phân phối; người đã nhận vẫn có thể xem bản lưu trong chuông.</p><div id="announcement-list" aria-live="polite"></div></section>`;
+  const form = view.querySelector('form'), error = view.querySelector('#announcement-error');
+  const list = view.querySelector('#announcement-list');
+  async function load() {
+    const ticket = ++request;
+    list.innerHTML = '<p class="admin-empty">Đang tải thông báo…</p>';
+    try {
+      const rows = await listAnnouncements(); if (!alive() || ticket !== request) return;
+      list.innerHTML = rows.length ? `<div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Ngày phát</th><th>Nội dung</th><th>Thao tác</th></tr></thead><tbody>${rows.map((r,i) => `<tr><td>${esc(dateLabel(r.createdAt))}</td><td style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(r.content)}</td><td><button class="admin-button compact danger" data-delete-announcement="${i}">Xóa</button></td></tr>`).join('')}</tbody></table></div>` : '<p class="admin-empty">Chưa có thông báo nào. Bạn có thể soạn lời nhắn đầu tiên ở trên.</p>';
+      list.querySelectorAll('[data-delete-announcement]').forEach(button => button.onclick = async () => {
+        const row = rows[Number(button.dataset.deleteAnnouncement)];
+        const ok = await confirmDialog({ title: 'Xóa thông báo?', message: 'Thông báo sẽ ngừng gửi đến người học mới. Bản đã nhận trong chuông vẫn được giữ.', okText: 'Xóa', danger: true });
+        if (!ok || !alive()) return;
+        button.disabled = true;
+        try { await deleteAnnouncement(row.id); if (alive()) { toast('Đã xóa thông báo.'); load(); } }
+        catch (e) { if (alive()) { error.textContent = adminError(e); button.disabled = false; } }
+      });
+    } catch (e) { if (alive() && ticket === request) list.innerHTML = `<p class="admin-error" role="alert">${esc(adminError(e))}</p>`; }
+  }
+  form.onsubmit = async e => {
+    e.preventDefault(); error.textContent = '';
+    const button = form.querySelector('button');
+    if (!pending) {
+      const content = form.content.value.trim(); if (!content) { error.textContent = 'Bạn chưa nhập nội dung.'; return; }
+      pending = { id: crypto.randomUUID(), content }; form.content.disabled = true;
+    }
+    button.disabled = true; button.textContent = 'Đang phát…';
+    try {
+      await publishAnnouncement(pending.id, pending.content);
+      if (!alive()) return;
+      pending = null; form.reset(); form.content.disabled = false; toast('Đã phát thông báo cho mọi người.'); load();
+    } catch (e) { if (alive()) error.textContent = adminError(e); }
+    finally { if (alive()) { button.disabled = false; button.textContent = pending ? 'Thử phát lại cùng thông báo' : 'Phát thông báo cho mọi người'; } }
+  };
+  view.querySelector('#refresh-announcements').onclick = load;
+  load();
 }
