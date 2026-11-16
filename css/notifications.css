@@ -1,3 +1,6 @@
+/* Banner belongs to the dashboard column, never the sidebar. */
+.right-content { flex:1 1 0%; min-width:0; display:flex; flex-direction:column; }
+.right-content > .notification-banner { width:100%; min-width:0; flex-shrink:0; }
 .notification-bell { position: relative; flex-shrink: 0; }
 .notification-count { position: absolute; top: -3px; right: -4px; min-width: 16px; padding: 1px 4px; border-radius: 99px; background: #c94c57; color: white; font-size: 10px; font-weight: 800; }
 .notification-panel { position: fixed; z-index: 80; top: calc(var(--header-h) + 8px); right: 20px; width: min(370px, calc(100vw - 24px)); max-height: min(65vh,520px); overflow-y: auto; background: #fffdf9; color: var(--brown-dark); border-radius: 20px; box-shadow: var(--shadow-lg); padding: 16px; }
@@ -10,7 +13,7 @@
 .notification-banner.visible { grid-template-rows:1fr; opacity:1; }
 .notification-banner-inner { overflow:hidden; min-height:0; }
 .notification-banner-bar { margin:8px 16px 0; padding:2px 8px 2px 14px; min-height:36px; display:flex; align-items:center; justify-content:space-between; gap:12px; background:#fff5cf; color:#704724; border-radius:12px; font-size:13px; }
-.notification-banner-bar span { overflow-wrap:anywhere; }
+.notification-banner-bar span { min-width:0; overflow-wrap:anywhere; }
 .notification-banner-bar button { flex-shrink:0; border-radius:10px; transition:background .2s; }
 .notification-banner-bar button:hover { background:#ffebac; }
 .notification-banner:not(.visible) button { visibility:hidden; }
