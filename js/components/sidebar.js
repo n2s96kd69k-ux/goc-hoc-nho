@@ -14,7 +14,7 @@ export const SIDEBAR_BLOCKS = [
   { key: 'progress', label: '📊 Tiến độ tuần', on: false },
   { key: 'time', label: '⏱ Thời gian học', on: false },
   { key: 'goal', label: '🎯 Mục tiêu', on: true },
-  { key: 'mascot', label: '🐱 Mèo Mochi', on: false },
+  { key: 'mascot', label: 'Mèo mascot', on: false },
 ];
 
 export function sidebarOn(settings, key) {

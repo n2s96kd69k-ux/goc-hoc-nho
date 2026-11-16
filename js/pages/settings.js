@@ -1,3 +1,4 @@
+import { mascotSVG } from '../mascot.js';
 import { getCurrentUser } from '../cloud.js';
 // ===== Trang /settings =====
 import { getState, update, replaceState } from '../state.js';
@@ -45,7 +46,7 @@ export function renderSettings(root) {
               <label class="switch">
                 <input type="checkbox" data-side="${b.key}" ${sidebarOn(s.settings, b.key) ? 'checked' : ''}>
                 <span class="switch-track"></span>
-                <span>${b.label}</span>
+                <span style="display:inline-flex;align-items:center;gap:6px">${b.key === 'mascot' ? `<span aria-hidden="true" style="display:inline-flex">${mascotSVG(24)}</span>` : ''}${escapeHtml(b.label)}</span>
               </label>`).join('')}
           </div>
         </div>
