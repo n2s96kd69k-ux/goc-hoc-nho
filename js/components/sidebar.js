@@ -1,3 +1,4 @@
+import { isCurrentAdmin } from '../cloud.js';
 // ===== Sidebar: lịch tháng, tiến độ tuần, thời gian, mục tiêu, mascot, navigation =====
 import { getState, update } from '../state.js';
 import { DAY_SHORT, fromKey, toKey, startOfWeek, minutesToText, todayKey, daysBetween, escapeHtml } from '../utils.js';
@@ -91,6 +92,7 @@ export function renderSidebar() {
 
       <nav class="side-nav" aria-label="Điều hướng">
         ${NAV.map((n) => `<a href="#${n.path}" class="nav-item ${path === n.path ? 'active' : ''}" data-path="${n.path}"><span class="nav-icon">${n.icon}</span>${n.label}</a>`).join('')}
+        ${isCurrentAdmin() ? `<a href="#/admin" class="nav-item nav-admin ${path === '/admin' ? 'active' : ''}"><span class="nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6z"/><path d="m8 12 3 3 5-6"/></svg></span>Quản Lý</a>` : ''}
       </nav>
     </div>`;
 

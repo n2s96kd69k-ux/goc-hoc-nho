@@ -1,6 +1,6 @@
 // ===== Logo trường trên Firestore (gói Spark, không cần Storage). =====
 import { collection, doc, getDocs, getDocFromServer, setDoc, deleteDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
-import { firebaseDb, getCurrentUser, accountId, OWNER_ID } from './cloud.js';
+import { firebaseDb, isCurrentAdmin } from './cloud.js';
 
 const KEY = 'ghn_unis';
 const EXAM_KEY = 'ghn_exams';
@@ -54,8 +54,7 @@ function applyExams(list) {
 }
 
 export function isAdminUser() {
-  const user = getCurrentUser();
-  return !!(user && accountId(user.uid) === OWNER_ID);
+  return isCurrentAdmin();
 }
 
 function remember(list) {

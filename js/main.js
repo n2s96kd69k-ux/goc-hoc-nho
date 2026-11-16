@@ -1,14 +1,16 @@
+import { applyAdminCredits } from './sync.js';
+import { renderAdmin, disposeAdmin } from './pages/admin.js';
 // ===== Khởi động ứng dụng =====
-import { initState, subscribe, getState, syncCloudForUser } from './state.js';
+import { initState, subscribe, getState, syncCloudForUser, update } from './state.js';
 import { registerRoute, startRouter, onRoute, currentRoute } from './router.js';
 import { renderHeader, refreshHeaderStats, refreshHeaderAuth, setHeaderMascotState } from './components/header.js';
 import { renderSidebar, renderBottomNav, setSidebarMascotState } from './components/sidebar.js';
 import { mascot } from './mascot.js';
-import { onTimer, getTimer, restoreTimer } from './timer.js';
+import { onTimer, getTimer, restoreTimer, pause } from './timer.js';
 import { recomputeStreak } from './gamification.js';
 import { pomodoroCompletePopup } from './components/reward.js';
 import { toast } from './components/toast.js';
-import { onCloudAuthChange } from './cloud.js';
+import { onCloudAuthChange, onAccountAccessChange, isCurrentAdmin } from './cloud.js';
 import { mmss } from './utils.js';
 
 import { patchTaskToggle } from './components/planner.js';
@@ -34,6 +36,7 @@ const PAGES = {
   '/stats': renderStats,
   '/goals': renderGoals,
   '/settings': renderSettings,
+  '/admin': renderAdmin,
 };
 
 let lastPath = null;
@@ -41,10 +44,13 @@ function renderCurrentPage(params) {
   const route = currentRoute();
   const fn = PAGES[route.path] || renderOverview;
   const el = main();
+  document.body.classList.toggle('admin-mode', route.path === '/admin');
+  if (lastPath === '/admin' && route.path !== '/admin') disposeAdmin();
   if (lastPath === '/room' && route.path !== '/room') disposeRoom();
   const isNav = lastPath !== route.path;
   lastPath = route.path;
   const paint = () => {
+    if (currentRoute()?.path !== route.path) return;
     el.classList.remove('page-leave');
     fn(el, params || route.params);
     // Chỉ animate cả trang khi chuyển route. Tick nhiệm vụ không được giật cả bảng tuần.
@@ -63,6 +69,7 @@ function renderCurrentPage(params) {
 function onStateChange(state, meta) {
   refreshHeaderStats();
   const type = meta.type || '';
+  if (currentRoute()?.path === '/admin') return;
   // Những thay đổi nhỏ không cần vẽ lại toàn trang
   if (type === 'coins' || type === 'streak' || type === 'note') return;
   if (type === 'task-toggle') { patchTaskToggle(meta.id); return; }
@@ -149,6 +156,28 @@ function boot() {
   subscribe(onStateChange);
   setupTimerPill();
   setupCloudSync();
+  let lastRole = null;
+  let bannedNoticeUid = null;
+  onAccountAccessChange(access => {
+    renderSidebar();
+    if (currentRoute()?.path === '/admin' && (!access.uid || access.ready || access.status === 'banned') && !isCurrentAdmin()) {
+      disposeAdmin(); main().replaceChildren(); location.hash = '/';
+    }
+    if (access.ready && access.uid && getState()._syncUid === access.uid) {
+      const adjusted = applyAdminCredits(getState(), access.adminCredits);
+      if (adjusted.wallet !== getState().wallet && adjusted.wallet.adminCreditsApplied !== getState().wallet.adminCreditsApplied) {
+        // Keep grant bookkeeping in sync even when an adjustment does not change the displayed balance.
+        update(s => { s.wallet = applyAdminCredits(s, access.adminCredits).wallet; }, { type: 'coins' });
+      }
+    }
+    if (access.status === 'banned' && bannedNoticeUid !== access.uid) {
+      bannedNoticeUid = access.uid;
+      pause();
+      toast('Tài khoản đã bị khóa truy cập dữ liệu trên máy chủ.', { kind: 'error' });
+    }
+    if (lastRole !== access.role && currentRoute()?.path === '/goals') renderCurrentPage();
+    lastRole = access.role;
+  });
 
   // Drawer backdrop
   document.getElementById('drawer-backdrop').onclick = () => document.body.classList.remove('drawer-open');

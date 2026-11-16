@@ -27,3 +27,13 @@ export function readSyncBase(uid) {
 export function writeSyncBase(uid, data) {
   localStorage.setItem('goc-hoc-nho:sync:' + uid, JSON.stringify(data));
 }
+
+/** Keep administrator grants separate from the browser's study/reward snapshot. */
+export function applyAdminCredits(state, credits = 0) {
+  if (!state) return state;
+  const wallet = state.wallet || {};
+  const applied = Number.isSafeInteger(wallet.adminCreditsApplied) ? wallet.adminCreditsApplied : 0;
+  if (!credits && !applied && !Object.hasOwn(wallet, 'adminCreditsApplied')) return state;
+  const balance = Number.isSafeInteger(wallet.coins) && wallet.coins >= 0 ? wallet.coins : 0;
+  return { ...state, wallet: { ...wallet, coins: Math.max(0, balance + credits - applied), adminCreditsApplied: credits } };
+}

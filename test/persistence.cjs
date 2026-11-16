@@ -57,7 +57,7 @@ function stateHarness(saved, load) {
  const bases=new Map([['user',plain(saved)]]),writes=[];
  const defaults=()=>({...initial(),ui:{},subjects:[],tasks:[],settings:{...initial().settings,seeded:false},room:{}});
  const context=vm.createContext({
-  mergeState:mergeContext.mergeState,readSyncBase:uid=>bases.get(uid),writeSyncBase:(uid,s)=>bases.set(uid,plain(s)),
+  mergeState:mergeContext.mergeState,applyAdminCredits:mergeContext.applyAdminCredits,readSyncBase:uid=>bases.get(uid),writeSyncBase:(uid,s)=>bases.set(uid,plain(s)),
   loadState:()=>saved,saveState:()=>true,createInitialState:defaults,isSampleTask:()=>false,SIDEBAR_DEFAULT:{},
   debounce:f=>()=>{},todayKey:()=> '2026-11-16',startOfWeek:x=>x,toKey:x=>x,migrateRoom:s=>s.room||{},
   getCurrentUser:()=>({uid:'user'}),loadCloudState:load,saveCloudState:async(uid,s)=>{writes.push(plain(s));return true;},
@@ -82,8 +82,8 @@ function cloudHarness(remote, baseline, fail=false) {
  let base=baseline,stored;
  const code=fs.readFileSync(path.join(__dirname,'../js/cloud.js'),'utf8').replace(/^import[\s\S]*?from ['"][^'"]+['"];\n/gm,'').replace(/export /g,'');
  const context=vm.createContext({
-  initializeApp:()=>({}),getAuth:()=>({}),getFirestore:()=>({}),doc:()=>({}),
-  mergeState:mergeContext.mergeState,readSyncBase:()=>base,writeSyncBase:(uid,s)=>base=plain(s),
+  initializeApp:()=>({}),getAuth:()=>({}),getFirestore:()=>({}),doc:()=>({}),onAuthStateChanged:()=>()=>{},
+  mergeState:mergeContext.mergeState,applyAdminCredits:mergeContext.applyAdminCredits,readSyncBase:()=>base,writeSyncBase:(uid,s)=>base=plain(s),
   runTransaction:async(db,fn)=>{if(fail)throw Error('offline');await fn({get:async()=>({exists:()=>!!remote,data:()=>({state:remote})}),set:(ref,p)=>stored=plain(p.state)});},console,
  });
  vm.runInContext(code,context);return {context,getBase:()=>base,getStored:()=>stored};

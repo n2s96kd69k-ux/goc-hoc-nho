@@ -1,4 +1,4 @@
-import { mergeState, readSyncBase, writeSyncBase } from './sync.js';
+import { mergeState, applyAdminCredits, readSyncBase, writeSyncBase } from './sync.js';
 // ===== Đồng bộ đám mây với Firebase (Auth + Firestore) =====
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
 import {
@@ -16,6 +16,8 @@ import {
   getDoc,
   setDoc,
   runTransaction,
+  onSnapshot,
+  getDocFromServer,
 } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
 const firebaseConfig = {
@@ -67,48 +69,46 @@ export function accountId(uid) {
   return `GHN-${out}`;
 }
 
-/** Chủ ứng dụng — luôn là quản trị viên, không gỡ được. */
+// Legacy public IDs remain display-only. Authorization comes from users/{Firebase UID}.
 export const OWNER_ID = 'GHN-776J9W';
-
-export function isOwner(pid) { return pid === OWNER_ID; }
-
-export async function loadRoleBook(uid) {
-  const members = {};
-  if (db && uid) {
-    try {
-      const snap = await getDoc(doc(db, 'users', uid));
-      const saved = snap.exists() ? snap.data().roleBook : null;
-      if (saved && saved.members) Object.assign(members, saved.members);
-    } catch (e) {
-      console.warn('Không đọc được roleBook:', e);
-    }
-  }
-  return withOwner({ members });
+let access = { uid: null, role: 'member', status: 'active', owner: false, adminCredits: 0 };
+let stopAccess = () => {};
+const accessListeners = new Set();
+let resolveAuth;
+const authReady = new Promise(resolve => { resolveAuth = resolve; });
+function publishAccess(next) {
+  access = next;
+  for (const listener of accessListeners) listener(access);
 }
-
-function withOwner(book) {
-  const members = { ...(book.members || {}) };
-  const cur = members[OWNER_ID] || {};
-  members[OWNER_ID] = { ...cur, role: 'admin', owner: true, name: cur.name || 'Lê Khả Thanh Bình' };
-  return { members };
+function accessFrom(uid, data = {}, ready = false) {
+  return { uid, ready, role: data.role === 'admin' ? 'admin' : 'member', status: data.status === 'banned' ? 'banned' : 'active', owner: data.owner === true, adminCredits: Number.isSafeInteger(data.adminCredits) ? data.adminCredits : 0 };
 }
-
-export function roleOf(pid, book) {
-  if (pid === OWNER_ID) return 'admin';
-  const row = book && book.members && book.members[pid];
-  if (!row) return null;
-  return row.role === 'admin' ? 'admin' : 'member';
+export function getAccountAccess() { return access; }
+export function isCurrentAdmin() { return !!currentUser && access.uid === currentUser.uid && access.role === 'admin' && access.status !== 'banned'; }
+export function onAccountAccessChange(listener) { accessListeners.add(listener); return () => accessListeners.delete(listener); }
+export async function requireAdmin() {
+  await authReady;
+  const user = currentUser;
+  if (!user || !db) return null;
+  try {
+    const snap = await getDocFromServer(doc(db, 'users', user.uid));
+    if (currentUser?.uid !== user.uid) return null;
+    publishAccess(accessFrom(user.uid, snap.exists() ? snap.data() : {}, true));
+    return isCurrentAdmin() ? user : null;
+  } catch { return null; }
 }
-
-export async function saveRoleBook(uid, book) {
-  if (!db || !uid) throw new Error('Firebase chưa sẵn sàng.');
-  const next = withOwner(book);
-  await setDoc(doc(db, 'users', uid), {
-    roleBook: { members: next.members },
-    roleBookUpdatedAt: new Date().toISOString(),
-  }, { merge: true });
-  return next;
-}
+if (auth) onAuthStateChanged(auth, user => {
+  currentUser = user || null;
+  stopAccess();
+  publishAccess(accessFrom(user?.uid || null));
+  resolveAuth();
+  if (user) stopAccess = onSnapshot(doc(db, 'users', user.uid), snap => {
+    if (currentUser?.uid === user.uid) publishAccess(accessFrom(user.uid, snap.exists() ? snap.data() : {}, true));
+  }, error => {
+    if (currentUser?.uid === user.uid) publishAccess(accessFrom(user.uid, { status: error.code === 'permission-denied' ? 'banned' : 'active' }));
+  });
+});
+else resolveAuth();
 
 export function onCloudAuthChange(callback) {
   if (!auth) {
@@ -151,7 +151,8 @@ export async function loadCloudState(uid) {
   const snap = await getDoc(ref);
   if (!snap.exists()) return null;
   const data = snap.data();
-  return data && data.state ? data.state : null;
+  if (data?.status === 'banned') throw new Error('Tài khoản đã bị khóa.');
+  return data?.state ? applyAdminCredits(data.state, data.adminCredits || 0) : null;
 }
 
 export async function saveCloudState(uid, state) {
@@ -165,13 +166,21 @@ export async function saveCloudState(uid, state) {
     state: snapshot,
     updatedAt: new Date().toISOString(),
   };
-  if (accountId(uid) === OWNER_ID) patch.role = 'admin';
+  const user = getCurrentUser();
+  if (user?.uid === uid) Object.assign(patch, {
+    displayName: user.displayName || snapshot.settings?.userName || 'Người học',
+    email: user.email || '', emailLower: (user.email || '').toLowerCase(), photoURL: user.photoURL || '',
+  });
   await runTransaction(db, async (transaction) => {
     const remote = await transaction.get(ref);
-    const existing = remote.exists() ? remote.data().state : null;
+    const data = remote.exists() ? remote.data() : {};
+    if (data.status === 'banned') throw new Error('Tài khoản đã bị khóa.');
+    const existing = data.state || null;
+    const credits = data.adminCredits || 0;
+    const adjusted = applyAdminCredits(snapshot, credits);
     // An unknown baseline must not silently overwrite an existing account.
     if (existing && !base) throw new Error('Cần tải dữ liệu tài khoản trước khi lưu.');
-    transaction.set(ref, { ...patch, state: existing ? mergeState(base, snapshot, existing) : snapshot }, { merge: true });
+    transaction.set(ref, { ...patch, state: existing ? mergeState(applyAdminCredits(base, credits), adjusted, applyAdminCredits(existing, credits)) : adjusted }, { merge: true });
   });
   writeSyncBase(uid, snapshot);
   return true;

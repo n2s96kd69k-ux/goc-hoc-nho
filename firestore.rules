@@ -1,0 +1,71 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function userPath(uid) { return /databases/$(database)/documents/users/$(uid); }
+    function admin() {
+      return signedIn() && exists(userPath(request.auth.uid))
+        && get(userPath(request.auth.uid)).data.get('role', 'member') == 'admin'
+        && get(userPath(request.auth.uid)).data.get('status', 'active') != 'banned';
+    }
+    function active(uid) {
+      return signedIn() && request.auth.uid == uid
+        && resource.data.get('status', 'active') != 'banned';
+    }
+    function profileFields() {
+      return ['state', 'publicId', 'updatedAt', 'displayName', 'email', 'emailLower', 'photoURL'];
+    }
+    function audited(uid) {
+      let operation = request.resource.data.lastAdminOperation;
+      let auditPath = /databases/$(database)/documents/adminLogs/$(operation);
+      let audit = getAfter(auditPath).data;
+      return operation is string && !exists(auditPath)
+        && audit.actorUid == request.auth.uid && audit.targetUid == uid
+        && audit.createdAt == request.time;
+    }
+    function adminUpdate(uid) {
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+      return admin()
+        && changed.hasOnly(['role', 'status', 'banReason', 'bannedAt', 'bannedBy', 'adminCredits', 'updatedAt', 'lastAdminOperation'])
+        && request.resource.data.get('role', 'member') in ['admin', 'member']
+        && request.resource.data.get('status', 'active') in ['active', 'banned']
+        && request.resource.data.get('adminCredits', 0) is int
+        && request.resource.data.get('adminCredits', 0) >= -1000000000
+        && request.resource.data.get('adminCredits', 0) <= 1000000000
+        && (!changed.hasAny(['role', 'status', 'banReason', 'bannedAt', 'bannedBy'])
+          || (uid != request.auth.uid && !resource.data.get('owner', false)))
+        && request.resource.data.updatedAt == request.time
+        && audited(uid);
+    }
+    match /users/{uid} {
+      // Deny banned accounts access to the private user document as well as writes.
+      allow get: if signedIn() && ((request.auth.uid == uid
+        && (!exists(userPath(uid)) || resource.data.get('status', 'active') != 'banned')) || admin());
+      allow list: if admin();
+      allow create: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(profileFields());
+      allow update: if (active(uid) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(profileFields()))
+        || adminUpdate(uid);
+      allow delete: if false;
+    }
+    match /adminLogs/{operation} {
+      allow read: if admin();
+      allow create: if admin()
+        && request.resource.data.keys().hasOnly(['actorUid', 'actorEmail', 'targetUid', 'type', 'requestedValue', 'before', 'after', 'reason', 'createdAt'])
+        && request.resource.data.actorUid == request.auth.uid
+        && request.resource.data.targetUid is string
+        && request.resource.data.type in ['coins-add', 'coins-set', 'role', 'status']
+        && request.resource.data.reason is string
+        && request.resource.data.reason.size() >= 3 && request.resource.data.reason.size() <= 300
+        && request.resource.data.createdAt == request.time
+        && getAfter(userPath(request.resource.data.targetUid)).data.lastAdminOperation == operation;
+      allow update, delete: if false;
+    }
+    // Existing school logos and exam schedule remain in their current collection.
+    match /universities/{id} {
+      allow read: if true;
+      allow create, update, delete: if admin();
+    }
+    match /{document=**} { allow read, write: if false; }
+  }
+}
