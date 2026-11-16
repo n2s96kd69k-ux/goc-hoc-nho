@@ -1,17 +1,56 @@
-// Original daily study curve (Vietnam time), shared across accounts and timezones.
-// Quantized, deterministic movement replaces independent per-browser randomness.
-export function studyBaseline(at = Date.now()) {
-  const slot = Math.floor(at / 12000);
-  const date = new Date(slot * 12000 + 7 * 3600000);
-  const h = date.getUTCHours() + date.getUTCMinutes() / 60;
-  const anchors = [[0,82],[2,46],[4,22],[5.5,12],[7.5,34],[9.5,56],[11.5,44],[13.5,52],[16,64],[17.5,98],[19,156],[20.5,208],[22,170],[23.5,112],[24,82]];
-  let base = 82;
-  for (let i=1;i<anchors.length;i++) {
-    const [h0,n0]=anchors[i-1], [h1,n1]=anchors[i];
-    if(h<=h1) { base=n0+(n1-n0)*(h-h0)/(h1-h0); break; }
+// Shared simulation, not real attendance. Seeded by Vietnam calendar day so
+// reloads, accounts and browser timezones all replay the same 8-second walk.
+const STEP = 8000, DAY = 86400000, VN = 7 * 3600000;
+const curves = [[0,40],[2,25],[4.5,13],[5,25],[8,40],[10,52],[12,55],[13,65],[15,85],[17.5,115],[18.5,170],[20.5,255],[22,220],[23,165],[23.5,50],[24,40]];
+const cache = new Map();
+const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
+function target(hour) {
+  for (let i = 1; i < curves.length; i++) {
+    const [a, x] = curves[i - 1], [b, y] = curves[i];
+    if (hour <= b) return x + (y - x) * (hour - a) / (b - a);
   }
-  // A smooth common wave, with a shared daily phase; no user-specific state.
-  const phase = Math.floor(at / 86400000) % 31;
-  const movement = 4 * Math.sin(slot / 9 + phase) + 2 * Math.sin(slot / 23);
-  return Math.max(6, Math.min(240, Math.round(base + movement)));
+  return 40;
+}
+function bounds(h) {
+  if (h >= 5 && h <= 8) return [20,45];
+  if (h >= 13 && h <= 17.5) return [60,120];
+  if (h >= 18.5 && h <= 23) return [150,280];
+  if (h >= 23.5 || h <= 4.5) return [10,50];
+  return [10,280];
+}
+function dailyWalk(day) {
+  let seed = (day ^ 0x9e3779b9) >>> 0;
+  const random = () => {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    return seed / 4294967296;
+  };
+  const values = new Uint16Array(DAY / STEP);
+  let value = 40, burst = 0, beats = 0;
+  for (let i = 0; i < values.length; i++) {
+    const hour = i * STEP / 3600000, base = target(hour);
+    // A 15% chance when no burst is running. Spread surges/drops over 3 beats.
+    if (!beats && random() < 0.15) {
+      burst = random() < 0.5 ? 15 + Math.floor(random() * 16) : -(10 + Math.floor(random() * 6));
+      beats = 3;
+    }
+    let delta = clamp(Math.floor(random() * 8) - 3 + Math.round((base - value) * 0.12), -3, 4);
+    if (beats) {
+      delta = Math.round(burst / beats);
+      burst -= delta; beats--;
+    }
+    const [lo, hi] = bounds(hour);
+    value = clamp(value + delta, lo, hi);
+    // Meet at midnight without a daily seed-reset jump.
+    const fade = Math.min(1, i * STEP / 120000, (DAY - i * STEP) / 120000);
+    values[i] = Math.round(clamp(base + (value - base) * fade, lo, hi));
+  }
+  return values;
+}
+export function studyBaseline(at = Date.now()) {
+  const local = at + VN, day = Math.floor(local / DAY);
+  if (!cache.has(day)) {
+    if (cache.size >= 2) cache.delete(cache.keys().next().value);
+    cache.set(day, dailyWalk(day));
+  }
+  return cache.get(day)[Math.floor((local - day * DAY) / STEP)];
 }

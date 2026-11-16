@@ -8,7 +8,7 @@ export function countStudying(rows, now = Date.now()) {
 export function startStudyPresence(onCount) {
   const db = firebaseDb(); if (!db) { onCount(null); return () => {}; }
   const pageId = crypto.randomUUID();
-  let user = null, rows = [], connected = false, stopped = false, generation = 0;
+  let user = null, rows = [], connected = false, stopped = false, suspended = false, generation = 0;
   let queue = Promise.resolve();
   const publish = () => onCount(connected ? countStudying(rows) : null);
   const refFor = uid => doc(db, 'studyPresence', `${uid}_${pageId}`);
@@ -20,10 +20,12 @@ export function startStudyPresence(onCount) {
     const endAt = timer.endAt;
     // Serialize start/stop so a slow start request cannot overwrite a later stop.
     queue = queue.catch(() => {}).then(async () => {
-      if (stopped || version !== generation || !uid) return;
+      if (stopped || suspended || version !== generation || !uid) return;
       if (!running) { await remove(uid); return; }
       try {
         await setDoc(refFor(uid), { uid, updatedAt: serverTimestamp(), expiresAt: Timestamp.fromMillis(Date.now() + 90000), focusEndsAt: Timestamp.fromMillis(endAt) });
+        // A write already in flight may finish after logout/pagehide/cleanup.
+        if (stopped || suspended || version !== generation) await remove(uid);
       } catch (error) { console.warn('Không đồng bộ được trạng thái học:', error.code); }
     });
   }
@@ -39,13 +41,15 @@ export function startStudyPresence(onCount) {
   const heartbeat = setInterval(sync, 30000);
   const expiry = setInterval(publish, 5000);
   const reconnect = () => sync();
-  const leave = () => remove(user?.uid);
+  const leave = () => { suspended = true; generation++; remove(user?.uid); };
+  const resume = () => { suspended = false; sync(); };
   window.addEventListener('online', reconnect);
   window.addEventListener('pagehide', leave);
+  window.addEventListener('pageshow', resume);
   const visible = () => { if (document.visibilityState === 'visible') sync(); };
   document.addEventListener('visibilitychange', visible);
   return () => {
     stopped = true; generation++; stopAuth(); stopTimer(); stopFeed(); clearInterval(heartbeat); clearInterval(expiry);
-    window.removeEventListener('online', reconnect); window.removeEventListener('pagehide', leave); document.removeEventListener('visibilitychange', visible); leave();
+    window.removeEventListener('online', reconnect); window.removeEventListener('pagehide', leave); window.removeEventListener('pageshow', resume); document.removeEventListener('visibilitychange', visible); leave();
   };
 }

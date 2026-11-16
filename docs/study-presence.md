@@ -1,6 +1,6 @@
 # Số tài khoản đang học
 
-Số hiển thị = nền mô phỏng theo giờ Việt Nam của `studyBaseline.js` + số tài khoản tập trung từ Firestore. Giữ nguyên các mốc giờ của đường cong cũ, thay dao động ngẫu nhiên riêng từng máy bằng dao động tính từ cùng mốc thời gian 12 giây. Mọi tài khoản có cùng thời gian sẽ nhận cùng số nền; không cộng riêng tài khoản hiện tại lần nữa. Sai lệch đồng hồ thiết bị hoặc độ trễ mạng vẫn có thể gây chênh lệch tạm thời. Đây là số mô phỏng kết hợp người học thực, không phải số người thực hoàn toàn.
+Số hiển thị = nền mô phỏng theo giờ Việt Nam của `studyBaseline.js` + số tài khoản tập trung từ Firestore. Mỗi ngày theo giờ Việt Nam có một chuỗi random walk dùng seed chung, cập nhật mỗi 8 giây. Sáng 05–08h: 20–45; chiều 13–17:30: 60–120; tối 18:30–23h: 150–280; khuya 23:30–04:30: 10–50. Các khoảng chuyển tiếp được nội suy. Nhịp thường dịch -3 đến +4 về phía đường cong mục tiêu; mỗi nhịp chưa có đợt biến động có xác suất 15% khởi tạo tăng 15–30 hoặc giảm 10–15, chia trong 3 nhịp. Giới hạn khung giờ có thể cắt bớt đợt tăng/giảm. Hai phút quanh nửa đêm làm dịu dao động để đổi seed không nhảy số. Cache tối đa hai ngày, không lưu số ngẫu nhiên riêng theo tài khoản. Mọi tài khoản có cùng thời gian sẽ nhận cùng số nền; không cộng riêng tài khoản hiện tại lần nữa. Sai lệch đồng hồ thiết bị hoặc độ trễ mạng vẫn có thể gây chênh lệch tạm thời. Đây là số mô phỏng kết hợp người học thực, không phải số người thực hoàn toàn.
 
 `js/studyPresence.js` theo dõi timer và Firebase Auth. Mỗi trang ghi một document `studyPresence/{uid}_{pageId}` gồm `uid`, `updatedAt` (server timestamp), `expiresAt`, `focusEndsAt`. Không lưu tên/email hay nội dung nhiệm vụ trong presence.
 
@@ -21,3 +21,28 @@ Có thể bật Firestore TTL cho field `expiresAt` của collection group `stud
 `node --test test/presence.cjs`: hết hạn, kết thúc phiên, dedup nhiều tab, hai tài khoản nhận cùng thay đổi bắt đầu/dừng với lớp Firestore giả dùng chung.
 
 `npm run test:rules`: kiểm tra emulator quyền đọc chung, không giả mạo UID, không sửa/xóa trạng thái tài khoản khác, không đăng ký phiên có lease vượt giới hạn.
+
+## Tích hợp đã có trong ứng dụng
+
+`js/components/header.js` import hai service, khởi tạo listener một lần (không tạo lại khi render header):
+
+```js
+import { studyBaseline } from '../studyBaseline.js';
+import { startStudyPresence } from '../studyPresence.js';
+let active = null;
+const paint = () => {
+  const total = studyBaseline() + (active ?? 0);
+  document.querySelectorAll('[data-live-count]').forEach(el => {
+    el.textContent = String(total);
+  });
+};
+const unsubscribe = startStudyPresence(count => { active = count; paint(); });
+const interval = setInterval(paint, 1000); // Kiểm tra mốc; số nền đổi mỗi 8 giây.
+// Khi hủy app/header vĩnh viễn: unsubscribe(); clearInterval(interval);
+```
+
+Pomodoro dùng `start()`, `pause()`, `reset()` của `js/timer.js` như hiện tại. Service đăng ký `onTimer` để xử lý `start`, `pause`, `reset`, `restore`, `complete:*`; không ghi Firebase theo từng tick. Không gọi tăng/giảm thủ công ở nút bấm vì sẽ đếm trùng. Chỉ phiên `focus` đang chạy được tính, không tính giờ nghỉ. `pagehide` vô hiệu hóa các lần ghi đang chờ và xóa lại nếu một lần ghi đang gửi hoàn tất muộn; `pageshow` đăng ký lại sau khi quay về trang từ browser cache.
+
+Không có `onDisconnect()` trong Firestore. Xóa khi thoát là best effort, lease 90 giây là dự phòng. Không cần đổi Rules so với phiên bản đã có `studyPresence`; nếu chưa publish thì dùng toàn bộ file `firestore.rules` trong repo. Chưa kiểm chứng trên Firebase production nếu chưa có phiên đăng nhập và Rules đã publish.
+
+Kiểm thử thuật toán: `node --test test/study-baseline.cjs test/presence.cjs`.
