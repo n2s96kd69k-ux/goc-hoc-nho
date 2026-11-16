@@ -1,3 +1,4 @@
+import { bellHTML, bindBell } from '../notifications/ui.js';
 // ===== Header gọn =====
 import { getState } from '../state.js';
 import { mascotSVG, mascot } from '../mascot.js';
@@ -34,6 +35,7 @@ export function renderHeader() {
       <span class="pill glass header-coins" title="Xu của bạn">🪙 ${s.wallet.coins} xu</span>
       <button class="pill glass header-auth" id="auth-btn" type="button" title="Tài khoản & Đồng bộ">${authButtonText(user)}</button>
       <button class="header-mascot mascot-wrap mascot-${mascot.state}" id="header-mascot" type="button" aria-label="Mochi" title="${s.mascot.name}">${mascotSVG(34)}</button>
+      ${bellHTML}
       <button class="icon-btn" id="settings-btn" type="button" aria-label="Cài đặt">⚙</button>
     </div>`;
   el.querySelector('#settings-btn').onclick = () => navigate('/settings');
@@ -44,6 +46,7 @@ export function renderHeader() {
   shownCoins = s.wallet.coins;
   bindSidebarToggle(el.querySelector('#menu-btn'));
   startLiveCount();
+  bindBell();
 }
 
 const SIDEBAR_KEY = 'ghn_sidebar_collapsed';

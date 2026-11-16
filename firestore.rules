@@ -67,6 +67,15 @@ service cloud.firestore {
       allow read: if true;
       allow create, update, delete: if admin();
     }
+    match /announcements/{id} {
+      allow read: if true;
+      allow write: if admin();
+    }
+    match /users/{uid}/notifications/{id} {
+      allow read: if admin() || (signedIn() && request.auth.uid == uid
+        && get(userPath(uid)).data.get('status', 'active') != 'banned');
+      allow write: if admin();
+    }
     match /{document=**} { allow read, write: if false; }
   }
 }

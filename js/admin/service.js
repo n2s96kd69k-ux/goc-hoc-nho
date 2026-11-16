@@ -77,6 +77,14 @@ export async function changeUser({ uid, type, value, reason, operationId }) {
     const entry = { actorUid: actor.uid, actorEmail: actor.email || '', targetUid: uid, type, requestedValue: value, before, after, reason, createdAt: serverTimestamp() };
     tx.update(ref, patch);
     tx.set(log, entry);
+    if (type === 'coins-add' || type === 'coins-set') {
+      tx.set(doc(db, 'users', uid, 'notifications', operationId), {
+        type: 'personal', content: type === 'coins-add'
+          ? `Bạn được cộng ${value} xu. ${reason}`
+          : `Số dư của bạn đã được điều chỉnh thành ${after} xu. ${reason}`,
+        createdAt: serverTimestamp(),
+      });
+    }
     return entry;
   });
 }

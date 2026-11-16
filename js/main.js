@@ -1,3 +1,5 @@
+import { startNotifications } from './notifications/data.js';
+import { initNotificationUI } from './notifications/ui.js';
 import { applyAdminCredits } from './sync.js';
 import { renderAdmin, disposeAdmin } from './pages/admin.js';
 // ===== Khởi động ứng dụng =====
@@ -156,6 +158,8 @@ function boot() {
   subscribe(onStateChange);
   setupTimerPill();
   setupCloudSync();
+  initNotificationUI();
+  startNotifications();
   let lastRole = null;
   let bannedNoticeUid = null;
   onAccountAccessChange(access => {
