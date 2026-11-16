@@ -1,6 +1,6 @@
 # Số tài khoản đang học
 
-Đã bỏ bộ đếm giả theo giờ/ngẫu nhiên, phép cộng riêng trên máy và số người theo môn giả trong hộp Phòng học chung.
+Số hiển thị = nền mô phỏng theo giờ Việt Nam của `studyBaseline.js` + số tài khoản tập trung từ Firestore. Giữ nguyên các mốc giờ của đường cong cũ, thay dao động ngẫu nhiên riêng từng máy bằng dao động tính từ cùng mốc thời gian 12 giây. Mọi tài khoản có cùng thời gian sẽ nhận cùng số nền; không cộng riêng tài khoản hiện tại lần nữa. Sai lệch đồng hồ thiết bị hoặc độ trễ mạng vẫn có thể gây chênh lệch tạm thời. Đây là số mô phỏng kết hợp người học thực, không phải số người thực hoàn toàn.
 
 `js/studyPresence.js` theo dõi timer và Firebase Auth. Mỗi trang ghi một document `studyPresence/{uid}_{pageId}` gồm `uid`, `updatedAt` (server timestamp), `expiresAt`, `focusEndsAt`. Không lưu tên/email hay nội dung nhiệm vụ trong presence.
 
@@ -8,7 +8,7 @@ Tất cả người xem đăng ký Firestore realtime và đếm UID khác nhau 
 
 Bắt đầu/khôi phục focus ghi trạng thái; pause, reset, đổi preset hoặc kết thúc phiên gỡ trạng thái. Nhịp duy trì 30 giây, hạn 90 giây. Rời trang cố gắng gỡ document. Mất mạng, đóng trình duyệt hoặc hệ điều hành treo tab có thể khiến trạng thái còn lưu tối đa khoảng 90 giây; mọi người xem loại bản ghi hết hạn trong vòng kiểm tra 5 giây tiếp theo. Thời điểm kết thúc Pomodoro cũng được kiểm tra để không tính tiếp phiên đã hết giờ. Khi tab bị trình duyệt đình chỉ lâu, tài khoản có thể tạm không được tính đến khi tab hoạt động lại.
 
-Trạng thái kết nối chưa có dữ liệu server hiển thị `…`, không hiển thị số giả. Hai thiết bị cùng nhận trạng thái sau độ trễ mạng/snapshot, không phải đồng thời tuyệt đối từng mili giây.
+Khi chưa kết nối được Firestore, chỉ hiển thị nền mô phỏng; chưa cộng người học thực. Hai thiết bị cùng nhận trạng thái sau độ trễ mạng/snapshot, không phải đồng thời tuyệt đối từng mili giây.
 
 ## Kích hoạt
 

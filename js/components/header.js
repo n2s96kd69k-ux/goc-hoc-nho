@@ -1,3 +1,4 @@
+import { studyBaseline } from '../studyBaseline.js';
 import { startStudyPresence } from '../studyPresence.js';
 import { bellHTML, bindBell } from '../notifications/ui.js';
 // ===== Header gọn =====
@@ -86,14 +87,16 @@ export function refreshHeaderAuth() {
 let shownCoins = null;
 let crowdCount = null;
 let stopLiveCount = null;
-function liveTotal() { return crowdCount === null ? '…' : crowdCount; }
+function liveTotal() { return studyBaseline() + (crowdCount ?? 0); }
 function paintLiveCount() {
   document.querySelectorAll('[data-live-count]').forEach(el => { el.textContent = String(liveTotal()); });
-  document.querySelectorAll('.live-study').forEach(el => { el.title = crowdCount === null ? 'Đang kết nối bộ đếm người học' : 'Số tài khoản đang chạy Pomodoro tập trung'; });
+  document.querySelectorAll('.live-study').forEach(el => { el.title = crowdCount === null ? 'Đang kết nối trạng thái học chung' : 'Học cùng mọi người'; });
 }
 function startLiveCount() {
   if (stopLiveCount) return;
-  stopLiveCount = startStudyPresence(count => { crowdCount = count; paintLiveCount(); });
+  const stopPresence = startStudyPresence(count => { crowdCount = count; paintLiveCount(); });
+  const clock = setInterval(paintLiveCount, 1000);
+  stopLiveCount = () => { stopPresence(); clearInterval(clock); };
 }
 
 function openLiveRoom() {
@@ -105,7 +108,7 @@ function openLiveRoom() {
         <span class="live-copy">Đang có <strong class="live-count" data-live-count>${liveTotal()}</strong> bạn đang học bài</span>
       </button>
       <p class="page-sub">Thư viện đang mở. Mọi người học trong yên lặng, bạn có thể vào học cùng.</p>
-      <p class="small muted">Mỗi tài khoản được tính một lần khi đang chạy phiên tập trung. Tạm dừng hoặc chuyển sang nghỉ sẽ không được tính.</p>
+      <p class="small muted">Cùng nhau dành một khoảng thời gian tập trung cho mục tiêu hôm nay nhé.</p>
       <div class="modal-actions">
         <button class="btn btn-primary" type="button" id="live-join">Học cùng mọi người</button>
       </div>`,
