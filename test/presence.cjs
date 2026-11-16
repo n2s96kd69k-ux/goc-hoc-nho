@@ -10,18 +10,18 @@ function sharedClients(options = {}) {
  const notify=()=>{for(const f of feeds)f({metadata:{fromCache:false},docs:[...records.values()].map(data=>({data:()=>data}))});};
  function client(uid) {
   const events = new Map();
-  const timer={status:'idle',mode:'focus',endAt:Date.now()+1500000},counts=[];let timerListener;
+  const timer={status:'idle',mode:'focus',endAt:Date.now()+1500000},counts=[],statuses=[];let timerListener, failedOnce=false;
   const context=vm.createContext({
    Date,Promise,Set,console,crypto:{randomUUID:()=>String(++id)},
    firebaseDb:()=>({}),onCloudAuthChange:f=>{f({uid});return ()=>{};},getTimer:()=>timer,onTimer:f=>{timerListener=f;return ()=>{};},
    collection:()=>({}),doc:(db,col,id)=>id,query:x=>x,where:()=>({}),Timestamp:{now:()=>({}),fromMillis:n=>({toMillis:()=>n})},serverTimestamp:()=>({}),
-   setDoc:async(ref,data)=>{if(options.beforeWrite)await options.beforeWrite();records.set(ref,data);notify();},deleteDoc:async ref=>{records.delete(ref);notify();},
-   onSnapshot:(q,opts,f)=>{feeds.add(f);notify();return ()=>feeds.delete(f);},
+   setDoc:async(ref,data)=>{if(options.denyWrite)throw {code:'permission-denied'};if(options.beforeWrite)await options.beforeWrite();records.set(ref,data);notify();},deleteDoc:async ref=>{records.delete(ref);notify();},
+   onSnapshot:(q,opts,f,error)=>{if(options.failFeedOnce&&!failedOnce){failedOnce=true;error({code:'permission-denied'});return ()=>{};}feeds.add(f);notify();return ()=>feeds.delete(f);},
    setInterval:()=>1,clearInterval:()=>{},window:{addEventListener:(name,fn)=>events.set(name,fn),removeEventListener:name=>events.delete(name)},document:{addEventListener(){},removeEventListener(){}},
   });
   vm.runInContext(fs.readFileSync(__dirname+'/../js/studyPresence.js','utf8').replace(/^import .*;\n/gm,'').replace(/export /g,''),context);
-  context.startStudyPresence(n=>counts.push(n));
-  return {counts,event(name){events.get(name)?.();},set(on){timer.status=on?'running':'paused';timerListener(timer,on?'start':'pause');}};
+  context.startStudyPresence(n=>counts.push(n),s=>statuses.push(s));
+  return {counts,statuses,event(name){events.get(name)?.();},set(on){timer.status=on?'running':'paused';timerListener(timer,on?'start':'pause');}};
  }
  return client;
 }
@@ -41,4 +41,16 @@ test('pagehide cleans an in-flight start and pageshow restores focus',async()=>{
  assert.equal(b.counts.at(-1),0);
  a.event('pageshow');await flush();release();await flush();assert.equal(b.counts.at(-1),1);
  a.set(false);await flush();assert.equal(b.counts.at(-1),0);
+});
+
+test('a listener rejected before Rules publish recovers on Start',async()=>{
+ const client=sharedClients({failFeedOnce:true}),a=client('a');
+ const flush=()=>new Promise(resolve=>setImmediate(resolve));await flush();
+ assert.equal(a.counts.at(-1),null);a.set(true);await flush();
+ assert.equal(a.counts.at(-1),1);assert.equal(a.statuses.at(-1).counted,true);
+});
+test('denied writes are surfaced instead of pretending the session was counted',async()=>{
+ const client=sharedClients({denyWrite:true}),a=client('a');
+ const flush=()=>new Promise(resolve=>setImmediate(resolve));await flush();a.set(true);await flush();
+ assert.equal(a.counts.at(-1),0);assert.equal(a.statuses.at(-1).error,'permission-denied');assert.equal(a.statuses.at(-1).counted,false);
 });
