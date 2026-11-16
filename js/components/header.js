@@ -86,26 +86,15 @@ export function refreshHeaderAuth() {
 
 let shownCoins = null;
 let crowdCount = null;
-let presenceStatus = {};
-function presenceMessage() {
-  if (!presenceStatus.signedIn) return 'Đăng nhập để phiên tập trung của bạn được tính vào phòng học chung.';
-  if (presenceStatus.error) return presenceStatus.error === 'permission-denied'
-    ? 'Chưa ghi nhận phiên học: Firebase từ chối quyền truy cập.'
-    : 'Chưa đồng bộ được phiên học. Đang thử kết nối lại.';
-  if (presenceStatus.writing || !presenceStatus.connected) return 'Đang đồng bộ trạng thái học…';
-  return presenceStatus.counted ? 'Đã ghi nhận tài khoản của bạn đang học.' : 'Tài khoản của bạn chưa có phiên tập trung đang chạy trên máy chủ.';
-}
 let stopLiveCount = null;
 function liveTotal() { return studyBaseline() + (crowdCount ?? 0); }
 function paintLiveCount() {
   document.querySelectorAll('[data-live-count]').forEach(el => { el.textContent = String(liveTotal()); });
-  document.querySelectorAll('[data-presence-status]').forEach(el => { el.textContent = presenceMessage(); });
-  document.querySelectorAll('[data-real-count]').forEach(el => { el.textContent = crowdCount === null ? 'Đang kết nối…' : String(crowdCount); });
   document.querySelectorAll('.live-study').forEach(el => { el.title = crowdCount === null ? 'Đang kết nối trạng thái học chung' : 'Học cùng mọi người'; });
 }
 function startLiveCount() {
   if (stopLiveCount) return;
-  const stopPresence = startStudyPresence(count => { crowdCount = count; paintLiveCount(); }, status => { presenceStatus = status; paintLiveCount(); });
+  const stopPresence = startStudyPresence(count => { crowdCount = count; paintLiveCount(); });
   const clock = setInterval(paintLiveCount, 1000);
   stopLiveCount = () => { stopPresence(); clearInterval(clock); };
 }
@@ -119,8 +108,6 @@ function openLiveRoom() {
         <span class="live-copy">Đang có <strong class="live-count" data-live-count>${liveTotal()}</strong> bạn đang học bài</span>
       </button>
       <p class="page-sub">Thư viện đang mở. Mọi người học trong yên lặng, bạn có thể vào học cùng.</p>
-      <p class="small muted">Tài khoản đang tập trung thực tế: <strong data-real-count>${crowdCount === null ? 'Đang kết nối…' : crowdCount}</strong>. Số trên thanh bao gồm cả lượng mô phỏng theo giờ.</p>
-      <p class="small muted" data-presence-status aria-live="polite">${escapeHtml(presenceMessage())}</p>
       <div class="modal-actions">
         <button class="btn btn-primary" type="button" id="live-join">Học cùng mọi người</button>
       </div>`,
