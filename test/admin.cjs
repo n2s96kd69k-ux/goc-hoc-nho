@@ -50,7 +50,7 @@ test('route guard fails closed for guests, members, banned admin and network fai
 function serviceHarness() {
   const database = { user: {state:{wallet:{coins:50}},adminCredits:0}, logs:new Map() };
   const context = vm.createContext({
-    firebaseDb:()=>({}),requireAdmin:async()=>({uid:'admin',email:'admin@example.test'}),
+    OWNER_UID:'Vyd1sYXrKARaTujn0ucX0XFe0gp2',firebaseDb:()=>({}),requireAdmin:async()=>({uid:'admin',email:'admin@example.test'}),
     applyAdminCredits:sync.applyAdminCredits,...Object.fromEntries(['coinChange','validateReason','canChangeAccess'].map(k=>[k,policy[k]])),
     doc:(db,collection,id)=>({collection,id}),serverTimestamp:()=>new Date(0),
     runTransaction:async(db,fn)=>fn({

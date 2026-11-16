@@ -82,3 +82,12 @@ test('concurrent grants both persist and retrying the same operation is a no-op'
  const snapshot=await getDoc(doc(db,'users','student'));
  require('node:assert/strict').equal(snapshot.data().adminCredits,20);
 });
+
+test('existing primary owner keeps admin access without role or owner fields',async()=>{
+ const uid='Vyd1sYXrKARaTujn0ucX0XFe0gp2';
+ await env.withSecurityRulesDisabled(async ctx=>{await setDoc(doc(ctx.firestore(),'users',uid),{state:{wallet:{coins:0}}});});
+ await assertSucceeds(getDocs(collection(dbFor(uid),'users')));
+ await assertSucceeds(getDocs(collection(dbFor(uid),'adminLogs')));
+ await assertSucceeds(setDoc(doc(dbFor(uid),'universities','owner-test'),{name:'School'}));
+ await assertFails(audited(dbFor('admin'),uid,{status:'banned'},'status'));
+});

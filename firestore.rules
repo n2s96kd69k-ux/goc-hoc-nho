@@ -3,10 +3,11 @@ service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
     function userPath(uid) { return /databases/$(database)/documents/users/$(uid); }
+    function owner(uid) { return uid == "Vyd1sYXrKARaTujn0ucX0XFe0gp2"; }
     function admin() {
-      return signedIn() && exists(userPath(request.auth.uid))
+      return signedIn() && (owner(request.auth.uid) || (exists(userPath(request.auth.uid))
         && get(userPath(request.auth.uid)).data.get('role', 'member') == 'admin'
-        && get(userPath(request.auth.uid)).data.get('status', 'active') != 'banned';
+        && get(userPath(request.auth.uid)).data.get('status', 'active') != 'banned'));
     }
     function active(uid) {
       return signedIn() && request.auth.uid == uid
@@ -33,7 +34,7 @@ service cloud.firestore {
         && request.resource.data.get('adminCredits', 0) >= -1000000000
         && request.resource.data.get('adminCredits', 0) <= 1000000000
         && (!changed.hasAny(['role', 'status', 'banReason', 'bannedAt', 'bannedBy'])
-          || (uid != request.auth.uid && !resource.data.get('owner', false)))
+          || (uid != request.auth.uid && !owner(uid) && !resource.data.get('owner', false)))
         && request.resource.data.updatedAt == request.time
         && audited(uid);
     }

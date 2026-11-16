@@ -71,6 +71,7 @@ export function accountId(uid) {
 
 // Legacy public IDs remain display-only. Authorization comes from users/{Firebase UID}.
 export const OWNER_ID = 'GHN-776J9W';
+export const OWNER_UID = 'Vyd1sYXrKARaTujn0ucX0XFe0gp2';
 let access = { uid: null, role: 'member', status: 'active', owner: false, adminCredits: 0 };
 let stopAccess = () => {};
 const accessListeners = new Set();
@@ -81,7 +82,7 @@ function publishAccess(next) {
   for (const listener of accessListeners) listener(access);
 }
 function accessFrom(uid, data = {}, ready = false) {
-  return { uid, ready, role: data.role === 'admin' ? 'admin' : 'member', status: data.status === 'banned' ? 'banned' : 'active', owner: data.owner === true, adminCredits: Number.isSafeInteger(data.adminCredits) ? data.adminCredits : 0 };
+  return { uid, ready, role: uid === OWNER_UID || data.role === 'admin' ? 'admin' : 'member', status: uid !== OWNER_UID && data.status === 'banned' ? 'banned' : 'active', owner: uid === OWNER_UID || data.owner === true, adminCredits: Number.isSafeInteger(data.adminCredits) ? data.adminCredits : 0 };
 }
 export function getAccountAccess() { return access; }
 export function isCurrentAdmin() { return !!currentUser && access.uid === currentUser.uid && access.role === 'admin' && access.status !== 'banned'; }
@@ -151,7 +152,7 @@ export async function loadCloudState(uid) {
   const snap = await getDoc(ref);
   if (!snap.exists()) return null;
   const data = snap.data();
-  if (data?.status === 'banned') throw new Error('Tài khoản đã bị khóa.');
+  if (uid !== OWNER_UID && data?.status === 'banned') throw new Error('Tài khoản đã bị khóa.');
   return data?.state ? applyAdminCredits(data.state, data.adminCredits || 0) : null;
 }
 
@@ -174,7 +175,7 @@ export async function saveCloudState(uid, state) {
   await runTransaction(db, async (transaction) => {
     const remote = await transaction.get(ref);
     const data = remote.exists() ? remote.data() : {};
-    if (data.status === 'banned') throw new Error('Tài khoản đã bị khóa.');
+    if (uid !== OWNER_UID && data.status === 'banned') throw new Error('Tài khoản đã bị khóa.');
     const existing = data.state || null;
     const credits = data.adminCredits || 0;
     const adjusted = applyAdminCredits(snapshot, credits);

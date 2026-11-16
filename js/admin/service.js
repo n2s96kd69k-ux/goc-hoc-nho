@@ -1,5 +1,5 @@
 import { collection, doc, getDocs, getDocFromServer, query, where, orderBy, documentId, limit, startAfter, runTransaction, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
-import { firebaseDb, requireAdmin } from '../cloud.js';
+import { firebaseDb, requireAdmin, OWNER_UID } from '../cloud.js';
 import { applyAdminCredits } from '../sync.js';
 import { coinChange, validateReason, canChangeAccess } from './policy.js';
 
@@ -7,7 +7,7 @@ export const PAGE_SIZE = 20;
 export function userRow(snapshot) {
   const data = snapshot.data();
   const state = applyAdminCredits(data.state || {}, data.adminCredits || 0);
-  return { uid: snapshot.id, displayName: data.displayName || data.state?.settings?.userName || 'Chưa có tên', email: data.email || '', photoURL: data.photoURL || '', publicId: data.publicId || '', coins: state.wallet?.coins || 0, role: data.role === 'admin' ? 'admin' : 'member', status: data.status === 'banned' ? 'banned' : 'active', owner: data.owner === true };
+  return { uid: snapshot.id, displayName: data.displayName || data.state?.settings?.userName || 'Chưa có tên', email: data.email || '', photoURL: data.photoURL || '', publicId: data.publicId || '', coins: state.wallet?.coins || 0, role: snapshot.id === OWNER_UID || data.role === 'admin' ? 'admin' : 'member', status: data.status === 'banned' ? 'banned' : 'active', owner: snapshot.id === OWNER_UID || data.owner === true };
 }
 export async function listUsers({ cursor = null, search = '' } = {}) {
   if (!await requireAdmin()) throw new Error('Bạn không có quyền quản trị.');
@@ -64,7 +64,7 @@ export async function changeUser({ uid, type, value, reason, operationId }) {
       before = change.before; after = change.after;
       patch.adminCredits = (target.adminCredits || 0) + change.delta;
     } else {
-      if (!canChangeAccess(actor.uid, uid, target)) throw new Error('Không thể đổi quyền hoặc khóa tài khoản này.');
+      if (!canChangeAccess(actor.uid, uid, { ...target, owner: uid === OWNER_UID || target.owner === true })) throw new Error('Không thể đổi quyền hoặc khóa tài khoản này.');
       if (type === 'status' && ['active', 'banned'].includes(value)) {
         before = target.status || 'active'; after = value;
         patch.status = value; patch.banReason = value === 'banned' ? reason : '';

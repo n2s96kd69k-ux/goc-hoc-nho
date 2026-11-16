@@ -6,12 +6,8 @@
 
 GitHub Pages chỉ triển khai HTML/CSS/JS. Security Rules phải được Publish riêng trên Firebase; việc commit `firestore.rules` không thay đổi Rules đang chạy.
 
-1. Mở Firebase Console → project **goc-hoc-48ad4** → Authentication → Users. Sao chép Firebase **UID** của chủ ứng dụng (không dùng mã GHN).
-2. Trong Firestore → Data → `users/{UID đó}`, đặt các field cấp cao nhất:
-   - `role`: string `admin`
-   - `owner`: boolean `true`
-   - `status`: string `active`
-   Giữ nguyên các field/dữ liệu đang có. Không dùng `state.role` hay `roleBook` để cấp quyền.
+1. Chủ hệ thống đã được xác định bằng UID **`Vyd1sYXrKARaTujn0ucX0XFe0gp2`** từ Rules cũ. Code và Rules mới cùng dùng UID này; chủ không cần tự thêm field role/owner để mở quản trị.
+2. Những quản trị viên khác được cấp `role: "admin"` trên document `users/{Firebase UID}` thông qua trang Quản Lý. User thường không được tự thay role/status/adminCredits.
 3. Firestore → Rules: sao lưu Rules cũ rồi thay bằng toàn bộ nội dung [`firestore.rules`](../firestore.rules), nhấn **Publish**. File này bao gồm quyền cho `users`, `adminLogs` và collection `universities` đang chứa logo/lịch thi.
 4. Tải lại web, đăng nhập tài khoản chủ. **Quản Lý** xuất hiện dưới **Cài đặt** ở cuối sidebar; địa chỉ trực tiếp là `/#/admin`.
 5. Kiểm tra bằng một tài khoản thường: không thấy Quản Lý, truy cập trực tiếp bị chuyển về `/`. Kiểm tra thêm tài khoản chủ thấy danh sách và có thể phát một lượng xu thử cho tài khoản kiểm thử.
