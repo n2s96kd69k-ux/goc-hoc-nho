@@ -89,14 +89,14 @@ export function renderSettings(root) {
   form.sound.onchange = () => { root.querySelector('#sound-label').textContent = form.sound.checked ? 'BẬT' : 'TẮT'; };
   form.onsubmit = (e) => {
     e.preventDefault();
-    update((st) => {
+    const saved = update((st) => {
       st.settings.userName = form.userName.value.trim() || 'Bạn nhỏ';
       st.settings.focusMinutes = Math.max(1, Number(form.focusMinutes.value) || 25);
       st.settings.breakMinutes = Math.max(1, Number(form.breakMinutes.value) || 5);
       st.settings.sound = form.sound.checked;
     }, { type: 'settings' });
     setupDurations();
-    toast('Đã lưu cài đặt ✨');
+    toast(saved ? 'Đã lưu cài đặt trên thiết bị ✨' : 'Cài đặt chưa lưu được. Hãy tải bản sao dữ liệu.', { kind: saved ? '' : 'error' });
   };
   root.querySelectorAll('[data-side]').forEach((input) => {
     input.onchange = () => update((st) => {
@@ -112,11 +112,12 @@ export function renderSettings(root) {
     const file = e.target.files[0];
     if (!file) return;
     try {
+      if (file.size > 5 * 1024 * 1024) throw new Error('File vượt quá giới hạn 5 MB.');
       const text = await file.text();
       const data = parseImportFile(text);
       const ok = await confirmDialog({
         title: 'Nhập dữ liệu?',
-        message: `File có <strong>${data.tasks.length}</strong> nhiệm vụ, <strong>${data.subjects.length}</strong> môn, <strong>${(data.wallet && data.wallet.coins) || 0}</strong> xu.<br>Dữ liệu hiện tại sẽ bị ghi đè.`,
+        message: `File có <strong>${data.tasks.length}</strong> nhiệm vụ, <strong>${data.subjects.length}</strong> môn, <strong>${escapeHtml(String(data.wallet.coins))}</strong> xu.<br>Dữ liệu hiện tại sẽ bị ghi đè.`,
         okText: 'Nhập & ghi đè', danger: true,
       });
       if (ok) { replaceState(data); toast('Đã nhập dữ liệu 🌷'); navigate('/'); }

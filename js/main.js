@@ -1,9 +1,10 @@
+import { exportToFile } from './storage.js';
 import { startNotifications } from './notifications/data.js';
 import { initNotificationUI } from './notifications/ui.js';
 import { applyAdminCredits } from './sync.js';
 import { renderAdmin, disposeAdmin } from './pages/admin.js';
 // ===== Khởi động ứng dụng =====
-import { initState, subscribe, getState, syncCloudForUser, update } from './state.js';
+import { initState, subscribe, getState, syncCloudForUser, update, retrySave } from './state.js';
 import { registerRoute, startRouter, onRoute, currentRoute } from './router.js';
 import { renderHeader, refreshHeaderStats, refreshHeaderAuth, setHeaderMascotState } from './components/header.js';
 import { renderSidebar, renderBottomNav, setSidebarMascotState } from './components/sidebar.js';
@@ -143,7 +144,27 @@ function setupCloudSync() {
   });
 }
 
+function setupSaveFeedback() {
+  const box = document.createElement('aside');
+  box.className = 'save-feedback'; box.hidden = true;
+  box.setAttribute('role', 'status'); box.setAttribute('aria-live', 'polite');
+  const text = document.createElement('span');
+  const retry = document.createElement('button'); retry.type = 'button';
+  retry.className = 'btn btn-soft btn-sm'; retry.textContent = 'Thử lưu lại'; retry.onclick = retrySave;
+  const backup = document.createElement('button'); backup.type = 'button';
+  backup.className = 'btn btn-soft btn-sm'; backup.textContent = 'Tải bản sao';
+  backup.onclick = () => exportToFile(getState());
+  box.append(text, retry, backup); document.body.append(box);
+  window.addEventListener('storage:status', ({ detail }) => {
+    box.hidden = !detail.localFailed && !detail.cloudFailed;
+    text.textContent = detail.localFailed
+      ? 'Chưa lưu được trên thiết bị. Hãy tải bản sao để giữ dữ liệu.'
+      : 'Đã lưu trên thiết bị, nhưng chưa đồng bộ lên tài khoản. Hãy thử lại khi có mạng.';
+  });
+}
+
 function boot() {
+  setupSaveFeedback();
   initState();
   recomputeStreak();
   renderHeader();

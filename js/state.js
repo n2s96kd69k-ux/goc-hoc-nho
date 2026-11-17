@@ -46,7 +46,14 @@ let syncedUid = null;
 let syncing = null;
 let saving = false;
 let saveAgain = false;
-const persist = () => saveState(state);
+let localFailed = false, cloudFailed = false;
+function reportSave() {
+  if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function' && typeof CustomEvent !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('storage:status', { detail: { localFailed, cloudFailed } }));
+  }
+}
+const persist = () => { localFailed = !saveState(state); reportSave(); return !localFailed; };
+export function retrySave() { persist(); persistCloud(); }
 const persistCloud = debounce(async () => {
   const user = getCurrentUser();
   if (!user) return;
@@ -55,9 +62,11 @@ const persistCloud = debounce(async () => {
   try {
     if (syncedUid !== user.uid) await syncCloudForUser(user);
     else await saveCloudState(user.uid, state);
-  } catch (e) { console.warn('Đồng bộ đám mây lỗi:', e); }
+    cloudFailed = false;
+  } catch (e) { cloudFailed = true; console.warn('Đồng bộ đám mây lỗi:', e); }
   finally {
     saving = false;
+    reportSave();
     if (saveAgain) { saveAgain = false; persistCloud(); }
   }
 }, 1200);
@@ -68,6 +77,7 @@ export function update(mutator, meta = {}) {
   persist();
   persistCloud();
   if (!meta.silent) emit(meta);
+  return !localFailed;
 }
 
 export function replaceState(newState, { skipCloud = false } = {}) {
@@ -76,7 +86,7 @@ export function replaceState(newState, { skipCloud = false } = {}) {
   if (user) state._syncUid = user.uid;
   state.ui.viewWeek = toKey(startOfWeek(todayKey()));
   state.ui.viewDay = todayKey();
-  saveState(state);
+  persist();
   if (!skipCloud) persistCloud();
   emit({ type: 'replace' });
 }

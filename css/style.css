@@ -584,3 +584,8 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 
 /* ---------- Bottom nav / drawer (mobile only, hidden on desktop) ---------- */
 .bottom-nav, .drawer-backdrop { display: none; }
+
+/* Persistent save feedback, independent of the currently rendered page. */
+.save-feedback { position: fixed; bottom: 76px; left: 50%; transform: translateX(-50%); z-index: 3000; width: min(620px, calc(100% - 24px)); padding: 14px 18px; border-radius: 20px; background: #fff3dc; color: #574338; box-shadow: 0 6px 24px #57433826; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.save-feedback[hidden] { display: none; }
+.save-feedback span { flex: 1 1 260px; }

@@ -47,6 +47,7 @@ export function exportToFile(state) {
 
 /** Đọc & kiểm tra file JSON nhập vào. Trả về state hợp lệ hoặc ném lỗi. */
 export function parseImportFile(text) {
+  if (typeof text !== 'string' || text.length > 5 * 1024 * 1024) throw new Error('File vượt quá giới hạn 5 MB.');
   let parsed;
   try { parsed = JSON.parse(text); } catch { throw new Error('File không phải JSON hợp lệ.'); }
   const data = parsed && parsed.app === 'goc-hoc-nho' ? parsed.data : parsed;
@@ -56,5 +57,51 @@ export function parseImportFile(text) {
     if (!(k in data)) throw new Error(`Thiếu trường "${k}" trong dữ liệu.`);
   }
   if (!Array.isArray(data.tasks) || !Array.isArray(data.subjects)) throw new Error('tasks/subjects phải là danh sách.');
+  validateImportData(data);
   return data;
+}
+
+function validateImportData(data) {
+  const fail = () => { throw new Error('Dữ liệu sao lưu sai kiểu hoặc chứa nội dung không an toàn.'); };
+  const record = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+  const number = value => typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1e12;
+  let nodes = 0;
+  function walk(value, depth = 0) {
+    if (++nodes > 200000 || depth > 30) fail();
+    if (typeof value === 'string' && (value.length > 100000 || /[<>]/.test(value))) fail();
+    if (typeof value === 'number' && !Number.isFinite(value)) fail();
+    if (value && typeof value === 'object') for (const [key, child] of Object.entries(value)) {
+      if (['__proto__', 'constructor', 'prototype'].includes(key)) fail();
+      walk(child, depth + 1);
+    }
+  }
+  walk(data);
+  if (!record(data.days) || !record(data.wallet) || !number(data.wallet.coins)) fail();
+  if (data.wallet.totalEarned !== undefined && !number(data.wallet.totalEarned)) fail();
+  const ids = new Set();
+  for (const task of data.tasks) {
+    if (!record(task) || typeof task.id !== 'string' || !/^[\w-]{1,100}$/.test(task.id) || ids.has(task.id)
+      || typeof task.title !== 'string' || typeof task.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(task.date)
+      || typeof task.done !== 'boolean') fail();
+    ids.add(task.id);
+    for (const key of ['minutes', 'pomodoros']) if (task[key] !== undefined && !number(task[key])) fail();
+  }
+  ids.clear();
+  for (const subject of data.subjects) {
+    if (!record(subject) || typeof subject.id !== 'string' || !/^[\w-]{1,100}$/.test(subject.id) || ids.has(subject.id)
+      || typeof subject.name !== 'string' || typeof subject.icon !== 'string'
+      || typeof subject.color !== 'string' || !/^#[0-9a-f]{3,8}$/i.test(subject.color)) fail();
+    ids.add(subject.id);
+    if (subject.chapters !== undefined && (!Array.isArray(subject.chapters) || !subject.chapters.every(v => typeof v === 'string'))) fail();
+    if (subject.scores !== undefined && (!Array.isArray(subject.scores) || !subject.scores.every(v => record(v) && number(v.score)))) fail();
+  }
+  for (const [date, day] of Object.entries(data.days)) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !record(day)) fail();
+    for (const key of ['minutes', 'pomodoros', 'pomoMinutes']) if (day[key] !== undefined && !number(day[key])) fail();
+  }
+  for (const key of ['settings', 'room', 'timer', 'goal', 'mascot', 'streak', 'ui']) if (data[key] !== undefined && !record(data[key])) fail();
+  if (data.settings) for (const [key, max] of [['focusMinutes', 180], ['breakMinutes', 60]]) {
+    const value = data.settings[key];
+    if (value !== undefined && (!Number.isInteger(value) || value < 1 || value > max)) fail();
+  }
 }

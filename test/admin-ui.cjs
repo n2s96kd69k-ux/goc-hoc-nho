@@ -9,7 +9,7 @@ const server=http.createServer((req,res)=>{
 const fixtureCloud=role=>`
  let access={uid:'admin',role:'${role}',status:'active',ready:true,owner:true,adminCredits:0};let listener;
  const user={uid:'admin',email:'admin@example.test',displayName:'Admin'};
- export const OWNER_ID='GHN-776J9W';export const firebaseDb=()=>({});export const getCurrentUser=()=>user;
+ export const OWNER_UID='admin';export const OWNER_ID='GHN-776J9W';export const firebaseDb=()=>({});export const getCurrentUser=()=>user;
  export const accountId=()=> 'GHN-ADMIN1';export const isCurrentAdmin=()=>access.role==='admin';export const getAccountAccess=()=>access;
  export const requireAdmin=async()=>isCurrentAdmin()?user:null;
  export function onAccountAccessChange(fn){listener=fn;setTimeout(()=>fn(access),0);return ()=>{};}
