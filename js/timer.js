@@ -16,6 +16,7 @@ const timer = {
   taskId: null,
   subjectId: null,
   sessionId: null,
+  sessionDate: null,
   interval: null,
 };
 
@@ -45,8 +46,10 @@ export function restoreTimer() {
     setupDurations();
     return;
   }
-  for (const key of ['mode', 'status', 'duration', 'remaining', 'endAt', 'taskId', 'subjectId', 'sessionId']) timer[key] = saved[key];
+  for (const key of ['mode', 'status', 'duration', 'remaining', 'endAt', 'taskId', 'subjectId', 'sessionId', 'sessionDate']) timer[key] = saved[key];
   if (timer.status === 'running') {
+    timer.sessionId ||= `legacy-${timer.endAt}-${timer.duration}`;
+    timer.sessionDate ||= todayKey();
     timer.remaining = Math.max(0, Math.ceil((timer.endAt - Date.now()) / 1000));
     if (timer.remaining === 0) { complete(); return; }
     timer.interval = setInterval(tick, 250);
@@ -92,6 +95,7 @@ export function start() {
   if (timer.status === 'idle') {
     setupDurations();
     timer.sessionId = globalThis.crypto.randomUUID();
+    timer.sessionDate = todayKey();
   }
   timer.endAt = Date.now() + timer.remaining * 1000;
   timer.status = 'running';
@@ -136,15 +140,17 @@ function complete() {
   const finishedMode = timer.mode;
   const minutes = Math.round(timer.duration / 60);
   const coins = finishedMode === 'focus' ? pomodoroReward(minutes) : 0;
-  if (timer.sessionId && getState().timer.lastCompletedSession === timer.sessionId) {
+  if (timer.sessionId && (getState().timer.lastCompletedSession === timer.sessionId || getState().studyEvents?.[timer.sessionId])) {
     timer.mode = finishedMode === 'focus' ? 'break' : 'focus';
     setupDurations();
     return;
   }
 
   if (finishedMode === 'focus') {
-    const key = todayKey();
+    const key = timer.sessionDate || todayKey();
     update((s) => {
+      s.studyEvents ||= {};
+      s.studyEvents[timer.sessionId] = { type: 'focus', minutes, date: key, subjectId: timer.subjectId || null };
       s.timer.lastCompletedSession = timer.sessionId;
       s.timer.session = { ...sessionSnapshot(), mode: 'break', status: 'idle' };
       s.wallet.coins = (s.wallet.coins || 0) + coins;
@@ -180,7 +186,11 @@ function complete() {
 
 /** Ghi nhận thời gian học thủ công */
 export function logManualMinutes(minutes, key = todayKey()) {
+  if (!Number.isInteger(minutes) || minutes < 1 || minutes > 1440) throw new Error('Thời gian học phải từ 1 đến 1440 phút.');
+  const eventId = globalThis.crypto.randomUUID();
   update((s) => {
+    s.studyEvents ||= {};
+    s.studyEvents[eventId] = { type: 'manual', minutes, date: key };
     const d = dayRecord(key);
     d.minutes += minutes;
     s.timer.totalFocusMinutes = (s.timer.totalFocusMinutes || 0) + minutes;

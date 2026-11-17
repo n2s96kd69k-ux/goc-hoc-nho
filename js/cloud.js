@@ -172,6 +172,7 @@ export async function saveCloudState(uid, state) {
     displayName: user.displayName || snapshot.settings?.userName || 'Người học',
     email: user.email || '', emailLower: (user.email || '').toLowerCase(), photoURL: user.photoURL || '',
   });
+  let committed;
   await runTransaction(db, async (transaction) => {
     const remote = await transaction.get(ref);
     const data = remote.exists() ? remote.data() : {};
@@ -181,10 +182,11 @@ export async function saveCloudState(uid, state) {
     const adjusted = applyAdminCredits(snapshot, credits);
     // An unknown baseline must not silently overwrite an existing account.
     if (existing && !base) throw new Error('Cần tải dữ liệu tài khoản trước khi lưu.');
-    transaction.set(ref, { ...patch, state: existing ? mergeState(applyAdminCredits(base, credits), adjusted, applyAdminCredits(existing, credits)) : adjusted }, { merge: true });
+    committed = existing ? mergeState(applyAdminCredits(base, credits), adjusted, applyAdminCredits(existing, credits)) : adjusted;
+    transaction.set(ref, { ...patch, state: committed }, { merge: true });
   });
   writeSyncBase(uid, snapshot);
-  return true;
+  return committed;
 }
 
 export function friendlyAuthError(err) {

@@ -1,0 +1,13 @@
+const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const c=vm.createContext({});vm.runInContext(fs.readFileSync(__dirname+'/../js/sync.js','utf8').replace(/export /g,''),c);
+const clone=v=>JSON.parse(JSON.stringify(v));
+const base=()=>({wallet:{coins:50,totalEarned:50},days:{},timer:{totalFocusMinutes:0,totalPomodoros:0},studyEvents:{}});
+function focus(b,id,minutes=25){const s=clone(b);s.studyEvents[id]={type:'focus',minutes,date:'2026-11-17',subjectId:'math'};s.wallet.coins+=minutes;s.wallet.totalEarned+=minutes;s.days['2026-11-17']||={minutes:0,pomoMinutes:0,pomodoros:0};s.days['2026-11-17'].minutes+=minutes;s.days['2026-11-17'].pomoMinutes+=minutes;s.days['2026-11-17'].pomodoros++;s.timer.totalFocusMinutes+=minutes;s.timer.totalPomodoros++;s.timer.bySubject={math:(s.timer.bySubject?.math||0)+minutes};s.timer.pomosBySubject={math:(s.timer.pomosBySubject?.math||0)+1};return s;}
+const merge=(b,l,r)=>clone(c.mergeState(b,l,r));
+test('two independent focus sessions accumulate coins, days and subject totals',()=>{const b=base(),a=focus(b,'a'),r=focus(b,'b',50);const m=merge(b,a,r);assert.equal(m.wallet.coins,125);assert.equal(m.timer.totalFocusMinutes,75);assert.equal(m.days['2026-11-17'].pomodoros,2);assert.equal(m.timer.bySubject.math,75);assert.deepEqual(merge(b,a,r),merge(b,r,a));assert.equal(a.wallet.coins,75);});
+test('same restored session on two devices is credited once',()=>{const b=base(),a=focus(b,'same'),r=focus(b,'same');const m=merge(b,a,r);assert.equal(m.wallet.coins,75);assert.equal(m.days['2026-11-17'].pomodoros,1);});
+test('retry, stale client and later independent session do not replay prior credits',()=>{const b=base(),a=focus(b,'a'),r=focus(b,'b'),m=merge(b,a,r);assert.equal(merge(a,a,m).wallet.coins,100);assert.equal(merge(a,focus(a,'c'),m).wallet.coins,125);assert.equal(merge(m,m,m).wallet.coins,100);});
+test('manual minutes accumulate without coins or pomodoro count',()=>{const b=base(),manual=clone(b);manual.studyEvents.manual={type:'manual',minutes:10,date:'2026-11-17'};manual.days['2026-11-17']={minutes:10};manual.timer.totalFocusMinutes=10;const m=merge(b,manual,focus(b,'focus'));assert.equal(m.days['2026-11-17'].minutes,35);assert.equal(m.wallet.coins,75);assert.equal(m.timer.totalPomodoros,1);});
+test('legacy snapshots without events retain existing merge behavior',()=>{assert.deepEqual(merge({title:'old'},{title:'local'},{title:'remote'}),{title:'local'});});
+
+test('conflicting metadata for the same session fails instead of silently double-counting',()=>{const b=base();assert.throws(()=>merge(b,focus(b,'same',25),focus(b,'same',50)),/không nhất quán/);});

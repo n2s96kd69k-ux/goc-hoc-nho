@@ -2,7 +2,7 @@
   "name": "goc-hoc-nho",
   "private": true,
   "scripts": {
-    "test": "node --test test/persistence.cjs test/admin.cjs test/presence.cjs test/study-baseline.cjs test/notifications.cjs test/import.cjs",
+    "test": "node --test test/persistence.cjs test/admin.cjs test/presence.cjs test/study-baseline.cjs test/notifications.cjs test/import.cjs test/study-events.cjs",
     "test:rules": "firebase emulators:exec --project demo-goc-hoc-nho --only firestore \"node --test test/firestore-rules.cjs\"",
     "test:ui": "node test/admin-ui.cjs",
     "test:quality-ui": "node test/quality-ui.cjs"

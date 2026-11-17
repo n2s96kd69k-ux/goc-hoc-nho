@@ -61,7 +61,7 @@ const persistCloud = debounce(async () => {
   saving = true;
   try {
     if (syncedUid !== user.uid) await syncCloudForUser(user);
-    else await saveCloudState(user.uid, state);
+    else await saveAndApply(user.uid);
     cloudFailed = false;
   } catch (e) { cloudFailed = true; console.warn('Đồng bộ đám mây lỗi:', e); }
   finally {
@@ -107,7 +107,7 @@ export async function syncCloudForUser(user) {
     const next = remote ? (sameAccount && base ? mergeState(applyAdminCredits(base, remote.wallet?.adminCreditsApplied || 0), applyAdminCredits(local, remote.wallet?.adminCreditsApplied || 0), remote) : remote) : local;
     writeSyncBase(user.uid, remote || next);
     replaceState({ ...next, _syncUid: user.uid }, { skipCloud: true });
-    await saveCloudState(user.uid, state);
+    await saveAndApply(user.uid);
     syncedUid = user.uid;
     return remote ? 'loaded' : 'uploaded';
   })();
@@ -134,4 +134,18 @@ function emit(meta) {
 export function dayRecord(key) {
   if (!state.days[key]) state.days[key] = { minutes: 0, pomodoros: 0, mood: null, note: '' };
   return state.days[key];
+}
+
+
+// Apply the committed transaction without overwriting edits made while it ran.
+// Timer controls belong to this page; a background save must not restart it.
+async function saveAndApply(uid) {
+  const sent = JSON.parse(JSON.stringify(state));
+  const committed = await saveCloudState(uid, sent);
+  if (!committed || typeof committed !== 'object' || getCurrentUser()?.uid !== uid || state._syncUid !== uid) return;
+  const session = state.timer?.session;
+  state = migrate(mergeState(sent, state, committed));
+  if (session) state.timer.session = session;
+  persist();
+  emit({ type: 'sync-ack' });
 }

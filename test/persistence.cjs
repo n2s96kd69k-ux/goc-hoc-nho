@@ -23,7 +23,7 @@ test('different fields on the same task merge; local wins same-field conflict',(
 function timerHarness(state, clock={now:100000}) {
  const context=vm.createContext({
   getState:()=>state,update:f=>f(state),subscribe:()=>{},
-  dayRecord:k=>state.days[k] ||= {minutes:0,pomodoros:0},todayKey:()=> '2026-11-16',
+  dayRecord:k=>state.days[k] ||= {minutes:0,pomodoros:0},todayKey:()=>clock.day || '2026-11-16',
   pomodoroReward:m=>m,recomputeStreak:()=>{},sounds:{ting(){}},mascot:{setState(){},react(){}},
   Date:{now:()=>clock.now},globalThis:{crypto:{randomUUID:()=>String(clock.now)}},
   setInterval:()=>1,clearInterval:()=>{},document:{dispatchEvent(){}},CustomEvent:class{},
@@ -53,14 +53,14 @@ test('reset session does not resume after reload',()=>{
 test('break timer resumes without earning study rewards',()=>{
  const state=initial(),clock={now:100000};let t=timerHarness(state,clock);t.setMode('break');t.start();clock.now+=400000;t=timerHarness(state,clock);t.restoreTimer();assert.equal(t.getTimer().mode,'focus');assert.equal(state.wallet.coins,0);
 });
-function stateHarness(saved, load) {
+function stateHarness(saved, load, save = null) {
  const bases=new Map([['user',plain(saved)]]),writes=[];
  const defaults=()=>({...initial(),ui:{},subjects:[],tasks:[],settings:{...initial().settings,seeded:false},room:{}});
  const context=vm.createContext({
   mergeState:mergeContext.mergeState,applyAdminCredits:mergeContext.applyAdminCredits,readSyncBase:uid=>bases.get(uid),writeSyncBase:(uid,s)=>bases.set(uid,plain(s)),
   loadState:()=>saved,saveState:()=>true,createInitialState:defaults,isSampleTask:()=>false,SIDEBAR_DEFAULT:{},
   debounce:f=>()=>{},todayKey:()=> '2026-11-16',startOfWeek:x=>x,toKey:x=>x,migrateRoom:s=>s.room||{},
-  getCurrentUser:()=>({uid:'user'}),loadCloudState:load,saveCloudState:async(uid,s)=>{writes.push(plain(s));return true;},
+  getCurrentUser:()=>({uid:'user'}),loadCloudState:load,saveCloudState:async(uid,s)=>{writes.push(plain(s));return save ? await save(uid,s) : true;},
   localStorage:{setItem(){}},console,
  });
  vm.runInContext(source('state.js'),context);context.initState();return {context,writes,bases};
@@ -100,4 +100,18 @@ test('failed transaction keeps baseline so next retry can preserve offline edits
 test('cloud refuses to overwrite an existing account without a known baseline',async()=>{
  const h=cloudHarness({tasks:[{id:'remote'}]},null);
  await assert.rejects(h.context.saveCloudState('user',{tasks:[]}));assert.equal(h.getStored(),undefined);
+});
+
+test('committed totals reach the UI without discarding edits made during save',async()=>{
+ const saved={...initial(),ui:{},subjects:[],tasks:[{id:'a',title:'old'}],_syncUid:'user'};
+ let finish;const h=stateHarness(saved,async()=>plain(saved),async()=>new Promise(resolve=>{finish=resolve;}));
+ const job=h.context.syncCloudForUser({uid:'user'});await new Promise(resolve=>setImmediate(resolve));
+ h.context.update(s=>{s.tasks[0].title='edited while saving';});
+ finish({...plain(saved),wallet:{coins:75,totalEarned:75},timer:{totalFocusMinutes:25}});await job;
+ assert.equal(h.context.getState().wallet.coins,75);assert.equal(h.context.getState().tasks[0].title,'edited while saving');
+});
+
+test('restored focus crossing midnight keeps the same accounting day',()=>{
+ const state=initial(),clock={now:100000,day:'2026-11-16'};let t=timerHarness(state,clock);t.start();clock.now+=1600000;clock.day='2026-11-17';t=timerHarness(state,clock);t.restoreTimer();
+ assert.equal(state.days['2026-11-16'].pomodoros,1);assert.equal(state.days['2026-11-17'],undefined);assert.equal(Object.keys(state.studyEvents).length,1);
 });
