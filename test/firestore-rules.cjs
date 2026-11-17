@@ -105,3 +105,37 @@ test('study presence is visible to others but only its owner can write/delete',a
  await assertFails(setDoc(doc(dbFor('student'),'studyPresence','permanent'),{...data,expiresAt:Timestamp.fromMillis(Date.now()+3600000)}));
  await assertSucceeds(deleteDoc(doc(dbFor('student'),'studyPresence','session-a')));
 });
+
+test('canonical economy is private and client read-only, including admin browsers',async()=>{
+ const buckets=['economy','economyOperations','ownedItems','focusSessions','studyDays'];
+ await env.withSecurityRulesDisabled(async ctx=>{for(const b of buckets)await setDoc(doc(ctx.firestore(),'users','student',b,'test'),{value:1});});
+ for(const b of buckets){
+  await assertSucceeds(getDoc(doc(dbFor('student'),'users','student',b,'test')));
+  await assertSucceeds(getDoc(doc(dbFor('admin'),'users','student',b,'test')));
+  for(const uid of [null,'owner','banned']){
+   if(uid==='owner')continue; // owner fixture has admin role
+   await assertFails(getDoc(doc(dbFor(uid),'users','student',b,'test')));
+  }
+  await assertFails(getDoc(doc(dbFor('student'),'users','admin',b,'test')));
+  for(const uid of ['student','admin']){
+   await assertFails(setDoc(doc(dbFor(uid),'users','student',b,'new'),{value:2}));
+   await assertFails(updateDoc(doc(dbFor(uid),'users','student',b,'test'),{value:2}));
+   await assertFails(deleteDoc(doc(dbFor(uid),'users','student',b,'test')));
+  }
+ }
+ await assertSucceeds(getDocs(collection(dbFor('student'),'users','student','ownedItems')));
+});
+test('migration locks legacy economy paths without affecting unmigrated users',async()=>{
+ const ref=doc(dbFor('student'),'users','student');
+ await assertSucceeds(updateDoc(ref,{state:{wallet:{coins:60}}}));
+ await env.withSecurityRulesDisabled(ctx=>setDoc(doc(ctx.firestore(),'users','student','economy','wallet'),{version:1,balance:60,totalEarned:60}));
+ await assertFails(updateDoc(ref,{state:{wallet:{coins:999999},room:{owned:{desk:100}}}}));
+ await assertSucceeds(updateDoc(ref,{displayName:'Student'}));
+ await assertFails(audited(dbFor('admin'),'student',{adminCredits:100}));
+ await assertFails(deleteDoc(doc(dbFor('student'),'users','student','economy','wallet')));
+});
+test('catalog is readable but cannot be repriced by client accounts',async()=>{
+ await env.withSecurityRulesDisabled(ctx=>setDoc(doc(ctx.firestore(),'catalog','desk'),{price:60}));
+ await assertSucceeds(getDoc(doc(dbFor(null),'catalog','desk')));
+ for(const uid of ['student','admin'])await assertFails(setDoc(doc(dbFor(uid),'catalog','desk'),{price:0}));
+});
