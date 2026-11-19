@@ -1,3 +1,4 @@
+import { closeSidebarDrawer, startSidebarNavigation } from './components/sidebar-nav.js';
 import { startWalletAccount, subscribeServerTasks, subscribeStudyDays, subscribeWallet, walletMode } from './wallet-account.js';
 import { exportAccountBackup } from './account-backup.js';
 import { startNotifications } from './notifications/data.js';
@@ -54,11 +55,14 @@ function renderCurrentPage(params) {
   if (lastPath === '/room' && route.path !== '/room') disposeRoom();
   if (lastPath === '/pomodoro' && route.path !== '/pomodoro') disposePomodoro();
   const isNav = lastPath !== route.path;
+  const focusPage = isNav && lastPath !== null;
+  if (focusPage) closeSidebarDrawer({restoreFocus:false});
   lastPath = route.path;
   const paint = () => {
     if (currentRoute()?.path !== route.path) return;
     el.classList.remove('page-leave');
     fn(el, params || route.params);
+    if (focusPage) el.focus({preventScroll:true});
     // Chỉ animate cả trang khi chuyển route. Tick nhiệm vụ không được giật cả bảng tuần.
     if (!isNav) return;
     el.classList.remove('page-enter'); void el.offsetWidth;
@@ -209,7 +213,7 @@ function boot() {
   onRoute(() => {
     renderSidebar();
     renderBottomNav();
-    document.body.classList.remove('drawer-open');
+    closeSidebarDrawer({restoreFocus:false});
   });
   subscribe(onStateChange);
   setupTimerPill();
@@ -243,8 +247,11 @@ function boot() {
     lastRole = access.role;
   });
 
-  // Drawer backdrop
-  document.getElementById('drawer-backdrop').onclick = () => document.body.classList.remove('drawer-open');
+  startSidebarNavigation();
+  document.getElementById('skip-link')?.addEventListener('click', event => {
+    event.preventDefault();
+    main().focus();
+  });
 
   startRouter();
   restoreTimer();

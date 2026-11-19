@@ -1,3 +1,4 @@
+import { bindSidebarToggle } from './sidebar-nav.js';
 import { displayedBalance } from '../wallet-account.js';
 import { studyBaseline } from '../studyBaseline.js';
 import { startStudyPresence } from '../studyPresence.js';
@@ -52,33 +53,6 @@ export function renderHeader() {
   bindSidebarToggle(el.querySelector('#menu-btn'));
   startLiveCount();
   bindBell();
-}
-
-const SIDEBAR_KEY = 'ghn_sidebar_collapsed';
-function isMobileNav() { return window.matchMedia('(max-width: 768px)').matches; }
-
-function bindSidebarToggle(btn) {
-  const side = document.getElementById('sidebar');
-  if (!isMobileNav() && localStorage.getItem(SIDEBAR_KEY) === '1') {
-    document.body.classList.add('sidebar-collapsed');
-  }
-  const sync = () => {
-    const shown = isMobileNav()
-      ? document.body.classList.contains('drawer-open')
-      : !document.body.classList.contains('sidebar-collapsed');
-    btn.setAttribute('aria-expanded', shown ? 'true' : 'false');
-    btn.setAttribute('aria-label', shown ? 'Ẩn thanh bên' : 'Hiện thanh bên');
-    if (side) side.setAttribute('aria-hidden', shown ? 'false' : 'true');
-  };
-  sync();
-  btn.onclick = () => {
-    if (isMobileNav()) document.body.classList.toggle('drawer-open');
-    else {
-      const collapsed = document.body.classList.toggle('sidebar-collapsed');
-      localStorage.setItem(SIDEBAR_KEY, collapsed ? '1' : '0');
-    }
-    sync();
-  };
 }
 
 export function refreshHeaderAuth() {

@@ -238,7 +238,7 @@ function paintExams() {
         const dateHtml = !date && !admin
           ? '<span class="exam-date">Chưa chốt</span>'
           : admin
-            ? `<input class="exam-date" type="date" data-exam="${e.id}" data-index="${index}" value="${escapeHtml(date)}">`
+            ? `<input class="exam-date" type="date" data-exam="${e.id}" data-index="${index}" aria-label="Ngày thi ${escapeHtml(e.name)}" value="${escapeHtml(date)}">`
             : `<span class="exam-date">${formatDMY(date)}</span>`;
         const tools = admin && !single
           ? `${dates.length ? '<button type="button" class="round-del" data-del-round aria-label="Xóa đợt">×</button>' : ''}<button type="button" class="link-btn" data-add-round>Thêm đợt</button>`

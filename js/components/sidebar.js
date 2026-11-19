@@ -1,3 +1,4 @@
+import { closeSidebarDrawer } from './sidebar-nav.js';
 import { visibleTasks } from '../task-account.js';
 import { isCurrentAdmin } from '../cloud.js';
 // ===== Sidebar: lịch tháng, tiến độ tuần, thời gian, mục tiêu, mascot, navigation =====
@@ -54,6 +55,7 @@ export function renderSidebar() {
 
   el.innerHTML = `
     <div class="sidebar-inner">
+      <button type="button" class="btn btn-ghost drawer-close" id="close-sidebar">Đóng thanh bên</button>
       ${show('calendar') ? `<section class="side-block" id="side-calendar">
         ${calendarHTML({ year: calMonth.year, month: calMonth.month, viewWeekKey: s.ui.viewWeek, showStatus: true })}
       </section>` : ''}
@@ -92,8 +94,8 @@ export function renderSidebar() {
       </section>` : ''}
 
       <nav class="side-nav" aria-label="Điều hướng">
-        ${NAV.map((n) => `<a href="#${n.path}" class="nav-item ${path === n.path ? 'active' : ''}" data-path="${n.path}"><span class="nav-icon">${n.icon}</span>${n.label}</a>`).join('')}
-        ${isCurrentAdmin() ? `<a href="#/admin" class="nav-item nav-admin ${path === '/admin' ? 'active' : ''}"><span class="nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6z"/><path d="m8 12 3 3 5-6"/></svg></span>Quản Lý</a>` : ''}
+        ${NAV.map((n) => `<a href="#${n.path}" class="nav-item ${path === n.path ? 'active' : ''}" data-path="${n.path}" ${path === n.path ? 'aria-current="page"' : ''}><span class="nav-icon" aria-hidden="true">${n.icon}</span>${n.label}</a>`).join('')}
+        ${isCurrentAdmin() ? `<a href="#/admin" class="nav-item nav-admin ${path === '/admin' ? 'active' : ''}" ${path === '/admin' ? 'aria-current="page"' : ''}><span class="nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6z"/><path d="m8 12 3 3 5-6"/></svg></span>Quản Lý</a>` : ''}
       </nav>
     </div>`;
 
@@ -103,7 +105,7 @@ export function renderSidebar() {
       const monday = toKey(startOfWeek(key));
       update((st) => { st.ui.viewWeek = monday; st.ui.viewDay = key; }, { type: 'view' });
       if (path !== '/' && path !== '/week') navigate('/week');
-      else openDayDetail(key);
+      else { closeSidebarDrawer(); openDayDetail(key); }
     },
     onNav: (delta) => {
       const d = new Date(calMonth.year, calMonth.month + delta, 1);
@@ -113,7 +115,9 @@ export function renderSidebar() {
   });
   const goalBtn = el.querySelector('#side-goal');
   if (goalBtn) goalBtn.onclick = () => navigate('/goals');
-  el.querySelectorAll('.nav-item').forEach((a) => a.addEventListener('click', () => document.body.classList.remove('drawer-open')));
+  el.querySelectorAll('.nav-item').forEach(a => a.addEventListener('click', () => {
+    if (a.hash === location.hash) closeSidebarDrawer();
+  }));
   const cat = el.querySelector('#sidebar-mascot');
   if (cat) cat.onclick = () => mascot.poke();
 }
@@ -166,5 +170,5 @@ export function renderBottomNav() {
   const route = currentRoute();
   const path = route ? route.path : '/';
   const items = NAV.filter((n) => ['/', '/week', '/pomodoro', '/room', '/stats'].includes(n.path));
-  el.innerHTML = items.map((n) => `<a href="#${n.path}" class="bnav-item ${path === n.path ? 'active' : ''}" aria-label="${n.label}"><span>${n.icon}</span><small>${n.short || n.label}</small></a>`).join('');
+  el.innerHTML = items.map((n) => `<a href="#${n.path}" class="bnav-item ${path === n.path ? 'active' : ''}" aria-label="${n.label}" ${path === n.path ? 'aria-current="page"' : ''}><span aria-hidden="true">${n.icon}</span><small>${n.short || n.label}</small></a>`).join('');
 }

@@ -81,7 +81,7 @@
     line-height: 1.1;
   }
   .day-tab small { font-size: .68rem; font-weight: 700; opacity: .8; }
-  .day-tab.today { color: var(--peach-dark); }
+  .day-tab.today { color: #9B4944; }
   .day-tab.active { background: var(--brown-dark); color: #fff; }
   .tab-done { position: absolute; top: -4px; right: 2px; font-size: .55rem; background: var(--matcha-dark); color: #fff; border-radius: 50%; width: 13px; height: 13px; display: grid; place-items: center; font-style: normal; }
 

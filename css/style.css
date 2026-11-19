@@ -8,7 +8,7 @@
   --cream-3: #F1E5D2;
   --brown: #6F5547;
   --brown-dark: #4F3C34;
-  --brown-soft: #A08977;
+  --brown-soft: #7A6456;
   --matcha: #BFD8B8;
   --matcha-dark: #91B58A;
   --peach: #F4C8C5;
@@ -83,7 +83,7 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   cursor: pointer; white-space: nowrap;
 }
 .live-study:hover { color: var(--brown-dark); }
-.live-count { color: #E07B2D; font-weight: 800; }
+.live-count { color: #A54A14; font-weight: 800; }
 .live-dot {
   width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto;
   background: #3caf62; position: relative;
@@ -168,13 +168,13 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 .btn:hover { transform: translateY(-1px); }
 .btn:active { transform: scale(.97); }
 .btn:disabled { opacity: .5; cursor: default; transform: none; }
-.btn-primary { background: var(--matcha-dark); color: #fff; box-shadow: 0 4px 12px rgba(145, 181, 138, .35); }
+.btn-primary { background: var(--matcha-dark); color: #3E2922; box-shadow: 0 4px 12px rgba(145, 181, 138, .35); }
 .btn-primary:hover { background: #82a97b; }
 .btn-soft { background: var(--cream-3); color: var(--brown-dark); border-color: var(--line); }
 .btn-ghost { background: transparent; color: var(--brown); border-color: var(--line); }
 .btn-ghost:hover { background: rgba(111, 85, 71, .06); }
-.btn-danger { background: var(--peach-dark); color: #fff; }
-.btn-danger-text { color: #c2736d; }
+.btn-danger { background: var(--peach-dark); color: var(--brown-dark); }
+.btn-danger-text { color: #9B4944; }
 .btn-sm { padding: 6px 12px; font-size: .8rem; border-radius: 10px; }
 .btn-lg { padding: 13px 26px; font-size: 1rem; border-radius: 16px; }
 .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -412,7 +412,14 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 .field textarea { resize: vertical; }
 .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .chip-group { display: flex; gap: 6px; flex-wrap: wrap; }
-.chip-radio input, .color-radio input { position: absolute; opacity: 0; pointer-events: none; }
+.chip-radio, .color-radio { position: relative; }
+.field .chip-radio input, .field .color-radio input {
+  position: absolute; inset: 0; width: 1px; height: 1px; padding: 0; margin: 0;
+  opacity: 0; pointer-events: none;
+}
+.chip-radio input:focus-visible + span, .color-radio input:focus-visible + span {
+  outline: 2px solid var(--brown-dark); outline-offset: 2px;
+}
 .chip-radio span { display: inline-block; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: #fff; font-size: .8rem; font-weight: 700; cursor: pointer; transition: all .2s; }
 .chip-radio input:checked + span { background: var(--butter); border-color: var(--butter-dark); color: var(--brown-dark); }
 .chip-group.icons .chip-radio span { font-size: 1.1rem; padding: 5px 9px; }

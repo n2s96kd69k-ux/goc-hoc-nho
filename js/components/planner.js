@@ -44,14 +44,14 @@ export function plannerHTML() {
         <button class="btn btn-primary" type="button" id="add-task-btn">+ THÊM NHIỆM VỤ</button>
       </div>
 
-      <div class="filter-row" role="tablist" aria-label="Bộ lọc">
-        ${filters.map((f) => `<button type="button" class="chip ${filter === f.id ? 'active' : ''}" data-filter="${f.id}">${f.label}</button>`).join('')}
+      <div class="filter-row" role="group" aria-label="Bộ lọc nhiệm vụ">
+        ${filters.map((f) => `<button type="button" class="chip ${filter === f.id ? 'active' : ''}" data-filter="${escapeHtml(f.id)}" aria-pressed="${filter === f.id}">${escapeHtml(f.label)}</button>`).join('')}
       </div>
 
-      <div class="day-tabs" aria-label="Chọn ngày">
+      <div class="day-tabs" role="group" aria-label="Chọn ngày">
         ${keys.map((k, i) => {
           const p = dayProgress(k);
-          return `<button type="button" class="day-tab ${k === viewDay ? 'active' : ''} ${k === t ? 'today' : ''}" data-day="${k}">
+          return `<button type="button" class="day-tab ${k === viewDay ? 'active' : ''} ${k === t ? 'today' : ''}" data-day="${k}" aria-pressed="${k === viewDay}" aria-label="${DAY_LABELS[i]}, ${formatDM(k)}">
             <span>${DAY_SHORT[i]}</span><small>${fromKey(k).getDate()}</small>${p.total && p.done === p.total ? '<i class="tab-done">✓</i>' : ''}
           </button>`;
         }).join('')}
@@ -398,7 +398,11 @@ export function bindPlanner(root) {
   root.querySelector('#add-task-btn').onclick = () => openTaskForm({ date: s.ui.viewDay || todayKey() });
   root.querySelectorAll('[data-add]').forEach((b) => b.onclick = () => openTaskForm({ date: b.dataset.add }));
   root.querySelectorAll('[data-edit]').forEach((b) => b.onclick = () => openTaskForm({ taskId: b.dataset.edit }));
-  root.querySelectorAll('[data-filter]').forEach((b) => b.onclick = () => update((st) => { st.ui.filter = b.dataset.filter; }, { type: 'view' }));
+  root.querySelectorAll('[data-filter]').forEach(button => button.onclick = () => {
+    const filter = button.dataset.filter;
+    update(st => { st.ui.filter = filter; }, {type:'view'});
+    root.querySelector(`[data-filter="${CSS.escape(filter)}"]`)?.focus();
+  });
   root.querySelectorAll('[data-more]').forEach((b) => b.onclick = () => { expanded.add(b.dataset.more); update(() => {}, { type: 'view' }); });
   root.querySelectorAll('[data-less]').forEach((b) => b.onclick = () => { expanded.delete(b.dataset.less); update(() => {}, { type: 'view' }); });
 
@@ -435,7 +439,11 @@ export function bindPlanner(root) {
   bindTaskDrag(root);
 
   // Tabs ngày (mobile)
-  root.querySelectorAll('[data-day].day-tab').forEach((b) => b.onclick = () => setViewDay(b.dataset.day));
+  root.querySelectorAll('[data-day].day-tab').forEach(button => button.onclick = () => {
+    const day = button.dataset.day;
+    setViewDay(day);
+    root.querySelector(`.day-tab[data-day="${day}"]`)?.focus();
+  });
 
   // Vuốt trái/phải trên mobile
   const grid = root.querySelector('#week-grid');

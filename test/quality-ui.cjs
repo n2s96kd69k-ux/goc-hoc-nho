@@ -66,6 +66,61 @@ const fixtureCloud=role=>`
   await page.evaluate(()=>window.__failCloud=false);await page.getByRole('button',{name:'Thử lưu lại'}).click();await page.waitForTimeout(1600);
   assert.equal(await page.locator('.save-feedback').isVisible(),false);
   console.log('PASS: modal focus, keyboard loop, Escape, focus return, storage quota/cloud failure feedback and retries');
+  await page.setViewportSize({width:320,height:720});
+  const menu = page.locator('#menu-btn');
+  await page.waitForFunction(() => document.querySelector('#sidebar').inert);
+  await menu.focus();
+  await page.keyboard.press('Enter');
+  await page.locator('#close-sidebar').waitFor();
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'close-sidebar');
+  assert.equal(await menu.getAttribute('aria-expanded'), 'true');
+  await page.keyboard.press('Shift+Tab');
+  assert.equal(await page.evaluate(() => document.activeElement.hash), '#/settings');
+  await page.keyboard.press('Tab');
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'close-sidebar');
+  await page.keyboard.press('Escape');
+  assert.equal(await menu.getAttribute('aria-expanded'), 'false');
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'menu-btn');
+  await page.locator('#skip-link').focus();
+  await page.keyboard.press('Enter');
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'main');
+  await menu.click();
+  await page.locator('.side-nav a[href="#/goals"]').click();
+  await page.locator('#goal-form').waitFor();
+  assert.equal(await menu.getAttribute('aria-expanded'), 'false');
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'main');
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 320);
+  await page.locator('#bottom-nav a[href="#/week"]').click();
+  await page.locator('#planner').waitFor();
+  const filter = page.locator('[data-filter="done"]');
+  await filter.focus();
+  await page.keyboard.press('Enter');
+  assert.equal(await filter.getAttribute('aria-pressed'), 'true');
+  assert.equal(await filter.evaluate(element => document.activeElement === element), true);
+  const primaryContrast = await page.locator('#add-task-btn').evaluate(button => {
+    const {color,backgroundColor} = getComputedStyle(button);
+    const luminance = rgb => rgb.match(/\d+/g).slice(0,3).map(Number).map(value => value / 255)
+      .map(value => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4)
+      .reduce((sum,value,index) => sum + value * [0.2126,0.7152,0.0722][index], 0);
+    const values = [luminance(color),luminance(backgroundColor)].sort((a,b) => b - a);
+    return (values[0] + 0.05) / (values[1] + 0.05);
+  });
+  assert.ok(primaryContrast >= 4.5);
+
+  await page.locator('[data-filter="all"]').click();
+  await page.locator('#bottom-nav a[href="#/room"]').click();
+  const sheet = page.locator('#side-fab');
+  await sheet.focus();
+  await page.keyboard.press('Enter');
+  assert.equal(await sheet.getAttribute('aria-expanded'), 'true');
+  assert.equal(await page.evaluate(() => document.activeElement.closest('#room-side') !== null), true);
+  await page.keyboard.press('Escape');
+  assert.equal(await sheet.getAttribute('aria-expanded'), 'false');
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'side-fab');
+  await page.setViewportSize({width:1280,height:720});
+  await page.evaluate(() => { location.hash = '/'; });
+  console.log('PASS: keyboard drawer, Skip to main, responsive goals at 320px, sheet and filter focus, primary button contrast');
+
   const openServerShop = async hadPurchase => {
     await page.evaluate(hadPurchase => {
       const docs = items => ({docs:Object.entries(items).map(([id,row])=>({id,data:()=>row}))});

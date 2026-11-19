@@ -199,10 +199,11 @@
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 70; max-height: 78vh; overflow-y: auto;
     background: var(--cream); border-radius: 22px 22px 0 0; padding: 10px 14px calc(16px + env(safe-area-inset-bottom));
     box-shadow: 0 -12px 40px rgba(79, 60, 52, .2);
-    transform: translateY(104%); transition: transform .42s var(--spring-soft);
+    visibility: hidden; transform: translateY(104%);
+    transition: transform .42s var(--spring-soft), visibility 0s .42s;
   }
   .room-side::before { content: ''; display: block; width: 40px; height: 4px; border-radius: 999px; background: rgba(111, 85, 71, .25); margin: 2px auto 10px; }
-  .room-side.open { transform: none; }
+  .room-side.open { visibility: visible; transform: none; transition-delay: 0s; }
   .sheet-backdrop { display: block; position: fixed; inset: 0; z-index: 65; background: rgba(79, 60, 52, .3); opacity: 0; pointer-events: none; transition: opacity .3s; backdrop-filter: blur(2px); }
   .sheet-backdrop.show { opacity: 1; pointer-events: auto; }
   .room-side .paper { box-shadow: none; }

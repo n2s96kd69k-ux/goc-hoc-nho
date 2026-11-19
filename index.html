@@ -19,14 +19,15 @@
   <link rel="stylesheet" href="css/notifications.css">
 </head>
 <body>
+  <a href="#main" id="skip-link" class="skip-link">Chuyển đến nội dung chính</a>
   <div class="app" id="app">
     <header class="app-header" id="app-header" aria-label="Đầu trang"></header>
     <section id="notification-panel" class="notification-panel" aria-label="Thông báo" hidden></section>
     <div class="app-body">
       <aside class="sidebar" id="sidebar" aria-label="Thông tin phụ và điều hướng"></aside>
       <div class="right-content">
-      <div id="notification-banner" class="notification-banner" hidden><div class="notification-banner-inner"></div></div>
-        <main class="main" id="main" aria-live="polite"></main>
+        <div id="notification-banner" class="notification-banner" hidden><div class="notification-banner-inner"></div></div>
+        <main class="main" id="main" tabindex="-1"></main>
       </div>
     </div>
   </div>

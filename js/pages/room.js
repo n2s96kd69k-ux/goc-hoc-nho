@@ -73,7 +73,7 @@ export function renderRoom(root) {
           </div>
         </aside>
       </div>
-      <button type="button" class="fab glass" id="side-fab" aria-label="Mở kho đồ">🎒</button>
+      <button type="button" class="fab glass" id="side-fab" aria-label="Mở kho đồ" aria-controls="room-side" aria-expanded="false">🎒</button>
       <div class="sheet-backdrop" id="sheet-backdrop"></div>
     </section>`;
 
@@ -364,10 +364,27 @@ export function renderRoom(root) {
 
   // ---------- Mobile bottom sheet ----------
   const backdrop = root.querySelector('#sheet-backdrop');
-  function openSheet() { if (!isMobile()) return; side.classList.add('open'); backdrop.classList.add('show'); }
-  function closeSheet() { side.classList.remove('open'); backdrop.classList.remove('show'); }
-  root.querySelector('#side-fab').onclick = () => (side.classList.contains('open') ? closeSheet() : openSheet());
+  const sheetButton = root.querySelector('#side-fab');
+  function openSheet() {
+    if (!isMobile()) return;
+    side.classList.add('open');
+    backdrop.classList.add('show');
+    sheetButton.setAttribute('aria-expanded', 'true');
+    sheetButton.setAttribute('aria-label', 'Đóng kho đồ');
+    side.querySelector('.tab.active')?.focus();
+  }
+  function closeSheet() {
+    if (side.classList.contains('open') && side.contains(document.activeElement)) sheetButton.focus();
+    side.classList.remove('open');
+    backdrop.classList.remove('show');
+    sheetButton.setAttribute('aria-expanded', 'false');
+    sheetButton.setAttribute('aria-label', 'Mở kho đồ');
+  }
+  sheetButton.onclick = () => (side.classList.contains('open') ? closeSheet() : openSheet());
   backdrop.onclick = closeSheet;
+  side.addEventListener('keydown', event => {
+    if (isMobile() && side.classList.contains('open') && event.key === 'Escape') closeSheet();
+  });
 
   renderPanel();
   renderTree();
