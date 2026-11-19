@@ -115,3 +115,11 @@ test('restored focus crossing midnight keeps the same accounting day',()=>{
  const state=initial(),clock={now:100000,day:'2026-11-16'};let t=timerHarness(state,clock);t.start();clock.now+=1600000;clock.day='2026-11-17';t=timerHarness(state,clock);t.restoreTimer();
  assert.equal(state.days['2026-11-16'].pomodoros,1);assert.equal(state.days['2026-11-17'],undefined);assert.equal(Object.keys(state.studyEvents).length,1);
 });
+
+test('a new cloud profile does not inherit a different account’s local data', async () => {
+ const saved = {...initial(), _syncUid: 'previous-user', tasks: [{id: 'private-task'}], ui: {}, subjects: []};
+ const h = stateHarness(saved, async () => null);
+ await h.context.syncCloudForUser({uid: 'user'});
+ assert.deepEqual(h.writes[0].tasks, []);
+ assert.equal(h.writes[0]._syncUid, 'user');
+});

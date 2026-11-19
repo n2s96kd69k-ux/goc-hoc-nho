@@ -141,19 +141,14 @@ test('catalog is readable but cannot be repriced by client accounts',async()=>{
  for(const uid of ['student','admin'])await assertFails(setDoc(doc(dbFor(uid),'catalog','desk'),{price:0}));
 });
 
-test('app sync removes deleted nested data, retains remote edits and keeps account permissions', async () => {
+function emulatedCloudApp(db, baseline) {
  const vm = require('node:vm');
- const db = dbFor('student');
- const ref = doc(db, 'users', 'student');
- const baseline = {wallet: {coins: 50}, days: {old: {minutes: 20}, kept: {minutes: 10}}};
- await updateDoc(ref, {state: {...baseline, days: {...baseline.days, added: {minutes: 30}}}});
-
- // Load the same browser functions with the real Firebase SDK pointed at the emulator.
+ // The browser functions use the real Firebase SDK pointed at the emulator.
  const source = file => fs.readFileSync(path.join(__dirname, '../js', file), 'utf8')
    .replace(/^import[\s\S]*?from ['"][^'"]+['"];\n/gm, '').replace(/export /g, '');
  const app = vm.createContext({
   initializeApp: () => ({}), getAuth: () => ({}), getFirestore: () => db,
-  onAuthStateChanged: () => () => {}, doc, runTransaction, console,
+  onAuthStateChanged: () => () => {}, doc, getDoc, console,
   localStorage: {getItem: () => JSON.stringify(baseline), setItem() {}},
  });
  vm.runInContext(source('sync.js') + '\n' + source('cloud.js'), app);
@@ -162,11 +157,64 @@ test('app sync removes deleted nested data, retains remote edits and keeps accou
   get: reference => tx.get(reference),
   set: (reference, data, options) => tx.set(reference, JSON.parse(JSON.stringify(data)), options),
  }));
+ return app;
+}
+
+test('app sync removes deleted nested data, retains remote edits and keeps account permissions', async () => {
+ const db = dbFor('student');
+ const ref = doc(db, 'users', 'student');
+ const baseline = {wallet: {coins: 50}, days: {old: {minutes: 20}, kept: {minutes: 10}}};
+ await updateDoc(ref, {state: {...baseline, days: {...baseline.days, added: {minutes: 30}}}});
+ const app = emulatedCloudApp(db, baseline);
  await app.saveCloudState('student', {wallet: {coins: 50}, days: {kept: {minutes: 10}}});
  const saved = (await getDoc(ref)).data();
  assert.deepEqual(saved.state.days, {kept: {minutes: 10}, added: {minutes: 30}});
  assert.equal(saved.role, 'member');
  assert.equal(saved.status, 'active');
+});
+
+test('migrated planner sync reconciles layout and notes while legacy state stays frozen', async () => {
+ const db = dbFor('student');
+ const ref = doc(db, 'users', 'student');
+ const baseline = {
+  settings: {userName: 'Trước đổi', sound: true},
+  room: {version: 2, theme: 'cream', owned: {desk: 1}, placed: []},
+  wallet: {coins: 50},
+  days: {'2026-11-19': {minutes: 20, note: 'Bản cũ'}},
+ };
+ await assertFails(updateDoc(ref, {planner: {}}));
+ await assertFails(updateDoc(ref, {economyVersion: 1}));
+ await env.withSecurityRulesDisabled(async context => {
+  const privileged = context.firestore();
+  await updateDoc(doc(privileged, ref.path), {
+   state: baseline, economyVersion: 1,
+   planner: {settings: {userName: 'Trước đổi', sound: false}, room: {theme: 'cream'}, dayNotes: {}},
+  });
+  await setDoc(doc(privileged, ref.path, 'economy', 'wallet'), {version: 1, balance: 90});
+ });
+ const app = emulatedCloudApp(db, baseline);
+ await app.saveCloudState('student', {
+  ...baseline, settings: {...baseline.settings, userName: 'Sau đổi'},
+  room: {...baseline.room, theme: 'mint', owned: {desk: 99}},
+  wallet: {coins: 999}, tasks: [{id: 'edited'}],
+  days: {'2026-11-19': {minutes: 999, note: 'Bản mới'}},
+ });
+ const saved = (await getDoc(ref)).data();
+ assert.deepEqual(saved.state, baseline);
+ assert.deepEqual(saved.planner.settings, {userName: 'Sau đổi', sound: false});
+ assert.equal(saved.planner.room.theme, 'mint');
+ assert.equal(saved.planner.room.owned, undefined);
+ assert.equal(saved.planner.tasks, undefined);
+ assert.deepEqual(saved.planner.dayNotes['2026-11-19'], {note: 'Bản mới'});
+ const loaded = await app.loadCloudState('student');
+ assert.equal(loaded.days['2026-11-19'].minutes, 20);
+ assert.equal(loaded.days['2026-11-19'].note, 'Bản mới');
+ assert.equal(loaded.room.owned.desk, 1);
+ assert.equal((await getDoc(doc(db, ref.path, 'economy', 'wallet'))).data().balance, 90);
+ await assertFails(updateDoc(ref, {'planner.room.owned': {desk: 99}}));
+ await assertFails(updateDoc(ref, {'planner.wallet': {coins: 999}}));
+ await assertFails(updateDoc(ref, {state: {wallet: {coins: 999}}}));
+ await assertFails(updateDoc(doc(dbFor('owner'), ref.path), {'planner.settings': {userName: 'Người khác'}}));
 });
 
 test('Worker REST transactions serialize purchases, keep receipts and enforce account access', async () => {

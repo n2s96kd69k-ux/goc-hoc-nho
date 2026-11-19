@@ -1,6 +1,7 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Nhận dạng tài khoản và quyền quản trị
     function signedIn() { return request.auth != null; }
     function userPath(uid) { return /databases/$(database)/documents/users/$(uid); }
     function owner(uid) { return uid == "Vyd1sYXrKARaTujn0ucX0XFe0gp2"; }
@@ -24,6 +25,36 @@ service cloud.firestore {
     function profileFields() {
       return ['state', 'publicId', 'updatedAt', 'displayName', 'email', 'emailLower', 'photoURL'];
     }
+    // Chỉ lưu nội dung cá nhân cho tài khoản đã chuyển ví. Bản state cũ,
+    // số dư, quyền sở hữu, nhiệm vụ và thống kê thưởng vẫn do máy chủ quản lý.
+    function saveMigratedPlanner(changed) {
+      let data = request.resource.data;
+      let planner = data.get('planner', {});
+      return resource.data.get('economyVersion', 0) == 1
+        && changed.hasOnly(['planner', 'publicId', 'updatedAt', 'displayName', 'email', 'emailLower', 'photoURL'])
+        && (!changed.hasAny(['planner']) || (
+          data.keys().hasAll(['planner'])
+          && planner is map
+          && planner.keys().hasOnly(['settings', 'subjects', 'goal', 'mascot', 'ui', 'room', 'dayNotes'])
+          && planner.get('settings', {}) is map
+          && planner.get('subjects', []) is list
+          && planner.get('goal', {}) is map
+          && planner.get('mascot', {}) is map
+          && planner.get('ui', {}) is map
+          && planner.get('dayNotes', {}) is map
+          && planner.get('room', {}) is map
+          && planner.get('room', {}).keys().hasOnly(['version', 'theme', 'placed', 'lampOverride', 'weather', 'presets'])
+        ));
+    }
+    function ownerProfileUpdate(uid) {
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+      return active(uid) && (
+        economyMigrated(uid)
+        ? (saveMigratedPlanner(changed) || (changed.hasOnly(profileFields()) && !changed.hasAny(['state'])))
+        : changed.hasOnly(profileFields())
+      );
+    }
+
     function audited(uid) {
       let operation = request.resource.data.lastAdminOperation;
       let auditPath = /databases/$(database)/documents/adminLogs/$(operation);
@@ -47,6 +78,7 @@ service cloud.firestore {
         && request.resource.data.updatedAt == request.time
         && audited(uid);
     }
+    // Hồ sơ, đồng bộ dữ liệu và nhật ký quản trị
     match /users/{uid} {
       // Deny banned accounts access to the private user document as well as writes.
       allow get: if signedIn() && ((request.auth.uid == uid
@@ -54,10 +86,7 @@ service cloud.firestore {
       allow list: if admin();
       allow create: if signedIn() && request.auth.uid == uid
         && request.resource.data.keys().hasOnly(profileFields());
-      allow update: if (active(uid)
-        && (!economyMigrated(uid) || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['state']))
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(profileFields()))
-        || adminUpdate(uid);
+      allow update: if ownerProfileUpdate(uid) || adminUpdate(uid);
       allow delete: if false;
     }
     match /adminLogs/{operation} {
@@ -87,6 +116,7 @@ service cloud.firestore {
         && get(userPath(uid)).data.get('status', 'active') != 'banned');
       allow write: if admin();
     }
+    // Phiên học công khai dùng cho bộ đếm người đang học
     match /studyPresence/{session} {
       allow read: if true;
       allow create, update: if signedIn()

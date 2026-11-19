@@ -191,7 +191,7 @@ function boot() {
     if (currentRoute()?.path === '/admin' && (!access.uid || access.ready || access.status === 'banned') && !isCurrentAdmin()) {
       disposeAdmin(); main().replaceChildren(); location.hash = '/';
     }
-    if (access.ready && access.uid && getState()._syncUid === access.uid) {
+    if (access.ready && access.economyVersion !== 1 && access.uid && getState()._syncUid === access.uid) {
       const adjusted = applyAdminCredits(getState(), access.adminCredits);
       if (adjusted.wallet !== getState().wallet && adjusted.wallet.adminCreditsApplied !== getState().wallet.adminCreditsApplied) {
         // Keep grant bookkeeping in sync even when an adjustment does not change the displayed balance.

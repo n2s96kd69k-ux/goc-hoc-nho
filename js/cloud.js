@@ -1,4 +1,4 @@
-import { mergeState, applyAdminCredits, readSyncBase, writeSyncBase } from './sync.js';
+import { mergeState, applyAdminCredits, readSyncBase, writeSyncBase, editablePlanner, applyEditablePlanner } from './sync.js';
 // ===== Đồng bộ đám mây với Firebase (Auth + Firestore) =====
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
 import {
@@ -153,6 +153,9 @@ export async function loadCloudState(uid) {
   if (!snap.exists()) return null;
   const data = snap.data();
   if (uid !== OWNER_UID && data?.status === 'banned') throw new Error('Tài khoản đã bị khóa.');
+  if (data.economyVersion === 1) {
+    return applyEditablePlanner(data.state || {}, data.planner || editablePlanner(data.state));
+  }
   return data?.state ? applyAdminCredits(data.state, data.adminCredits || 0) : null;
 }
 
@@ -164,7 +167,6 @@ export async function saveCloudState(uid, state) {
   const base = readSyncBase(uid);
   const patch = {
     publicId: accountId(uid),
-    state: snapshot,
     updatedAt: new Date().toISOString(),
   };
   const user = getCurrentUser();
@@ -178,13 +180,20 @@ export async function saveCloudState(uid, state) {
     const data = remote.exists() ? remote.data() : {};
     if (uid !== OWNER_UID && data.status === 'banned') throw new Error('Tài khoản đã bị khóa.');
     const existing = data.state || null;
+    if (data.economyVersion === 1) {
+      if (!base) throw new Error('Cần tải dữ liệu tài khoản trước khi lưu.');
+      const planner = mergeState(editablePlanner(base), editablePlanner(snapshot), data.planner || editablePlanner(existing));
+      committed = applyEditablePlanner(snapshot, planner);
+      transaction.set(ref, { ...patch, planner }, { mergeFields: [...Object.keys(patch), 'planner'] });
+      return;
+    }
     const credits = data.adminCredits || 0;
     const adjusted = applyAdminCredits(snapshot, credits);
     // An unknown baseline must not silently overwrite an existing account.
     if (existing && !base) throw new Error('Cần tải dữ liệu tài khoản trước khi lưu.');
     committed = existing ? mergeState(applyAdminCredits(base, credits), adjusted, applyAdminCredits(existing, credits)) : adjusted;
     // Replace the reconciled state as a whole so deleted nested fields stay deleted.
-    transaction.set(ref, { ...patch, state: committed }, { mergeFields: Object.keys(patch) });
+    transaction.set(ref, { ...patch, state: committed }, { mergeFields: [...Object.keys(patch), 'state'] });
   });
   writeSyncBase(uid, snapshot);
   return committed;

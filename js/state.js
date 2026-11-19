@@ -102,9 +102,14 @@ export async function syncCloudForUser(user) {
     // Read local state AFTER the request so edits made while loading survive.
     const local = state;
     // Keep a recoverable copy before the first sync of legacy/unowned data.
-    if (remote && !base) localStorage.setItem('goc-hoc-nho:before-first-sync:' + user.uid, JSON.stringify(local));
     const sameAccount = local._syncUid === user.uid;
-    const next = remote ? (sameAccount && base ? mergeState(applyAdminCredits(base, remote.wallet?.adminCreditsApplied || 0), applyAdminCredits(local, remote.wallet?.adminCreditsApplied || 0), remote) : remote) : local;
+    if (remote && !base && (!local._syncUid || sameAccount)) {
+      localStorage.setItem('goc-hoc-nho:before-first-sync:' + user.uid, JSON.stringify(local));
+    }
+    // A new remote profile can inherit guest data, never a different account's data.
+    const next = remote
+      ? (sameAccount && base ? mergeState(applyAdminCredits(base, remote.wallet?.adminCreditsApplied || 0), applyAdminCredits(local, remote.wallet?.adminCreditsApplied || 0), remote) : remote)
+      : (!local._syncUid || sameAccount ? local : createInitialState());
     writeSyncBase(user.uid, remote || next);
     replaceState({ ...next, _syncUid: user.uid }, { skipCloud: true });
     await saveAndApply(user.uid);

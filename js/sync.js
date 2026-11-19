@@ -91,3 +91,48 @@ function studyEventDeltas(event) {
   }
   return values.map(([path, amount]) => [JSON.stringify(path), amount]);
 }
+
+const plannerKeys = ['settings', 'subjects', 'goal', 'mascot', 'ui'];
+const roomLayoutKeys = ['version', 'theme', 'placed', 'lampOverride', 'weather', 'presets'];
+
+function selectFields(value, keys) {
+  return Object.fromEntries(keys.filter(key => Object.hasOwn(value || {}, key)).map(key => [key, value[key]]));
+}
+
+function plannerDayNotes(days) {
+  const notes = {};
+  for (const [date, day] of Object.entries(days || {})) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !object(day)) continue;
+    const fields = selectFields(day, ['note', 'mood']);
+    if (typeof fields.note !== 'string') delete fields.note;
+    if (typeof fields.mood !== 'string' && fields.mood !== null) delete fields.mood;
+    if (Object.keys(fields).length) notes[date] = fields;
+  }
+  return notes;
+}
+
+export function editablePlanner(state) {
+  return {
+    ...selectFields(state, plannerKeys),
+    room: selectFields(state?.room, roomLayoutKeys),
+    dayNotes: plannerDayNotes(state?.days),
+  };
+}
+
+export function applyEditablePlanner(state, planner) {
+  const dayNotes = plannerDayNotes(planner.dayNotes);
+  const days = {...state.days};
+  for (const date of Object.keys(days)) {
+    const {mood, note, ...study} = days[date] || {};
+    days[date] = {...study, ...dayNotes[date]};
+  }
+  for (const date of Object.keys(dayNotes)) {
+    if (!Object.hasOwn(days, date)) days[date] = {minutes: 0, pomodoros: 0, ...dayNotes[date]};
+  }
+  return {
+    ...state,
+    ...selectFields(planner, plannerKeys),
+    days,
+    room: {...state.room, ...selectFields(planner.room, roomLayoutKeys)},
+  };
+}
