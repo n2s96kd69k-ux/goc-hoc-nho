@@ -168,3 +168,90 @@ test('app sync removes deleted nested data, retains remote edits and keeps accou
  assert.equal(saved.role, 'member');
  assert.equal(saved.status, 'active');
 });
+
+test('Worker REST transactions serialize purchases, keep receipts and enforce account access', async () => {
+ const {generateKeyPairSync} = require('node:crypto');
+ const {default: worker} = await import('../worker/worker.js');
+ const {privateKey} = generateKeyPairSync('rsa', {modulusLength: 2048});
+ const projectId = 'demo-goc-hoc-nho';
+ const workerEnv = {
+  FIREBASE_PROJECT_ID: projectId, FIREBASE_WEB_API_KEY: 'emulator-test',
+  FIREBASE_SERVICE_ACCOUNT: JSON.stringify({
+   project_id: projectId,
+   client_email: 'worker-test@example.test',
+   private_key: privateKey.export({type: 'pkcs8', format: 'pem'}),
+  }),
+ };
+ const host = process.env.FIRESTORE_EMULATOR_HOST;
+ assert.match(host || '', /^(127\.0\.0\.1|localhost):\d+$/);
+ const db = dbFor('student');
+ const wallet = doc(db, 'users/student/economy/wallet');
+ const inventory = doc(db, 'users/student/ownedItems/desk');
+ await env.withSecurityRulesDisabled(async context => {
+  const privileged = context.firestore();
+  await setDoc(doc(privileged, wallet.path), {version: 1, balance: 100, totalEarned: 100});
+  await setDoc(doc(privileged, 'catalog/desk'), {active: true, price: 60, maxQty: 2});
+ });
+
+ // Stub Google identity and OAuth only. The bundled Worker's Firestore calls
+ // execute against the emulator with its special server credential.
+ const originalFetch = global.fetch;
+ global.fetch = async (input, options) => {
+  const url = new URL(input);
+  if (url.hostname === 'identitytoolkit.googleapis.com') {
+   const {idToken} = JSON.parse(options.body);
+   const uid = {'student-test-token': 'student', 'admin-test-token': 'admin'}[idToken];
+   return uid ? Response.json({users: [{localId: uid}]}) : Response.json({}, {status: 401});
+  }
+  if (url.hostname === 'oauth2.googleapis.com') {
+   return Response.json({access_token: 'owner', expires_in: 3600});
+  }
+  assert.equal(url.hostname, 'firestore.googleapis.com');
+  assert.ok(url.pathname.startsWith('/v1/projects/' + projectId + '/'));
+  return originalFetch('http://' + host + url.pathname + url.search, options);
+ };
+ const call = async (command, token = 'student-test-token') => {
+  const response = await worker.fetch(new Request('https://worker.test/api/economy', {
+   method: 'POST',
+   headers: {Authorization: 'Bearer ' + token, 'Content-Type': 'application/json'},
+   body: JSON.stringify(command),
+  }), workerEnv);
+  return {operationId: command.operationId, status: response.status, body: await response.json()};
+ };
+ const buy = operationId => call({type: 'buy', itemId: 'desk', operationId});
+ try {
+  const outcomes = await Promise.all([buy('worker-purchase-0001'), buy('worker-purchase-0002')]);
+  assert.deepEqual(outcomes.map(outcome => outcome.status).sort(), [200, 400], JSON.stringify(outcomes));
+  assert.equal(outcomes.find(outcome => outcome.status === 400).body.error, 'insufficient-funds');
+  const accepted = outcomes.find(outcome => outcome.status === 200);
+  assert.deepEqual(await buy(accepted.operationId), accepted);
+  assert.equal((await getDoc(wallet)).data().balance, 40);
+  assert.equal((await getDoc(inventory)).data().quantity, 1);
+  assert.equal((await getDocs(collection(db, 'users/student/economyOperations'))).size, 1);
+
+  const grant = {
+   type: 'admin-add', targetUid: 'student', amount: 10,
+   reason: 'Emulator test', operationId: 'worker-admin-grant-0001',
+  };
+  assert.equal((await call(grant)).status, 403);
+  assert.equal((await call(grant, 'invalid-token')).status, 401);
+  const granted = await call(grant, 'admin-test-token');
+  assert.equal(granted.status, 200, JSON.stringify(granted));
+  assert.deepEqual(await call(grant, 'admin-test-token'), granted);
+
+  await env.withSecurityRulesDisabled(async context => {
+   const privileged = context.firestore();
+   await updateDoc(doc(privileged, 'users', 'admin'), {role: 'member'});
+   await updateDoc(doc(privileged, 'users', 'student'), {status: 'banned'});
+  });
+  assert.equal((await call(grant, 'admin-test-token')).status, 403);
+  assert.equal((await buy(accepted.operationId)).status, 403);
+ } finally {
+  global.fetch = originalFetch;
+ }
+ await env.withSecurityRulesDisabled(async context => {
+  const privileged = context.firestore();
+  assert.equal((await getDoc(doc(privileged, wallet.path))).data().balance, 50);
+  assert.equal((await getDocs(collection(privileged, 'adminLogs'))).size, 1);
+ });
+});
