@@ -117,20 +117,20 @@ export function openAuthModal({ welcome = false } = {}) {
         ${welcome ? `
           <div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:4px;padding:4px 0;">
             <div class="mascot-wrap mascot-happy" style="width:58px;height:58px;">${mascotSVG(58)}</div>
-            <div style="font-size:13px;opacity:0.82;">“Một góc nhỏ cho những ngày cố gắng.”</div>
+            <div style="font-size:13px;color:var(--brown-soft);">“Một góc nhỏ cho những ngày cố gắng.”</div>
           </div>
         ` : ''}
-        <p style="margin:0;font-size:13px;opacity:0.8;text-align:${welcome ? 'center' : 'left'};">
+        <p style="margin:0;font-size:13px;color:var(--brown-soft);text-align:${welcome ? 'center' : 'left'};">
           Đăng nhập để lưu kế hoạch ôn thi, xu và căn phòng 2.5D của bạn trên mọi thiết bị.
         </p>
         <button class="btn btn-ghost" id="auth-google-btn" type="button" style="width:100%;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 14px;font-weight:700;">
           ${GOOGLE_ICON_SVG}
           <span>Tiếp tục với Google</span>
         </button>
-        <div style="text-align:center;font-size:12px;opacity:0.6;">— hoặc dùng Email —</div>
+        <div style="text-align:center;font-size:12px;color:var(--brown-soft);">— hoặc dùng Email —</div>
         <form id="auth-email-form" style="display:flex;flex-direction:column;gap:10px;">
-          <input class="input" id="auth-email" type="email" placeholder="Email của bạn" required />
-          <input class="input" id="auth-pass" type="password" placeholder="Mật khẩu (từ 6 ký tự)" minlength="6" required />
+          <input class="input" id="auth-email" type="email" aria-label="Email của bạn" autocomplete="email" placeholder="Email của bạn" required />
+          <input class="input" id="auth-pass" type="password" aria-label="Mật khẩu" placeholder="Mật khẩu (từ 6 ký tự)" minlength="6" required />
           <div id="auth-err" style="color:#c62828;font-size:12px;display:none;"></div>
           <button class="btn btn-primary" id="auth-submit-btn" type="submit" style="width:100%;justify-content:center;">Đăng nhập</button>
         </form>
@@ -138,7 +138,7 @@ export function openAuthModal({ welcome = false } = {}) {
           Chưa có tài khoản? Đăng ký mới
         </button>
         <div style="border-top:1px dashed rgba(0,0,0,0.1);padding-top:10px;text-align:center;">
-          <button class="btn btn-ghost" id="auth-skip-btn" type="button" style="width:100%;justify-content:center;font-size:12.5px;opacity:0.85;">
+          <button class="btn btn-ghost" id="auth-skip-btn" type="button" style="width:100%;justify-content:center;font-size:12.5px;">
             Bỏ qua đăng nhập, dùng thử ngay →
           </button>
         </div>

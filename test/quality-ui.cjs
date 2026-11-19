@@ -149,7 +149,14 @@ const fixtureCloud=role=>`
   await page.locator('#goal-form').waitFor();
   assert.equal(await menu.getAttribute('aria-expanded'), 'false');
   assert.equal(await page.evaluate(() => document.activeElement.id), 'main');
-  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 320);
+  const goalsLayout = await page.evaluate(() => ({
+    width: document.documentElement.scrollWidth,
+    overflow: [...document.querySelectorAll('#app-header *, #goal-form *')].filter(node => {
+      const rect = node.getBoundingClientRect();
+      return rect.width > 0 && rect.right > innerWidth + 1;
+    }).slice(0,8).map(node => node.id || node.className?.baseVal || node.className || node.tagName),
+  }));
+  assert.equal(goalsLayout.width, 320, JSON.stringify(goalsLayout));
   await page.locator('#bottom-nav a[href="#/week"]').click();
   await page.locator('#planner').waitFor();
   const filter = page.locator('[data-filter="done"]');
@@ -177,6 +184,8 @@ const fixtureCloud=role=>`
   await page.keyboard.press('Escape');
   assert.equal(await sheet.getAttribute('aria-expanded'), 'false');
   assert.equal(await page.evaluate(() => document.activeElement.id), 'side-fab');
+  await page.locator('#bottom-nav a[href="#/pomodoro"]').click();
+  await page.getByRole('combobox',{name:'Nhiệm vụ tập trung'}).waitFor();
   await page.setViewportSize({width:1280,height:720});
   await page.evaluate(() => { location.hash = '/'; });
   console.log('PASS: keyboard drawer, Skip to main, responsive goals at 320px, sheet and filter focus, primary button contrast');

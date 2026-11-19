@@ -33,8 +33,9 @@
   .app-header { padding: 0 12px; gap: 8px; }
   .menu-btn { display: inline-grid; }
   .brand-tag { display: none; }
-  .brand-name { font-size: 1rem; }
-  .header-right { gap: 6px; }
+  .brand { min-width: 0; }
+  .brand-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 1rem; }
+  .header-right { flex-shrink: 0; gap: 6px; }
   .header-right .pill { padding: 5px 9px; font-size: .75rem; }
   .live-study { display: none; }
   #settings-btn { display: none; }

@@ -26,6 +26,7 @@ Ngày 19/11/2026. Bản đối chiếu ban đầu là `c747585` trên `main`. D�
 | Vừa | Responsive, accessibility | Chromium ở 320 px xác nhận Mục tiêu hết tràn ngang. Kiểm tra bảy tuyến học chính, drawer đóng/mở bằng bàn phím, chuyển đến nội dung, focus của bộ lọc và kho đồ. Nút chính đạt tỉ lệ tương phản 4,5:1 trong kiểm thử | Mã trong repo. Chưa rà bằng trình đọc màn hình hoặc Safari | Kiểm tra thêm trình duyệt, zoom và thao tác chạm trên thiết bị thật |
 | Vừa | Bàn phím cho chuông và banner | Chromium kiểm tra mở bằng Enter, Escape trả focus, giữ nút đóng khi Firestore trả bản cập nhật, đóng bảng khi đổi trang. Banner chỉ hiện ở Tổng quan, cập nhật được nội dung sửa và trả focus khi ẩn | CI và GitHub Pages đạt tại `ac98ea0` | Kiểm tra với trình đọc màn hình và Safari |
 | Vừa | Kiểm thử đa trình duyệt | Bổ sung job Firefox và WebKit dùng cùng các bài kiểm tra bàn phím, thông báo, lưu cục bộ và mobile 320 px. Chromium tiếp tục chạy bộ đầy đủ. | Đang chờ kết quả CI. Firefox cục bộ không khởi tạo được hồ sơ, WebKit cục bộ thiếu thư viện | Kiểm tra Safari trên thiết bị Apple và trình đọc màn hình |
+| Vừa | Rà tự động accessibility trên web | Dùng axe-core ở 390 px, phát hiện nhãn ô chọn Pomodoro và độ tương phản chữ trên Mục tiêu, Tổng quan và hộp đăng nhập. Đã sửa các vị trí trên. CI Firefox vòng đầu phát hiện tràn ngang 17 px ở 320 px, đã giới hạn phần tên thương hiệu và thêm log phần tử tràn | Chromium kiểm tra cục bộ | Đợi kết quả CI Firefox và WebKit của bản sửa, sau đó kiểm tra bằng trình đọc màn hình |
 | Vừa | Hiệu năng và bảo trì | Tải Góc học, Mục tiêu, Nhìn lại và Quản lý khi mở trang tương ứng. Đo tải lạnh Tổng quan trên Chromium cục bộ, số tệp JS cùng origin giảm từ 58 còn 47, số byte sau giải nén giảm từ 375.193 còn 259.208. Kiểm thử import chậm khi người dùng đã đổi tuyến | GitHub Pages và CI đạt tại `79fee50`. Đã xác nhận mã tuyến tải theo nhu cầu có trên web thật. Chưa đo tốc độ trên thiết bị thật | Đo tải trên thiết bị và mạng thật |
 
 - [CI của bản đối chiếu](https://github.com/n2s96kd69k-ux/goc-hoc-nho/actions/runs/44519336478)
@@ -68,3 +69,5 @@ Worker chờ một khoảng tăng dần có độ lệch trước khi thử lạ
 Ngày 19/11/2026, người dùng yêu cầu bỏ qua phần ví và tiếp tục cải thiện web. Các phép đo tải lạnh dùng localhost, Chromium và phụ thuộc mạng mô phỏng.
 
 - [CI của tải trang theo nhu cầu](https://github.com/n2s96kd69k-ux/goc-hoc-nho/actions/runs/44540637499)
+
+Đo thử Tổng quan trên web thật ở viewport 390 px bằng Chromium tại môi trường kiểm thử. Lần đo ghi nhận LCP 1.524 ms. Đây là một lần đo trong môi trường kiểm thử, chưa có số liệu thực địa trên thiết bị người dùng.

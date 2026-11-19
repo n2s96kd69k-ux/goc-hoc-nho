@@ -64,7 +64,7 @@ export function renderPomodoro(root) {
           </div>
           <div class="paper">
             <h4 class="side-title">📌 Đang làm gì?</h4>
-            <select id="pomo-task" class="select">
+            <select id="pomo-task" class="select" aria-label="Nhiệm vụ tập trung">
               <option value="">— Không gắn nhiệm vụ —</option>
               ${todo.map((x) => `<option value="${x.id}" ${tm.taskId === x.id ? 'selected' : ''}>${escapeHtml(x.title)}</option>`).join('')}
             </select>

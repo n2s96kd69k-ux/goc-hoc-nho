@@ -97,7 +97,7 @@
 .count-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(168px, 1fr)); gap: 8px; }
 .count-card { background: var(--cream-2, #fff8ef); border-radius: 12px; padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; min-height: 96px; }
 .count-card small { display: block; color: var(--brown-soft); font-size: .75rem; font-weight: 800; line-height: 1.2; white-space: nowrap; }
-.count-card strong { font-family: var(--font-head); font-size: 1rem; color: var(--lavender-dark); white-space: nowrap; }
+.count-card strong { font-family: var(--font-head); font-size: 1rem; color: #665184; white-space: nowrap; }
 .side-goal .goal-name { text-align: center; font-size: 1.15rem; }
 .uni-progress { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
 .uni-progress .bar { flex: 1; height: 8px; }
