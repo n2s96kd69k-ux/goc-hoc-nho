@@ -1,3 +1,4 @@
+import { visibleTasks } from '../task-account.js';
 // ===== Trang /subjects =====
 import { getState } from '../state.js';
 import { escapeHtml, minutesToText, todayKey } from '../utils.js';
@@ -45,7 +46,7 @@ function renderSubjectDetail(root, id) {
   if (!sub) { navigate('/subjects'); return; }
   const s = getState();
   const st = subjectStats(id);
-  const tasks = s.tasks.filter((t) => t.subjectId === id).sort((a, b) => a.date.localeCompare(b.date));
+  const tasks = visibleTasks(s.tasks).filter((t) => t.subjectId === id).sort((a, b) => a.date.localeCompare(b.date));
   const scores = sub.scores || [];
   root.innerHTML = `
     <section class="page" style="--sub:${sub.color}">
@@ -89,7 +90,16 @@ function renderSubjectDetail(root, id) {
   root.querySelector('#add-task').onclick = () => openTaskForm({ date: todayKey(), subjectId: id });
   root.querySelector('#edit-subject').onclick = () => openSubjectForm(id);
   root.querySelectorAll('[data-edit]').forEach((b) => b.onclick = () => openTaskForm({ taskId: b.dataset.edit }));
-  root.querySelectorAll('[data-toggle]').forEach((b) => b.onclick = () => toggleTask(b.dataset.toggle));
+  root.querySelectorAll('[data-toggle]').forEach((b) => b.onclick = async () => {
+      b.disabled = true;
+      try {
+        await toggleTask(b.dataset.toggle);
+      } catch (error) {
+        toast(error.message, { kind: 'error' });
+      } finally {
+        b.disabled = false;
+      }
+    });
   root.querySelector('#chapter-form').onsubmit = (e) => {
     e.preventDefault();
     const inp = e.target.querySelector('input');

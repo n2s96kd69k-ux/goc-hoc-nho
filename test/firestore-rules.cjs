@@ -319,7 +319,11 @@ test('Worker REST transactions serialize purchases, keep receipts and enforce ac
   assert.equal(removed.body.result.task.title, undefined);
   assert.deepEqual(await call(remove), removed);
   assert.equal((await call({...create, operationId: 'worker-task-create-0002'})).body.error, 'task-id-in-use');
-  await assertFails(getDoc(doc(db, 'users/student/rewardTasks', taskId)));
+  const taskRef = doc(db, 'users/student/rewardTasks', taskId);
+  assert.equal((await assertSucceeds(getDoc(taskRef))).data().version, 3);
+  await assertFails(updateDoc(taskRef, {done: true}));
+  await assertFails(getDoc(doc(dbFor('other-student'), 'users/student/rewardTasks', taskId)));
+  await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), 'users/student/rewardTasks', taskId)));
 
   await env.withSecurityRulesDisabled(async context => {
    const privileged = context.firestore();

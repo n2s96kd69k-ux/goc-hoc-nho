@@ -1,3 +1,4 @@
+import { visibleTasks } from '../task-account.js';
 import { isCurrentAdmin } from '../cloud.js';
 // ===== Sidebar: lịch tháng, tiến độ tuần, thời gian, mục tiêu, mascot, navigation =====
 import { getState, update } from '../state.js';
@@ -148,7 +149,7 @@ function goalBadge(g) {
 
 export function goalProgressPercent() {
   const s = getState();
-  const tasks = s.tasks;
+  const tasks = visibleTasks(s.tasks);
   if (!tasks.length) return 0;
   return Math.round((tasks.filter((t) => t.done).length / tasks.length) * 100);
 }

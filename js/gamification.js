@@ -1,3 +1,4 @@
+import { visibleTasks } from './task-account.js';
 // ===== Game hóa: xu, chuỗi cố gắng, mục tiêu ngày/tuần, cây tiến độ =====
 // Mua đồ / kho / phòng nằm ở room.js (single source of truth).
 import { getState, update } from './state.js';
@@ -34,8 +35,8 @@ export function streakProgress(key) {
   const s = getState();
   const d = s.days[key] || {};
   const minutes = typeof d.pomoMinutes === 'number' ? d.pomoMinutes : (d.pomodoros ? (d.minutes || 0) : 0);
-  const tasks = s.tasks.filter((t) => t.date === key && t.done).length;
-  const todo = s.tasks.filter((t) => t.date === key && !t.done);
+  const tasks = visibleTasks(s.tasks).filter((t) => t.date === key && t.done).length;
+  const todo = visibleTasks(s.tasks).filter((t) => t.date === key && !t.done);
   return {
     minutes,
     minutesNeed: STREAK_MINUTES,
@@ -84,7 +85,7 @@ export function checkWeekComplete(dateKey) {
   const s = getState();
   const monday = toKey(startOfWeek(dateKey));
   const keys = new Set(weekKeys(startOfWeek(dateKey)));
-  const tasks = s.tasks.filter((t) => keys.has(t.date));
+  const tasks = visibleTasks(s.tasks).filter((t) => keys.has(t.date));
   if (tasks.length < 5 || tasks.some((t) => !t.done)) return 0;
   s.streak.rewarded = s.streak.rewarded || {};
   if (s.streak.rewarded['week:' + monday]) return 0;

@@ -1,3 +1,4 @@
+import { visibleTasks } from './task-account.js';
 // ===== Môn học =====
 import { getState, update } from './state.js';
 import { uid, pct } from './utils.js';
@@ -48,7 +49,7 @@ export function addScore(id, score, note) {
 
 export function subjectStats(id) {
   const s = getState();
-  const tasks = s.tasks.filter((t) => t.subjectId === id);
+  const tasks = visibleTasks(s.tasks).filter((t) => t.subjectId === id);
   const done = tasks.filter((t) => t.done);
   const minutes = (s.timer.bySubject && s.timer.bySubject[id]) || 0;
   const pomodoros = (s.timer.pomosBySubject && s.timer.pomosBySubject[id]) || 0;

@@ -3,10 +3,12 @@ import { getState, update, dayRecord } from './state.js';
 import { uid, pct, todayKey } from './utils.js';
 import { addCoins, REWARDS, recomputeStreak, checkWeekComplete } from './gamification.js';
 import { sounds } from './sounds.js';
+import { sendTask, visibleTasks } from './task-account.js';
+import { walletMode } from './wallet-account.js';
 import { mascot } from './mascot.js';
 
 export function tasksOfDay(key) {
-  const list = getState().tasks.filter((t) => t.date === key);
+  const list = visibleTasks(getState().tasks).filter((t) => t.date === key);
   const ranked = list.some((t) => typeof t.order === 'number');
   if (!ranked) return list.sort((a, b) => Number(a.done) - Number(b.done) || (a.createdAt || 0) - (b.createdAt || 0));
   return list.sort((a, b) => (a.order ?? 1e15) - (b.order ?? 1e15));
@@ -14,7 +16,7 @@ export function tasksOfDay(key) {
 
 export function tasksOfWeek(keys) {
   const set = new Set(keys);
-  return getState().tasks.filter((t) => set.has(t.date));
+  return visibleTasks(getState().tasks).filter((t) => set.has(t.date));
 }
 
 export function dayProgress(key) {
@@ -41,6 +43,10 @@ export function applyFilter(list, filter) {
 }
 
 export function addTask(data) {
+  if (walletMode() !== 'legacy') {
+    return sendTask('task-create', null, { ...data, subjectId: data.subjectId || null,
+      minutes: Number(data.minutes || 30), pomodoros: Number(data.pomodoros || 0) });
+  }
   const task = {
     id: uid(),
     title: (data.title || '').trim() || 'Nhiệm vụ mới',
@@ -58,14 +64,16 @@ export function addTask(data) {
   return task;
 }
 
-export function updateTask(id, patch) {
+export function updateTask(id, patch, task = getTask(id)) {
+  if (walletMode() !== 'legacy') return changeServerTask('task-edit', task, patch);
   update((s) => {
     const t = s.tasks.find((x) => x.id === id);
     if (t) Object.assign(t, patch);
   }, { type: 'task-update', id });
 }
 
-export function deleteTask(id) {
+export function deleteTask(id, task = getTask(id)) {
+  if (walletMode() !== 'legacy') return changeServerTask('task-delete', task);
   update((s) => { s.tasks = s.tasks.filter((t) => t.id !== id); }, { type: 'task-delete', id });
 }
 
@@ -73,9 +81,25 @@ export function deleteTask(id) {
  * Bật/tắt hoàn thành. Trả về thông tin phần thưởng để UI hiển thị.
  * @returns {{done:boolean, coins:number, dayComplete:boolean, streakEvents:Array}}
  */
-export function toggleTask(id) {
-  const s = getState();
-  const t = s.tasks.find((x) => x.id === id);
+async function changeServerTask(type, task, fields) {
+  if (!task) throw new Error('Chưa tải được nhiệm vụ. Hãy mở lại thao tác.');
+  return sendTask(type, task, fields);
+}
+
+async function toggleServerTask(task) {
+  const result = await changeServerTask(task?.done ? 'task-undo' : 'task-complete', task);
+  const day = dayProgress(task.date);
+  const dayComplete = result.done && day.total > 0 && day.done === day.total;
+  if (result.done) {
+    if (dayComplete) { sounds.fanfare(); mascot.react('celebrate'); }
+    else { sounds.pop(); mascot.react('happy'); }
+  }
+  return { done: result.done, coins: result.delta, dayComplete, weekBonus: result.weekBonus,
+    streakEvents: result.streak?.events || [] };
+}
+
+export function toggleTask(id, t = getTask(id)) {
+  if (walletMode() !== 'legacy') return toggleServerTask(t);
   if (!t) return null;
   const nowDone = !t.done;
   const before = dayProgress(t.date);
@@ -158,4 +182,4 @@ export function restoreTask(id, prev) {
   }, { type: 'task-move', id, rollback: true });
 }
 
-export function getTask(id) { return getState().tasks.find((t) => t.id === id); }
+export function getTask(id) { return visibleTasks(getState().tasks).find((t) => t.id === id); }

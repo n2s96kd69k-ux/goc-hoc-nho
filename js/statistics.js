@@ -1,3 +1,4 @@
+import { visibleTasks } from './task-account.js';
 // ===== Thống kê =====
 import { getState } from './state.js';
 import { weekKeys, startOfWeek, todayKey, toKey, addDays, pct } from './utils.js';
@@ -18,7 +19,7 @@ export function weekSummary(monday = startOfWeek(todayKey())) {
   const keys = weekKeys(monday);
   const s = getState();
   const perDay = keys.map((k) => {
-    const list = s.tasks.filter((t) => t.date === k);
+    const list = visibleTasks(s.tasks).filter((t) => t.date === k);
     const done = list.filter((t) => t.done).length;
     return { key: k, total: list.length, done, percent: pct(done, list.length), minutes: minutesOfDay(k), pomodoros: pomodorosOfDay(k) };
   });
@@ -32,7 +33,7 @@ export function weekSummary(monday = startOfWeek(todayKey())) {
 export function totalMinutesAllTime() {
   const s = getState();
   const days = Object.keys(s.days);
-  const taskDays = new Set(s.tasks.map((t) => t.date));
+  const taskDays = new Set(visibleTasks(s.tasks).map((t) => t.date));
   const all = new Set([...days, ...taskDays]);
   let sum = 0;
   for (const k of all) sum += minutesOfDay(k);
@@ -41,9 +42,9 @@ export function totalMinutesAllTime() {
 
 export function overallStats() {
   const s = getState();
-  const doneTasks = s.tasks.filter((t) => t.done).length;
+  const doneTasks = visibleTasks(s.tasks).filter((t) => t.done).length;
   const totalMinutes = totalMinutesAllTime();
-  const allKeys = new Set([...Object.keys(s.days), ...s.tasks.map((t) => t.date)]);
+  const allKeys = new Set([...Object.keys(s.days), ...visibleTasks(s.tasks).map((t) => t.date)]);
   let totalPomos = 0;
   for (const k of allKeys) totalPomos += pomodorosOfDay(k);
   const subs = s.subjects.map((sub) => ({ ...sub, stats: subjectStats(sub.id) }))
@@ -52,7 +53,7 @@ export function overallStats() {
     totalMinutes,
     totalPomos,
     doneTasks,
-    totalTasks: s.tasks.length,
+    totalTasks: visibleTasks(s.tasks).length,
     streak: s.streak.current,
     longest: s.streak.longest,
     topSubject: subs[0] || null,
@@ -66,7 +67,7 @@ export function lastNDays(n = 14) {
   for (let i = n - 1; i >= 0; i--) {
     const k = toKey(addDays(t, -i));
     const s = getState();
-    const list = s.tasks.filter((x) => x.date === k);
+    const list = visibleTasks(s.tasks).filter((x) => x.date === k);
     out.push({ key: k, minutes: minutesOfDay(k), pomodoros: pomodorosOfDay(k), tasks: list.filter((x) => x.done).length, total: list.length });
   }
   return out;
@@ -76,7 +77,7 @@ export function dayStatus(key) {
   const t = todayKey();
   if (key > t) return 'future';
   const s = getState();
-  const list = s.tasks.filter((x) => x.date === key);
+  const list = visibleTasks(s.tasks).filter((x) => x.date === key);
   const done = list.filter((x) => x.done).length;
   const mins = minutesOfDay(key);
   if (list.length && done === list.length) return 'good';

@@ -1,3 +1,4 @@
+import { toast } from './toast.js';
 // ===== Popup chi tiết một ngày (từ lịch tháng) =====
 import { getState, update, dayRecord } from '../state.js';
 import { escapeHtml, dayLabelOf, formatDMY, MOODS, minutesToText } from '../utils.js';
@@ -40,7 +41,17 @@ export function openDayDetail(key) {
         <textarea class="day-note" rows="2" placeholder="Hôm nay thế nào nhỉ…">${escapeHtml(d.note || '')}</textarea>
       </div>`;
 
-    m.body.querySelectorAll('[data-toggle]').forEach((b) => b.onclick = () => { toggleTask(b.dataset.toggle); render(); });
+    m.body.querySelectorAll('[data-toggle]').forEach((b) => b.onclick = async () => {
+      b.disabled = true;
+      try {
+        await toggleTask(b.dataset.toggle);
+        render();
+      } catch (error) {
+        toast(error.message, { kind: 'error' });
+      } finally {
+        b.disabled = false;
+      }
+    });
     m.body.querySelectorAll('[data-edit]').forEach((b) => b.onclick = () => { m.close(); openTaskForm({ taskId: b.dataset.edit }); });
     m.body.querySelector('[data-act="add"]').onclick = () => { m.close(); openTaskForm({ date: key }); };
     m.body.querySelectorAll('[data-mood]').forEach((b) => b.onclick = () => {

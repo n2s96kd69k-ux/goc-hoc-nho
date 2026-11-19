@@ -1,6 +1,7 @@
 // ===== WEEKLY PLANNER — nhân vật chính =====
 import { getState, update } from '../state.js';
 import { DAY_LABELS, DAY_SHORT, DAY_ICONS, DAY_COLORS, fromKey, toKey, addDays, weekKeys, weekRangeLabel, formatDM, todayKey, startOfWeek, minutesToText, escapeHtml, PRIORITIES } from '../utils.js';
+import { walletMode } from '../wallet-account.js';
 import { tasksOfDay, dayProgress, mainSubjectOfDay, toggleTask, applyFilter, getTask, placeTask, restoreTask } from '../tasks.js';
 import { getCurrentUser, saveCloudState } from '../cloud.js';
 import { getSubject } from '../subjects.js';
@@ -369,10 +370,20 @@ export function bindPlanner(root) {
   root.querySelectorAll('[data-more]').forEach((b) => b.onclick = () => { expanded.add(b.dataset.more); update(() => {}, { type: 'view' }); });
   root.querySelectorAll('[data-less]').forEach((b) => b.onclick = () => { expanded.delete(b.dataset.less); update(() => {}, { type: 'view' }); });
 
-  root.querySelectorAll('[data-toggle]').forEach((b) => b.onclick = (e) => {
+  root.querySelectorAll('[data-toggle]').forEach((b) => b.onclick = async (e) => {
     e.stopPropagation();
     b.classList.add('animating');
-    const res = toggleTask(b.dataset.toggle);
+    b.disabled = true;
+    let res;
+    try {
+      const toggled = toggleTask(b.dataset.toggle);
+      res = toggled instanceof Promise ? await toggled : toggled;
+    } catch (error) {
+      toast(error.message, { kind: 'error' });
+    } finally {
+      b.disabled = false;
+      b.classList.remove('animating');
+    }
     if (res && res.done) {
       if (res.coins) floatCoins(res.coins, b);
       if (res.dayComplete) {
@@ -388,7 +399,7 @@ export function bindPlanner(root) {
     }
   });
 
-  bindTaskDrag(root);
+  if (walletMode() === 'legacy') bindTaskDrag(root);
 
   // Tabs ngày (mobile)
   root.querySelectorAll('[data-day].day-tab').forEach((b) => b.onclick = () => setViewDay(b.dataset.day));

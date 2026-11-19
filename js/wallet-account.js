@@ -4,6 +4,8 @@ import { sendWalletCommand } from './wallet-api.js';
 
 let account = null;
 const listeners = new Set();
+const taskListeners = new Set();
+const publishTasks = () => taskListeners.forEach(listener => listener());
 const inFlight = new Set();
 const terminal = new Set(['insufficient-funds', 'quantity-limit', 'item-unavailable', 'operation-conflict']);
 const publish = () => listeners.forEach(listener => listener());
@@ -12,11 +14,12 @@ export function startWalletAccount() {
   const connect = access => {
     const eligible = access.ready && access.economyVersion === 1 && access.status !== 'banned';
     if (eligible && account?.uid === access.uid) return;
+    if (!eligible && !account) return;
     account?.stop.forEach(stop => stop());
     account = null;
     if (eligible) {
       const db = firebaseDb();
-      const current = { uid: access.uid, balance: null, owned: new Map(), catalog: new Map(), stop: [] };
+      const current = { uid: access.uid, balance: null, owned: new Map(), catalog: new Map(), tasks: null, stop: [] };
       account = current;
       const watch = (ref, apply, clear) => onSnapshot(ref, snapshot => {
         if (account !== current) return;
@@ -28,6 +31,20 @@ export function startWalletAccount() {
         publish();
       });
       current.stop.push(
+        onSnapshot(collection(db, 'users', access.uid, 'rewardTasks'), snapshot => {
+          if (account !== current) return;
+          const rows = current.tasks || new Map();
+          let changed = current.tasks === null;
+          for (const row of snapshot.docs) {
+            if (setTaskRow(rows, { ...row.data(), id: row.id })) changed = true;
+          }
+          current.tasks = rows;
+          if (changed) publishTasks();
+        }, () => {
+          if (account !== current) return;
+          current.tasks = null;
+          publishTasks();
+        }),
         watch(doc(db, 'users', access.uid, 'economy', 'wallet'), snapshot => {
           const wallet = snapshot.data();
           current.balance = wallet?.version === 1 && Number.isSafeInteger(wallet.balance) && wallet.balance >= 0
@@ -49,6 +66,7 @@ export function startWalletAccount() {
       );
     }
     publish();
+    publishTasks();
   };
   onAccountAccessChange(connect);
   connect(getAccountAccess());
@@ -69,6 +87,29 @@ export function walletMode() {
 
 function currentWallet() {
   return walletMode() === 'server' && account?.uid === getCurrentUser()?.uid ? account : null;
+}
+
+export function subscribeServerTasks(listener) {
+  taskListeners.add(listener);
+  return () => taskListeners.delete(listener);
+}
+
+function setTaskRow(rows, task) {
+  if (!/^[a-zA-Z0-9_-]{1,128}$/.test(task.id) || !Number.isSafeInteger(task.version)
+      || (rows.get(task.id)?.version ?? -1) >= task.version) return false;
+  rows.set(task.id, task);
+  return true;
+}
+
+export function serverTaskRows() {
+  const rows = currentWallet()?.tasks;
+  return rows ? [...rows.values()].filter(task => task.deletedAt === undefined) : null;
+}
+
+export function applyServerTask(uid, task) {
+  const wallet = currentWallet();
+  if (wallet?.uid !== uid || !wallet.tasks) return;
+  if (setTaskRow(wallet.tasks, task)) publishTasks();
 }
 
 export function displayedBalance(legacy) {

@@ -95,5 +95,43 @@ const fixtureCloud=role=>`
   await page.locator('.header-coins').filter({hasText:'40 xu'}).waitFor();
   assert.deepEqual(errors,[]);
   console.log('PASS: server catalog and balance, lost response, retry after reload with the same operation');
+  const taskCalls = [];
+  await page.unroute('https://dark-tooth-7030.n2s96kd69k.workers.dev/api/economy');
+  await page.route('https://dark-tooth-7030.n2s96kd69k.workers.dev/api/economy', async route => {
+    const command = route.request().postDataJSON();
+    taskCalls.push(command);
+    if (taskCalls.length <= 2) return route.abort();
+    const task = command.type === 'task-create'
+      ? { id:command.taskId, ...command.fields, done:false, version:0, coinGain:0 }
+      : { id:command.taskId, ...taskCalls[2].fields, done:true, version:1, coinGain:5 };
+    return route.fulfill({json:{ok:true,result:{task,delta:5}}});
+  });
+  await page.reload({waitUntil:'domcontentloaded'});
+  await page.waitForSelector('#settings-btn');
+  const openTask = async () => {
+    await page.evaluate(() => {
+      window.__walletRows = {'users/admin/rewardTasks': () => ({docs:[]})};
+      window.__useServerWallet();
+      location.hash = '/';
+    });
+    await page.locator('#add-task-btn').click();
+    await page.getByRole('textbox',{name:'Tên nhiệm vụ'}).fill('Ôn Toán trên máy chủ');
+  };
+  await openTask();
+  await page.locator('#task-form button[type=submit]').click();
+  await page.getByText('Không nhận được phản hồi từ máy chủ ví.', {exact:false}).waitFor();
+  await page.reload({waitUntil:'domcontentloaded'});
+  await page.waitForSelector('#settings-btn');
+  await openTask();
+  await page.locator('#task-form button[type=submit]').click();
+  const taskRow = page.locator('.task').filter({hasText:'Ôn Toán trên máy chủ'});
+  await taskRow.waitFor();
+  assert.deepEqual(taskCalls[0], taskCalls[2]);
+  await taskRow.locator('[data-toggle]').click();
+  await page.locator('.task.done').filter({hasText:'Ôn Toán trên máy chủ'}).waitFor();
+  assert.equal(taskCalls[3].type, 'task-complete');
+  assert.equal(taskCalls[3].expectedVersion, 0);
+  assert.deepEqual(errors, []);
+  console.log('PASS: task creation after lost response and reload, completion from confirmed server row');
  }finally{await browser.close();await new Promise(r=>server.close(r));}
 })().catch(e=>{console.error(e);process.exitCode=1;});

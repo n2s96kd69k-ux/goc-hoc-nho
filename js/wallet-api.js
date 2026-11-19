@@ -12,6 +12,10 @@ const messages = {
   'quantity-limit': 'Bạn đã sở hữu số lượng tối đa của vật phẩm này.',
   'balance-limit': 'Số dư vượt giới hạn.',
   'earned-limit': 'Tổng xu đã nhận vượt giới hạn.',
+  'task-version-conflict': 'Nhiệm vụ đã thay đổi trên thiết bị khác. Hãy mở lại để xem bản mới.',
+  'task-not-found': 'Nhiệm vụ đã bị xóa hoặc không còn tồn tại.',
+  'invalid-task-fields': 'Hãy kiểm tra lại ngày, tên và thời lượng nhiệm vụ.',
+  'undo-insufficient-funds': 'Số dư hiện tại chưa đủ để hoàn lại xu của nhiệm vụ này.',
   'not-found': 'Máy chủ ví chưa sẵn sàng.',
 };
 const temporaryStatus = new Set([502, 503, 504]);

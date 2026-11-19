@@ -6,6 +6,8 @@ import { openModal, confirmDialog } from './modal.js';
 import { toast } from './toast.js';
 import { navigate } from '../router.js';
 import { attachTask } from '../timer.js';
+import { getCurrentUser } from '../cloud.js';
+import { walletMode } from '../wallet-account.js';
 
 function subjectOptions(selected) {
   return getState().subjects.map((s) => `<option value="${s.id}" ${s.id === selected ? 'selected' : ''}>${s.icon} ${escapeHtml(s.name)}</option>`).join('');
@@ -13,6 +15,12 @@ function subjectOptions(selected) {
 
 export function openTaskForm({ date = todayKey(), taskId = null, subjectId = null } = {}) {
   const task = taskId ? getTask(taskId) : null;
+  if (taskId && !task) {
+    toast('Nhiệm vụ không còn hiển thị. Hãy mở lại danh sách.', { kind: 'error' });
+    return;
+  }
+  const user = getCurrentUser();
+  const mode = walletMode();
   const isEdit = !!task;
   const v = task || { title: '', subjectId: subjectId || (getState().subjects[0] && getState().subjects[0].id), date, minutes: 30, priority: 'medium', pomodoros: 1, note: '' };
 
@@ -73,19 +81,40 @@ export function openTaskForm({ date = todayKey(), taskId = null, subjectId = nul
   const form = m.body.querySelector('#task-form');
   setTimeout(() => form.title.focus(), 60);
 
+  let saving = false;
+  async function save(action) {
+    if (saving) return;
+    if (user !== getCurrentUser() || mode !== walletMode()) {
+      toast('Tài khoản đã thay đổi. Hãy mở lại biểu mẫu.', { kind: 'error' });
+      return;
+    }
+    saving = true;
+    const actions = [...form.querySelectorAll('button')];
+    actions.forEach(button => { button.disabled = true; });
+    try { await action(); }
+    catch (error) { toast(error.message, { kind: 'error' }); }
+    finally {
+      actions.forEach(button => { button.disabled = false; });
+      saving = false;
+    }
+  }
+
   form.addEventListener('submit', (e) => {
     e.preventDefault();
     const fd = new FormData(form);
     const data = Object.fromEntries(fd.entries());
     if (!data.title.trim()) return;
-    if (isEdit) {
-      updateTask(task.id, { ...data, minutes: Number(data.minutes), pomodoros: Number(data.pomodoros) });
-      toast('Đã lưu thay đổi ✨', { icon: '✏️' });
-    } else {
-      addTask(data);
-      toast(`Thêm vào ${dayLabelOf(data.date)}, ${formatDMY(data.date)}`, { icon: '🌷' });
-    }
-    m.close();
+    save(async () => {
+      if (isEdit) {
+        await updateTask(task.id, { ...data, subjectId: data.subjectId || null,
+          minutes: Number(data.minutes || 30), pomodoros: Number(data.pomodoros || 0) }, task);
+        toast('Đã lưu thay đổi ✨', { icon: '✏️' });
+      } else {
+        await addTask(data);
+        toast(`Thêm vào ${dayLabelOf(data.date)}, ${formatDMY(data.date)}`, { icon: '🌷' });
+      }
+      m.close();
+    });
   });
 
   m.body.querySelector('[data-act="cancel"]').onclick = () => m.close();
@@ -93,9 +122,16 @@ export function openTaskForm({ date = todayKey(), taskId = null, subjectId = nul
   if (isEdit) {
     m.body.querySelector('[data-act="delete"]').onclick = async () => {
       const ok = await confirmDialog({ title: 'Xóa nhiệm vụ này?', message: `"${escapeHtml(task.title)}" sẽ được bỏ khỏi kế hoạch.`, okText: 'Xóa', danger: true });
-      if (ok) { deleteTask(task.id); toast('Đã xóa nhiệm vụ', { icon: '🗑' }); m.close(); }
+      if (ok) save(async () => {
+        await deleteTask(task.id, task);
+        toast('Đã xóa nhiệm vụ', { icon: '🗑' });
+        m.close();
+      });
     };
-    m.body.querySelector('[data-act="toggle"]').onclick = () => { toggleTask(task.id); m.close(); };
+    m.body.querySelector('[data-act="toggle"]').onclick = () => save(async () => {
+      await toggleTask(task.id, task);
+      m.close();
+    });
     m.body.querySelector('[data-act="focus"]').onclick = () => {
       attachTask(task.id, task.subjectId);
       m.close();

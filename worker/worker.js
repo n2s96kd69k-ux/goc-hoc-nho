@@ -346,7 +346,7 @@ async function transactTask(db, authUid, input, clock=Date.now) {
   const after = wallet.balance + delta + bonuses;
   const earned = wallet.totalEarned + Math.max(0, delta) + bonuses;
   guard(after <= 1000000000 && earned <= 1000000000, 'balance-limit');
-  const result = {taskId, done: next.done, version: next.version, delta, weekBonus, streak, balance: after};
+  const result = {task: next, taskId, done: next.done, version: next.version, delta, weekBonus, streak, balance: after};
   if (changed) {
    rewards.write(now);
    tx.set(taskRef, next);

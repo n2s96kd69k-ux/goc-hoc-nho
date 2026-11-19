@@ -137,7 +137,7 @@ service cloud.firestore {
     // Canonical economy is server-owned. Admin SDK bypasses Rules;
     // administrators in a browser must use the authenticated server command too.
     match /users/{uid}/{bucket}/{id} {
-      allow read: if bucket in ['economy', 'economyOperations', 'ownedItems', 'focusSessions', 'studyDays']
+      allow read: if bucket in ['economy', 'economyOperations', 'ownedItems', 'focusSessions', 'studyDays', 'rewardTasks']
         && privateEconomyRead(uid);
       allow write: if false;
     }
