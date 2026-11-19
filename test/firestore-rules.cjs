@@ -239,6 +239,32 @@ test('Worker REST transactions serialize purchases, keep receipts and enforce ac
   assert.equal(granted.status, 200, JSON.stringify(granted));
   assert.deepEqual(await call(grant, 'admin-test-token'), granted);
 
+  const taskId = 'worker-task-1';
+  const create = {
+   type: 'task-create', taskId, operationId: 'worker-task-create-0001',
+   fields: {title: 'Ôn Toán', date: '2026-11-19'},
+  };
+  const created = await call(create);
+  assert.equal(created.status, 200, JSON.stringify(created));
+  assert.equal(created.body.result.task.done, false);
+  assert.deepEqual(await call(create), created);
+  const edit = {
+   type: 'task-edit', taskId, expectedVersion: 0, operationId: 'worker-task-edit-0001',
+   fields: {title: 'Ôn Hình học', date: '2026-11-20'},
+  };
+  assert.equal((await call({...edit, fields: {...edit.fields, coinGain: 50}})).body.error, 'invalid-task-fields');
+  assert.equal((await call(edit)).body.result.task.version, 1);
+  assert.equal((await call({...edit, operationId: 'worker-task-edit-0002'})).body.error, 'task-version-conflict');
+  const complete = {type: 'task-complete', taskId, expectedVersion: 1, operationId: 'worker-task-complete-0001'};
+  assert.equal((await call(complete)).body.result.balance, 55);
+  const remove = {type: 'task-delete', taskId, expectedVersion: 2, operationId: 'worker-task-delete-0001'};
+  const removed = await call(remove);
+  assert.equal(removed.status, 200, JSON.stringify(removed));
+  assert.equal(removed.body.result.task.title, undefined);
+  assert.deepEqual(await call(remove), removed);
+  assert.equal((await call({...create, operationId: 'worker-task-create-0002'})).body.error, 'task-id-in-use');
+  await assertFails(getDoc(doc(db, 'users/student/rewardTasks', taskId)));
+
   await env.withSecurityRulesDisabled(async context => {
    const privileged = context.firestore();
    await updateDoc(doc(privileged, 'users', 'admin'), {role: 'member'});
@@ -251,7 +277,7 @@ test('Worker REST transactions serialize purchases, keep receipts and enforce ac
  }
  await env.withSecurityRulesDisabled(async context => {
   const privileged = context.firestore();
-  assert.equal((await getDoc(doc(privileged, wallet.path))).data().balance, 50);
+  assert.equal((await getDoc(doc(privileged, wallet.path))).data().balance, 55);
   assert.equal((await getDocs(collection(privileged, 'adminLogs'))).size, 1);
  });
 });
