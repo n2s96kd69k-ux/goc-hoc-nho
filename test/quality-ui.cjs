@@ -47,7 +47,30 @@ const fixtureCloud=role=>`
   `}));
   const url='http://127.0.0.1:'+server.address().port;
   await page.route('https://fonts.**/**',r=>r.abort());
+  const deferredPages = [];
+  page.on('request', request => {
+    const path = new URL(request.url()).pathname;
+    if (/^\/js\/pages\/(admin|room|goals|stats)\.js$/.test(path)) deferredPages.push(path);
+  });
   await page.goto(url,{waitUntil:'domcontentloaded',timeout:15000});await page.waitForSelector('#settings-btn');
+  assert.deepEqual(deferredPages, []);
+  let releaseStats;
+  const delayedStats = new Promise(resolve => { releaseStats = resolve; });
+  await page.route('**/js/pages/stats.js', async route => {
+    await delayedStats;
+    return route.continue();
+  });
+  await page.evaluate(() => { location.hash = '/stats'; });
+  await page.locator('#main[aria-busy=true]').waitFor();
+  await page.evaluate(() => { location.hash = '/'; });
+  await page.locator('#today-bar').waitFor();
+  const statsResponse = page.waitForResponse(response => response.url().endsWith('/js/pages/stats.js'));
+  releaseStats();
+  await statsResponse;
+  await page.waitForFunction(() => document.querySelector('#today-bar') && !document.querySelector('#main').hasAttribute('aria-busy'));
+  assert.deepEqual(deferredPages, ['/js/pages/stats.js']);
+  console.log('PASS: cold overview skips unused pages and a delayed import does not replace the current route');
+
   await page.evaluate(async()=>{const {getState}=await import('/js/state.js');const {parseImportFile}=await import('/js/storage.js');parseImportFile(JSON.stringify({app:'goc-hoc-nho',data:getState()}));});
   await page.evaluate(async()=>{const {openModal}=await import('/js/components/modal.js');document.querySelector('#settings-btn').focus();window.testModal=openModal({title:'Kiểm tra',content:'<input aria-label="Test"><button id="last">Cuối</button>'});});
   await page.waitForFunction(()=>document.activeElement?.classList.contains('modal-close'));

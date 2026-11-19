@@ -4,7 +4,6 @@ import { exportAccountBackup } from './account-backup.js';
 import { startNotifications } from './notifications/data.js';
 import { initNotificationUI } from './notifications/ui.js';
 import { applyAdminCredits } from './sync.js';
-import { renderAdmin, disposeAdmin } from './pages/admin.js';
 // ===== Khởi động ứng dụng =====
 import { initState, subscribe, getState, syncCloudForUser, selectAccountState, update, retrySave } from './state.js';
 import { registerRoute, startRouter, onRoute, currentRoute } from './router.js';
@@ -17,17 +16,13 @@ import { pomodoroCompletePopup } from './components/reward.js';
 import { toast } from './components/toast.js';
 import { closeAllModals } from './components/modal.js';
 import { onCloudAuthChange, onAccountAccessChange, getAccountAccess, getCurrentUser, isCurrentAdmin } from './cloud.js';
-import { mmss } from './utils.js';
+import { mmss, timeOfDay } from './utils.js';
 
 import { patchTaskToggle } from './components/planner.js';
 import { renderOverview } from './pages/overview.js';
 import { renderWeek } from './pages/week.js';
 import { renderSubjects } from './pages/subjects.js';
 import { renderPomodoro, disposePomodoro } from './pages/pomodoro.js';
-import { renderRoom, disposeRoom } from './pages/room.js';
-import { timeOfDay } from './catBrain.js';
-import { renderStats } from './pages/stats.js';
-import { renderGoals } from './pages/goals.js';
 import { renderSettings } from './pages/settings.js';
 import { refreshUniversities } from './universities.js';
 
@@ -38,29 +33,39 @@ const PAGES = {
   '/week': renderWeek,
   '/subjects': renderSubjects,
   '/pomodoro': renderPomodoro,
-  '/room': renderRoom,
-  '/stats': renderStats,
-  '/goals': renderGoals,
   '/settings': renderSettings,
-  '/admin': renderAdmin,
 };
 
+const lazyPages = {
+  '/room': { load: () => import('./pages/room.js').then(({renderRoom, disposeRoom}) => ({render:renderRoom, dispose:disposeRoom})) },
+  '/stats': { load: () => import('./pages/stats.js').then(({renderStats}) => ({render:renderStats})) },
+  '/goals': { load: () => import('./pages/goals.js').then(({renderGoals}) => ({render:renderGoals})) },
+  '/admin': { load: () => import('./pages/admin.js').then(({renderAdmin, disposeAdmin}) => ({render:renderAdmin, dispose:disposeAdmin})) },
+};
+
+let pendingRoute;
 let lastPath = null;
+
+function loadPage(page) {
+  page.loading ||= page.load().then(module => { page.module = module; return module; })
+    .finally(() => { page.loading = null; });
+  return page.loading;
+}
 function renderCurrentPage(params) {
   const route = currentRoute();
-  const fn = PAGES[route.path] || renderOverview;
+  const lazy = lazyPages[route.path];
   const el = main();
   document.body.classList.toggle('admin-mode', route.path === '/admin');
-  if (lastPath === '/admin' && route.path !== '/admin') disposeAdmin();
-  if (lastPath === '/room' && route.path !== '/room') disposeRoom();
+  if (lastPath !== route.path) lazyPages[lastPath]?.module?.dispose?.();
   if (lastPath === '/pomodoro' && route.path !== '/pomodoro') disposePomodoro();
   const isNav = lastPath !== route.path;
   const focusPage = isNav && lastPath !== null;
   if (focusPage) closeSidebarDrawer({restoreFocus:false});
   lastPath = route.path;
-  const paint = () => {
-    if (currentRoute()?.path !== route.path) return;
+  const paint = fn => {
+    if (currentRoute() !== route) return;
     el.classList.remove('page-leave');
+    el.removeAttribute('aria-busy');
     fn(el, params || route.params);
     if (focusPage) el.focus({preventScroll:true});
     // Chỉ animate cả trang khi chuyển route. Tick nhiệm vụ không được giật cả bảng tuần.
@@ -68,11 +73,28 @@ function renderCurrentPage(params) {
     el.classList.remove('page-enter'); void el.offsetWidth;
     el.classList.add('page-enter');
   };
+  if (lazy && !lazy.module) {
+    if (pendingRoute === route) return;
+    pendingRoute = route;
+    el.classList.remove('page-leave');
+    el.setAttribute('aria-busy', 'true');
+    el.innerHTML = '<p role="status">Đang tải trang…</p>';
+    loadPage(lazy).then(module => paint(module.render)).catch(() => {
+      if (currentRoute() !== route) return;
+      el.removeAttribute('aria-busy');
+      el.innerHTML = '<p role="status">Chưa tải được trang. Kiểm tra kết nối rồi tải lại nhé.</p><button class="btn btn-soft" type="button" id="reload-route">Tải lại trang</button>';
+      el.querySelector('#reload-route').onclick = () => location.reload();
+      if (focusPage) el.focus({preventScroll:true});
+    }).finally(() => { if (pendingRoute === route) pendingRoute = null; });
+    return;
+  }
+
+  const render = lazy?.module?.render || PAGES[route.path] || renderOverview;
   // Chuyển trang: trang cũ mờ + thu nhất nhẹ → trang mới materialize
   if (isNav && el.children.length && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
     el.classList.add('page-leave');
-    setTimeout(paint, 140);
-  } else paint();
+    setTimeout(() => paint(render), 140);
+  } else paint(render);
 }
 
 /** Khi state đổi: vẽ lại phần cần thiết */
@@ -149,7 +171,7 @@ function setupCloudSync() {
       closeAllModals();
       renderHeader();
       if (currentRoute()?.path === '/admin') {
-        disposeAdmin();
+        lazyPages['/admin'].module?.dispose();
         main().replaceChildren();
         location.hash = '/';
       }
@@ -209,7 +231,7 @@ function boot() {
   startWalletAccount();
   setupMascotSync();
 
-  for (const p of Object.keys(PAGES)) registerRoute(p, (params) => renderCurrentPage(params));
+  for (const p of [...Object.keys(PAGES), ...Object.keys(lazyPages)]) registerRoute(p, (params) => renderCurrentPage(params));
   onRoute(() => {
     renderSidebar();
     renderBottomNav();
@@ -227,7 +249,7 @@ function boot() {
   onAccountAccessChange(access => {
     renderSidebar();
     if (currentRoute()?.path === '/admin' && (!access.uid || access.ready || access.status === 'banned') && !isCurrentAdmin()) {
-      disposeAdmin(); main().replaceChildren(); location.hash = '/';
+      lazyPages['/admin'].module?.dispose(); main().replaceChildren(); location.hash = '/';
     }
     if (access.ready && access.economyVersion !== 1 && access.uid && getState()._syncUid === access.uid) {
       const adjusted = applyAdminCredits(getState(), access.adminCredits);

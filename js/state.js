@@ -3,7 +3,7 @@ import { mergeState, applyAdminCredits, readSyncBase, writeSyncBase } from './sy
 import { loadState, saveState } from './storage.js';
 import { createInitialState, isSampleTask, SIDEBAR_DEFAULT } from './seed.js';
 import { debounce, todayKey, startOfWeek, toKey } from './utils.js';
-import { migrateRoom } from './room.js';
+import { migrateRoom } from './room-migration.js';
 import { getCurrentUser, loadCloudState, saveCloudState } from './cloud.js';
 
 let state = null;

@@ -1,3 +1,5 @@
+import { timeOfDay } from './utils.js';
+export { timeOfDay } from './utils.js';
 // ===== CAT BRAIN — mèo đọc roomState và quyết định hành vi =====
 // Mèo KHÔNG hard-code vị trí. Anchor được tính từ item thực sự đang đặt trong phòng.
 // Vòng lặp: chọn mục tiêu → walk tới anchor → hành vi tại đó → sau một lúc chọn mục tiêu khác.
@@ -10,14 +12,6 @@ import { ROOM } from './placement.js';
 export const CAT_W = 14; // % chiều rộng phòng (mèo là 14 × ~15.4 vì tỉ lệ 100:110)
 
 /** Buổi trong ngày: morning | day | afternoon | evening | night */
-export function timeOfDay(h = new Date().getHours()) {
-  if (h >= 5 && h < 9) return 'morning';
-  if (h >= 9 && h < 15) return 'day';
-  if (h >= 15 && h < 18) return 'afternoon';
-  if (h >= 18 && h < 22) return 'evening';
-  return 'night';
-}
-
 /**
  * Danh sách anchor mèo có thể đến, sinh từ item đang đặt.
  * Mỗi anchor: { id, kind, x, y, state, item }

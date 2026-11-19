@@ -110,3 +110,12 @@ export const PRIORITIES = [
   { id: 'medium', label: 'Bình thường', dot: '🟡' },
   { id: 'high', label: 'Quan trọng', dot: '🌷' },
 ];
+
+
+export function timeOfDay(h = new Date().getHours()) {
+  if (h >= 5 && h < 9) return 'morning';
+  if (h >= 9 && h < 15) return 'day';
+  if (h >= 15 && h < 18) return 'afternoon';
+  if (h >= 18 && h < 22) return 'evening';
+  return 'night';
+}
