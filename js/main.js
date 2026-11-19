@@ -10,7 +10,7 @@ import { registerRoute, startRouter, onRoute, currentRoute } from './router.js';
 import { renderHeader, refreshHeaderStats, refreshHeaderAuth, setHeaderMascotState } from './components/header.js';
 import { renderSidebar, renderBottomNav, setSidebarMascotState } from './components/sidebar.js';
 import { mascot } from './mascot.js';
-import { onTimer, getTimer, restoreTimer, pause } from './timer.js';
+import { onTimer, getTimer, restoreTimer, startTimerAccount } from './timer.js';
 import { recomputeStreak } from './gamification.js';
 import { pomodoroCompletePopup } from './components/reward.js';
 import { toast } from './components/toast.js';
@@ -115,7 +115,11 @@ function setupTimerPill() {
     if (show) pill.innerHTML = `<span>${tm.mode === 'focus' ? '🍅' : '☕'}</span><strong>${mmss(tm.remaining)}</strong>${tm.status === 'paused' ? '<small>tạm dừng</small>' : ''}`;
   });
   document.addEventListener('pomodoro:complete', (e) => {
-    if (e.detail.mode === 'focus') pomodoroCompletePopup(e.detail.minutes, e.detail.coins);
+    if (e.detail.mode === 'focus') {
+      pomodoroCompletePopup(e.detail.minutes, e.detail.coins);
+      const firstAward = e.detail.streakEvents?.[0];
+      if (firstAward) toast(`Bạn nhận thêm ${e.detail.streakEvents.reduce((sum, event) => sum + event.coins, 0)} xu từ chuỗi học 🌷`, { icon: '🔥' });
+    }
   });
   pill.onclick = () => { location.hash = '/pomodoro'; };
   onRoute(() => {
@@ -186,6 +190,7 @@ function boot() {
   });
   subscribe(onStateChange);
   setupTimerPill();
+  startTimerAccount();
   setupCloudSync();
   initNotificationUI();
   startNotifications();
@@ -205,7 +210,6 @@ function boot() {
     }
     if (access.status === 'banned' && bannedNoticeUid !== access.uid) {
       bannedNoticeUid = access.uid;
-      pause();
       toast('Tài khoản đã bị khóa truy cập dữ liệu trên máy chủ.', { kind: 'error' });
     }
     if (lastRole !== access.role && currentRoute()?.path === '/goals') renderCurrentPage();

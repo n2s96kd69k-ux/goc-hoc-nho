@@ -4,8 +4,17 @@ import { todayKey } from './utils.js';
 import { pomodoroReward, recomputeStreak } from './gamification.js';
 import { sounds } from './sounds.js';
 import { mascot } from './mascot.js';
+import { getCurrentUser } from './cloud.js';
+import { walletMode } from './wallet-account.js';
+import { focusSession, sendFocus, startFocusAccount, subscribeFocus } from './focus-account.js';
 
 const listeners = new Set();
+let accountUser;
+let accountMode;
+let serverId;
+let inFlight;
+let retryAt = 0;
+let context = 0;
 
 const timer = {
   mode: 'focus',        // 'focus' | 'break'
@@ -28,15 +37,20 @@ function sessionSnapshot() {
   return session;
 }
 function emit(evt = 'tick') {
-  if (evt !== 'tick') update(s => { s.timer.session = sessionSnapshot(); }, { silent: true, type: 'timer-session' });
+  if (evt !== 'tick' && walletMode() === 'legacy' && (!getState()._syncUid || getState()._syncUid === getCurrentUser()?.uid)) update(s => { s.timer.session = sessionSnapshot(); }, { silent: true, type: 'timer-session' });
   for (const fn of listeners) fn(timer, evt);
 }
 
 /** Restore from the same persisted state as study totals and rewards. */
 export function restoreTimer() {
+  if (walletMode() !== 'legacy') {
+    setupDurations();
+    return;
+  }
   clearInterval(timer.interval);
   const saved = getState().timer.session;
-  const valid = saved && ['focus', 'break'].includes(saved.mode)
+  const owner = getState()._syncUid;
+  const valid = (!owner || owner === getCurrentUser()?.uid) && saved && ['focus', 'break'].includes(saved.mode)
     && ['running', 'paused', 'idle'].includes(saved.status)
     && Number.isFinite(saved.duration) && saved.duration > 0
     && Number.isFinite(saved.remaining) && saved.remaining >= 0
@@ -60,6 +74,109 @@ export function restoreTimer() {
 }
 subscribe((s, meta) => { if (meta.type === 'replace') restoreTimer(); });
 
+export function startTimerAccount() {
+  subscribeFocus(session => {
+    const user = getCurrentUser();
+    const mode = walletMode();
+    if (user !== accountUser || mode !== accountMode) {
+      accountUser = user;
+      accountMode = mode;
+      context++;
+      inFlight = null;
+      serverId = null;
+      retryAt = 0;
+      clearInterval(timer.interval);
+      Object.assign(timer, { status: 'idle', mode: 'focus', taskId: null, subjectId: null,
+        sessionId: null, sessionDate: null, endAt: null, pending: false, error: '' });
+      if (mode === 'legacy') {
+        restoreTimer();
+        return;
+      }
+      mascot.setState('idle');
+      setupDurations();
+    }
+    if (mode !== 'server') return;
+    if (!session || session.expiresAt <= Date.now()) {
+      if (session === undefined && serverId) return;
+      if (serverId) {
+        serverId = null;
+        clearInterval(timer.interval);
+        Object.assign(timer, { status: 'idle', sessionId: null, endAt: null });
+        mascot.setState('idle');
+        setupDurations();
+      }
+      emit('server-session');
+      return;
+    }
+    if (serverId !== session.id) retryAt = 0;
+    serverId = session.id;
+    const remainingMs = Math.max(0, session.durationMs - session.elapsedMs);
+    const endAt = session.status === 'running' ? session.resumedAt + remainingMs : null;
+    clearInterval(timer.interval);
+    Object.assign(timer, {
+      status: session.status, mode: 'focus', sessionId: session.id, sessionDate: session.date,
+      taskId: session.taskId ?? null, subjectId: session.subjectId ?? null, endAt,
+      duration: session.durationMs / 1000,
+      remaining: Math.max(0, Math.ceil((endAt === null ? remainingMs : endAt - Date.now()) / 1000)),
+    });
+    mascot.setState(session.status === 'running' ? 'focus' : 'idle');
+    if (session.status === 'running') timer.interval = setInterval(tick, 250);
+    emit('server-session');
+  });
+  startFocusAccount();
+}
+
+export function timerControlsReady() {
+  const mode = walletMode();
+  return mode === 'legacy' || (mode === 'server' && focusSession() !== undefined);
+}
+
+async function runFocus(type, options) {
+  if (inFlight) return;
+  const owner = context;
+  inFlight = type;
+  timer.pending = true;
+  timer.error = '';
+  emit('server-command');
+  try {
+    const result = await sendFocus(type, options);
+    if (owner !== context || walletMode() !== 'server') return;
+    if (result.status === 'completed') {
+      if (serverId === options.sessionId || !serverId) {
+        serverId = null;
+        clearInterval(timer.interval);
+        Object.assign(timer, { status: 'idle', mode: 'break', sessionId: null, endAt: null });
+        setupDurations();
+      }
+      sounds.ting();
+      mascot.react('celebrate');
+      document.dispatchEvent(new CustomEvent('pomodoro:complete', { detail: {
+        mode: 'focus', minutes: result.reward, coins: result.reward, streakEvents: result.streak?.events || [],
+      } }));
+    }
+  } catch (error) {
+    if (owner !== context) return;
+    retryAt = Date.now() + (error.code === 'focus-too-early' ? 3000 : 15000);
+    if (error.code !== 'focus-too-early') timer.error = error.message;
+    if (type === 'focus-complete' && error.code === 'session-expired') {
+      serverId = null;
+      clearInterval(timer.interval);
+      Object.assign(timer, { status: 'idle', sessionId: null, endAt: null });
+      setupDurations();
+    }
+  } finally {
+    if (owner === context) {
+      inFlight = null;
+      timer.pending = false;
+      emit('server-command');
+    }
+  }
+}
+
+function activeFocusOptions(session) {
+  return { sessionId: session.id, expectedRevision: session.revision ?? 0 };
+}
+
 export function setupDurations() {
   const s = getState().settings;
   if (timer.status === 'idle') {
@@ -70,6 +187,7 @@ export function setupDurations() {
 }
 
 export function setPreset(focus, brk) {
+  if (walletMode() !== 'legacy' && (timer.pending || serverId)) return;
   update((s) => { s.settings.focusMinutes = focus; s.settings.breakMinutes = brk; }, { type: 'settings' });
   timer.mode = 'focus';
   timer.status = 'idle';
@@ -78,20 +196,31 @@ export function setPreset(focus, brk) {
 }
 
 export function setMode(mode) {
-  if (timer.status === 'running') return;
+  if (timer.status === 'running' || (walletMode() !== 'legacy' && (timer.pending || serverId))) return;
   timer.mode = mode;
   timer.status = 'idle';
   setupDurations();
 }
 
 export function attachTask(taskId, subjectId) {
+  if (walletMode() !== 'legacy' && (timer.pending || serverId)) return;
   timer.taskId = taskId || null;
   timer.subjectId = subjectId || null;
   emit('task');
 }
 
 export function start() {
-  if (timer.status === 'running') return;
+  if (timer.status === 'running' || !timerControlsReady()) return;
+  if (walletMode() === 'server' && timer.mode === 'focus') {
+    const session = focusSession();
+    if (session && session.expiresAt > Date.now()) {
+      if (session.status === 'paused') return runFocus('focus-resume', activeFocusOptions(session));
+      return;
+    }
+    return runFocus('focus-start', {
+      minutes: getState().settings.focusMinutes, taskId: timer.taskId, subjectId: timer.subjectId,
+    });
+  }
   if (timer.status === 'idle') {
     setupDurations();
     timer.sessionId = globalThis.crypto.randomUUID();
@@ -107,7 +236,12 @@ export function start() {
 }
 
 export function pause() {
-  if (timer.status !== 'running') return;
+  if (timer.status !== 'running' || !timerControlsReady()) return;
+  if (walletMode() === 'server' && timer.mode === 'focus') {
+    const session = focusSession();
+    if (session?.status === 'running') return runFocus('focus-pause', activeFocusOptions(session));
+    return;
+  }
   timer.remaining = Math.max(0, Math.round((timer.endAt - Date.now()) / 1000));
   timer.status = 'paused';
   clearInterval(timer.interval);
@@ -117,6 +251,12 @@ export function pause() {
 }
 
 export function reset() {
+  if (!timerControlsReady()) return;
+  if (walletMode() === 'server' && serverId) {
+    const session = focusSession();
+    if (session) return runFocus('focus-cancel', activeFocusOptions(session));
+    return;
+  }
   clearInterval(timer.interval);
   timer.status = 'idle';
   setupDurations();
@@ -126,15 +266,24 @@ export function reset() {
 }
 
 function tick() {
-  const left = Math.max(0, Math.round((timer.endAt - Date.now()) / 1000));
+  const left = Math.max(0, Math.ceil((timer.endAt - Date.now()) / 1000));
   if (left !== timer.remaining) {
     timer.remaining = left;
     emit('tick');
   }
-  if (left <= 0) complete();
+  if (left > 0) return;
+  if (walletMode() === 'server' && timer.mode === 'focus') {
+    const session = focusSession();
+    if (session?.id === serverId && !inFlight && Date.now() >= retryAt) {
+      return runFocus('focus-complete', { sessionId: session.id });
+    }
+    return;
+  }
+  if (walletMode() !== 'unavailable') complete();
 }
 
 function complete() {
+  if (timer.mode === 'focus' && walletMode() !== 'legacy') return;
   clearInterval(timer.interval);
   timer.status = 'idle';
   const finishedMode = timer.mode;

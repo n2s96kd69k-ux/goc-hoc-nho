@@ -16,6 +16,10 @@ const messages = {
   'task-not-found': 'Nhiệm vụ đã bị xóa hoặc không còn tồn tại.',
   'invalid-task-fields': 'Hãy kiểm tra lại ngày, tên và thời lượng nhiệm vụ.',
   'undo-insufficient-funds': 'Số dư hiện tại chưa đủ để hoàn lại xu của nhiệm vụ này.',
+  'active-session-exists': 'Đang có một phiên tập trung trên tài khoản này.',
+  'focus-version-conflict': 'Phiên tập trung đã thay đổi trên thiết bị khác.',
+  'session-expired': 'Phiên tập trung đã hết hạn. Hãy bắt đầu phiên mới.',
+  'session-not-active': 'Phiên tập trung đã kết thúc trên thiết bị khác.',
   'not-found': 'Máy chủ ví chưa sẵn sàng.',
 };
 const temporaryStatus = new Set([502, 503, 504]);

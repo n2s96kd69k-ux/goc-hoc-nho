@@ -14,12 +14,11 @@ export function startWalletAccount() {
   const connect = access => {
     const eligible = access.ready && access.economyVersion === 1 && access.status !== 'banned';
     if (eligible && account?.uid === access.uid) return;
-    if (!eligible && !account) return;
     account?.stop.forEach(stop => stop());
     account = null;
     if (eligible) {
       const db = firebaseDb();
-      const current = { uid: access.uid, balance: null, owned: new Map(), catalog: new Map(), tasks: null, stop: [] };
+      const current = { uid: access.uid, balance: null, activeFocusId: undefined, owned: new Map(), catalog: new Map(), tasks: null, stop: [] };
       account = current;
       const watch = (ref, apply, clear) => onSnapshot(ref, snapshot => {
         if (account !== current) return;
@@ -49,7 +48,11 @@ export function startWalletAccount() {
           const wallet = snapshot.data();
           current.balance = wallet?.version === 1 && Number.isSafeInteger(wallet.balance) && wallet.balance >= 0
             ? wallet.balance : null;
-        }, () => { current.balance = null; }),
+          current.activeFocusId = current.balance === null ? undefined : (wallet.activeSessionId ?? null);
+        }, () => {
+          current.balance = null;
+          current.activeFocusId = undefined;
+        }),
         watch(collection(db, 'users', access.uid, 'ownedItems'), snapshot => {
           current.owned = new Map(snapshot.docs.flatMap(row => {
             const { quantity } = row.data();
@@ -110,6 +113,11 @@ export function applyServerTask(uid, task) {
   const wallet = currentWallet();
   if (wallet?.uid !== uid || !wallet.tasks) return;
   if (setTaskRow(wallet.tasks, task)) publishTasks();
+}
+
+export function activeFocusId() {
+  const id = currentWallet()?.activeFocusId;
+  return id === null || (typeof id === 'string' && /^[a-zA-Z0-9_-]{16,128}$/.test(id)) ? id : undefined;
 }
 
 export function displayedBalance(legacy) {

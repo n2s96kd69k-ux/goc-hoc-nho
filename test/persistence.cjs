@@ -22,7 +22,7 @@ test('different fields on the same task merge; local wins same-field conflict',(
 });
 function timerHarness(state, clock={now:100000}) {
  const context=vm.createContext({
-  getState:()=>state,update:f=>f(state),subscribe:()=>{},
+  getState:()=>state,update:f=>f(state),subscribe:()=>{},walletMode:()=> 'legacy',getCurrentUser:()=>null,
   dayRecord:k=>state.days[k] ||= {minutes:0,pomodoros:0},todayKey:()=>clock.day || '2026-11-16',
   pomodoroReward:m=>m,recomputeStreak:()=>{},sounds:{ting(){}},mascot:{setState(){},react(){}},
   Date:{now:()=>clock.now},globalThis:{crypto:{randomUUID:()=>String(clock.now)}},

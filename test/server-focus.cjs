@@ -41,3 +41,15 @@ test('starting a new session releases an expired session without awarding coins'
  await assert.rejects(f.call('focus-complete'), /session-not-active/);
  assert.equal(f.rows.get('users/a/economy/wallet').balance, 50);
 });
+
+test('stale pause cannot interrupt a session that was paused and resumed on another device', async () => {
+ const f = fixture();
+ await f.call('focus-start', {minutes: 25, taskId: 'task-math'});
+ await f.call('focus-pause', {expectedRevision: 0});
+ await f.call('focus-resume', {expectedRevision: 1});
+ await assert.rejects(f.call('focus-pause', {expectedRevision: 0}), /focus-version-conflict/);
+ const session = f.rows.get('users/a/focusSessions/session-1234567890');
+ assert.equal(session.status, 'running');
+ assert.equal(session.revision, 2);
+ assert.equal(session.taskId, 'task-math');
+});

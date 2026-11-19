@@ -10,7 +10,11 @@ async function transactFocus(db, authUid, input, clock = Date.now) {
  if(type==='focus-start')requireValue(Number.isInteger(minutes)&&minutes>=1&&minutes<=180,'invalid-duration');
  const subjectId=type==='focus-start'?(input.subjectId??null):null;
  requireValue(subjectId===null||(typeof subjectId==='string'&&/^[A-Za-z0-9_-]{1,100}$/.test(subjectId)),'invalid-subject');
- const fingerprint=JSON.stringify({type,sessionId:input.sessionId,minutes,subjectId});
+ const taskId=type==='focus-start'?(input.taskId??null):null;
+ requireValue(taskId===null||(typeof taskId==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(taskId)),'invalid-operation');
+ const expectedRevision = input.expectedRevision;
+ if (expectedRevision !== undefined) requireValue(Number.isSafeInteger(expectedRevision) && expectedRevision >= 0, 'invalid-operation');
+ const fingerprint=JSON.stringify({type,sessionId:input.sessionId,minutes,subjectId,...(taskId ? {taskId} : {}),expectedRevision});
  const user=db.doc(`users/${authUid}`),wallet=db.doc(`users/${authUid}/economy/wallet`),session=db.doc(`users/${authUid}/focusSessions/${input.sessionId}`),receipt=db.doc(`users/${authUid}/economyOperations/${authUid}_${input.operationId}`);
  return db.runTransaction(async tx=>{
   const now=clock(),u=await tx.get(user);requireValue(u.exists&&u.data().status!=='banned','access-denied');
@@ -33,7 +37,7 @@ async function transactFocus(db, authUid, input, clock = Date.now) {
      tx.set(activeRef, {...previous, status: 'cancelled', cancellationReason: 'expired', cancelledAt: now});
     }
    }
-   next={status:'running',durationMs:minutes*60000,elapsedMs:0,resumedAt:now,createdAt:now,expiresAt:now+86400000,subjectId,date:studyDate(now)};
+   next={status:'running',durationMs:minutes*60000,elapsedMs:0,resumedAt:now,createdAt:now,expiresAt:now+86400000,subjectId,taskId,revision:0,date:studyDate(now)};
    result={sessionId:input.sessionId,status:'running',remainingSeconds:minutes*60};
   }else{
    requireValue(s.exists,'session-not-found');next={...s.data()};
@@ -43,6 +47,8 @@ async function transactFocus(db, authUid, input, clock = Date.now) {
    }
    requireValue(w.data().activeSessionId===input.sessionId,'session-not-active');
    requireValue(['running','paused'].includes(next.status),'session-closed');
+   if (expectedRevision !== undefined) requireValue((next.revision ?? 0) === expectedRevision,'focus-version-conflict');
+   next.revision = (next.revision ?? 0) + 1;
    if(type!=='focus-cancel')requireValue(now<=next.expiresAt,'session-expired');
    const elapsed=next.elapsedMs+(next.status==='running'?Math.max(0,now-next.resumedAt):0);
    if(type==='focus-complete'){

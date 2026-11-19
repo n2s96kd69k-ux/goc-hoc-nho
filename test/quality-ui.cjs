@@ -4,12 +4,14 @@ const root=path.resolve(__dirname,'..');
 const server=http.createServer((req,res)=>{const p=path.resolve(root,'.'+(req.url.split('?')[0]==='/'?'/index.html':req.url.split('?')[0]));if(!p.startsWith(root+'/'))return res.writeHead(403).end();fs.readFile(p,(e,d)=>{if(e)return res.writeHead(404).end();res.setHeader('Content-Type',p.endsWith('.js')?'application/javascript':p.endsWith('.css')?'text/css':'text/html');res.end(d);});});
 const fixtureCloud=role=>`
  let access={uid:'admin',role:'${role}',status:'active',ready:true,owner:true,adminCredits:0};const listeners=new Set();
- const user={uid:'admin',email:'admin@example.test',displayName:'Admin',getIdToken:async()=> 'student-test-token'};
+ let user={uid:'admin',email:'admin@example.test',displayName:'Admin',getIdToken:async()=> 'student-test-token'};
  export const OWNER_UID='admin';export const OWNER_ID='GHN-776J9W';export const firebaseDb=()=>({});export const getCurrentUser=()=>user;
  export const accountId=()=> 'GHN-ADMIN1';export const isCurrentAdmin=()=>access.role==='admin';export const getAccountAccess=()=>access;
  export const requireAdmin=async()=>isCurrentAdmin()?user:null;
  export function onAccountAccessChange(fn){listeners.add(fn);setTimeout(()=>fn(access),0);return ()=>listeners.delete(fn);}
  window.__useServerWallet=()=>{access={...access,economyVersion:1};listeners.forEach(fn=>fn(access));};
+ window.__switchWalletUser=()=>{user={...user,uid:'other'};access={...access,uid:'other'};listeners.forEach(fn=>fn(access));};
+
  export function onCloudAuthChange(fn){setTimeout(()=>fn(user),0);return ()=>{};}
  export const loadCloudState=async()=>null;export const saveCloudState=async()=>{if(window.__failCloud)throw Error('offline');return true;};
  export const loginWithGoogle=async()=>user;export const loginWithEmail=async()=>user;export const registerWithEmail=async()=>user;export const logoutCloud=async()=>{};export const friendlyAuthError=e=>e.message;
@@ -31,8 +33,12 @@ const fixtureCloud=role=>`
       serverTimestamp=()=>({}),getDocs=async()=>({docs:[]}),setDoc=async()=>{};
     export function onSnapshot(ref,fn){
       const rows=window.__walletRows;
+      const subscriptions = window.__walletListeners ||= new Map();
+      if (!subscriptions.has(ref)) subscriptions.set(ref, new Set());
+      const listeners = subscriptions.get(ref);
+      listeners.add(fn);
       if(rows&&Object.hasOwn(rows,ref))queueMicrotask(()=>fn(rows[ref]()));
-      return ()=>{};
+      return ()=>listeners.delete(fn);
     }
   `}));
   const url='http://127.0.0.1:'+server.address().port;
@@ -133,5 +139,66 @@ const fixtureCloud=role=>`
   assert.equal(taskCalls[3].expectedVersion, 0);
   assert.deepEqual(errors, []);
   console.log('PASS: task creation after lost response and reload, completion from confirmed server row');
+  const focusCalls = [];
+  const balanceBeforeFocus = await page.evaluate(async () => (await import('/js/state.js')).getState().wallet.coins);
+  await page.unroute('https://dark-tooth-7030.n2s96kd69k.workers.dev/api/economy');
+  const actor = 'users/admin';
+  const walletPath = actor + '/economy/wallet';
+  async function pushRow(ref, row) {
+    await page.evaluate(([ref, row]) => {
+      window.__walletRows[ref] = () => ({data: () => row});
+      window.__walletListeners.get(ref)?.forEach(fn => fn(window.__walletRows[ref]()));
+    }, [ref, row]);
+  }
+  await page.route('https://dark-tooth-7030.n2s96kd69k.workers.dev/api/economy', async route => {
+    const command = route.request().postDataJSON();
+    focusCalls.push(command);
+    if (focusCalls.length <= 2) return route.abort();
+    const result = command.type === 'focus-complete'
+      ? {status:'completed', reward:25, streak:{events:[]}}
+      : {status:'running'};
+    await route.fulfill({json:{ok:true,result}});
+  });
+  await pushRow(walletPath, {version:1,balance:100});
+  await page.evaluate(() => { location.hash = '/pomodoro'; });
+  await page.locator('#pomo-start').click();
+  await page.locator('#pomo-feedback').filter({hasText:'Không nhận được phản hồi'}).waitFor();
+  await page.locator('#pomo-start').click();
+  await page.waitForFunction(() => document.querySelector('#pomo-feedback').hidden);
+  assert.deepEqual(focusCalls[0], focusCalls[2]);
+  const sessionId = focusCalls[0].sessionId;
+  const sessionPath = actor + '/focusSessions/' + sessionId;
+  const session = {status:'running', durationMs:1500000, elapsedMs:0, resumedAt:Date.now(),
+    expiresAt:Date.now() + 86400000, revision:0};
+  await pushRow(walletPath, {version:1,balance:100,activeSessionId:sessionId});
+  await pushRow(sessionPath, session);
+  await page.locator('#pomo-state').getByText('Đang tập trung…').waitFor();
+  await page.locator('#pomo-pause').click();
+  await page.waitForFunction(() => document.querySelector('#pomo-feedback').hidden);
+  assert.equal(focusCalls[3].type, 'focus-pause');
+  assert.equal(focusCalls[3].expectedRevision, 0);
+  await pushRow(sessionPath, {...session,status:'paused',elapsedMs:600000,revision:1});
+  await page.locator('#pomo-time').getByText('15:00').waitFor();
+  await page.locator('#pomo-start').click();
+  await page.waitForFunction(() => document.querySelector('#pomo-feedback').hidden);
+  assert.equal(focusCalls[4].type, 'focus-resume');
+  assert.equal(focusCalls[4].expectedRevision, 1);
+  await pushRow(sessionPath, {...session,resumedAt:Date.now() - 1500001,revision:2});
+  await page.locator('#pomo-state').getByText('Nghỉ ngơi').waitFor();
+  assert.equal(focusCalls[5].type, 'focus-complete');
+  const legacyBalance = await page.evaluate(async () => (await import('/js/state.js')).getState().wallet.coins);
+  assert.equal(legacyBalance, balanceBeforeFocus);
+  const remoteId = 'second-device-session-0001';
+  await pushRow(actor + '/focusSessions/' + remoteId, {...session,resumedAt:Date.now()});
+  await pushRow(walletPath, {version:1,balance:125,activeSessionId:remoteId});
+  await page.locator('#pomo-state').getByText('Đang tập trung…').waitFor();
+  await page.evaluate(() => window.__switchWalletUser());
+  await pushRow(actor + '/focusSessions/' + remoteId, {...session,status:'paused',elapsedMs:600000});
+  await page.locator('#pomo-feedback').filter({hasText:'Chưa tải được phiên tập trung'}).waitFor();
+  assert.equal(await page.locator('#pomo-pause').isDisabled(), true);
+
+  assert.deepEqual(errors, []);
+  console.log('PASS: focus retry, server snapshots for pause/resume, account switch, and completion without local wallet credit');
+
  }finally{await browser.close();await new Promise(r=>server.close(r));}
 })().catch(e=>{console.error(e);process.exitCode=1;});

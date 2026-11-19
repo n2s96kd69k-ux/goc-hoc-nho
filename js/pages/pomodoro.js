@@ -1,11 +1,12 @@
 // ===== Trang /pomodoro =====
 import { getState } from '../state.js';
 import { mmss, todayKey, escapeHtml, minutesToText } from '../utils.js';
-import { getTimer, onTimer, start, pause, reset, setPreset, setMode, attachTask } from '../timer.js';
+import { getTimer, onTimer, timerControlsReady, start, pause, reset, setPreset, setMode, attachTask } from '../timer.js';
 import { tasksOfDay, getTask } from '../tasks.js';
 import { getSubject } from '../subjects.js';
 import { mascotSVG, mascot } from '../mascot.js';
 import { pomodorosOfDay, minutesOfDay } from '../statistics.js';
+import { walletMode } from '../wallet-account.js';
 import { openModal } from '../components/modal.js';
 
 let unsub = null;
@@ -44,6 +45,7 @@ export function renderPomodoro(root) {
             <button type="button" class="btn btn-ghost" id="pomo-pause">⏸ TẠM DỪNG</button>
             <button type="button" class="btn btn-ghost" id="pomo-reset">↻ ĐẶT LẠI</button>
           </div>
+          <p id="pomo-feedback" class="muted" role="status" hidden></p>
           <div class="pomo-presets">
             ${presets.map(([f, b]) => `<button type="button" class="chip ${s.settings.focusMinutes === f && s.settings.breakMinutes === b ? 'active' : ''}" data-preset="${f},${b}">${f} / ${b}</button>`).join('')}
             <button type="button" class="chip ${isPreset ? '' : 'active'}" id="pomo-custom">Tùy chỉnh${isPreset ? '' : ` (${s.settings.focusMinutes}/${s.settings.breakMinutes})`}</button>
@@ -75,6 +77,11 @@ export function renderPomodoro(root) {
   const stateEl = root.querySelector('#pomo-state');
   const startBtn = root.querySelector('#pomo-start');
   const pauseBtn = root.querySelector('#pomo-pause');
+  const feedback = root.querySelector('#pomo-feedback');
+  const resetBtn = root.querySelector('#pomo-reset');
+  const customBtn = root.querySelector('#pomo-custom');
+  const taskSelect = root.querySelector('#pomo-task');
+  const configuration = [...root.querySelectorAll('[data-mode], [data-preset]'), customBtn, taskSelect];
   const C = 552.9;
 
   const paint = () => {
@@ -85,8 +92,21 @@ export function renderPomodoro(root) {
     stateEl.textContent = tmr.status === 'running' ? (tmr.mode === 'focus' ? 'Đang tập trung…' : 'Đang nghỉ ☕')
       : tmr.status === 'paused' ? 'Tạm dừng' : (tmr.mode === 'focus' ? 'Tập trung' : 'Nghỉ ngơi');
     startBtn.textContent = tmr.status === 'running' ? '▶ ĐANG CHẠY' : tmr.status === 'paused' ? '▶ TIẾP TỤC' : (tmr.mode === 'focus' ? '▶ BẮT ĐẦU TẬP TRUNG' : '▶ BẮT ĐẦU NGHỈ');
-    startBtn.disabled = tmr.status === 'running';
-    pauseBtn.disabled = tmr.status !== 'running';
+    const available = timerControlsReady();
+    const disabled = !available || tmr.pending;
+    startBtn.disabled = disabled || tmr.status === 'running';
+    pauseBtn.disabled = disabled || tmr.status !== 'running';
+    resetBtn.disabled = disabled;
+    const active = walletMode() === 'server' && tmr.mode === 'focus' && tmr.status !== 'idle';
+    for (const control of configuration) control.disabled = disabled || active;
+    taskSelect.value = tmr.taskId || '';
+    const status = tmr.error || (tmr.pending ? 'Đang đồng bộ phiên tập trung…'
+      : !available ? 'Chưa tải được phiên tập trung. Hãy kiểm tra kết nối.' : '');
+    if (feedback.textContent !== status) feedback.textContent = status;
+    feedback.hidden = !status;
+    root.querySelector('#pomo-msg').textContent = tmr.status === 'running'
+      ? (tmr.mode === 'focus' ? 'Shh… đang tập trung 🎧' : 'Nghỉ chút thôi rồi quay lại nhé ☕')
+      : tmr.status === 'paused' ? 'Tạm nghỉ một chút cũng được.' : 'Sẵn sàng chưa? Mình canh giờ cho bạn.';
     root.querySelectorAll('[data-mode]').forEach((b) => b.classList.toggle('active', b.dataset.mode === tmr.mode));
     const m = root.querySelector('#pomo-mascot');
     if (m) m.className = `mascot-wrap mascot-${mascot.state}`;
@@ -94,9 +114,9 @@ export function renderPomodoro(root) {
   paint();
   unsub = onTimer(paint);
 
-  startBtn.onclick = () => { start(); paint(); root.querySelector('#pomo-msg').textContent = getTimer().mode === 'focus' ? 'Shh… đang tập trung 🎧' : 'Nghỉ chút thôi rồi quay lại nhé ☕'; };
-  pauseBtn.onclick = () => { pause(); paint(); root.querySelector('#pomo-msg').textContent = 'Tạm nghỉ một chút cũng được.'; };
-  root.querySelector('#pomo-reset').onclick = () => { reset(); paint(); };
+  startBtn.onclick = start;
+  pauseBtn.onclick = pause;
+  resetBtn.onclick = reset;
   root.querySelectorAll('[data-mode]').forEach((b) => b.onclick = () => { setMode(b.dataset.mode); paint(); });
   root.querySelectorAll('[data-preset]').forEach((b) => b.onclick = () => {
     const [f, br] = b.dataset.preset.split(',').map(Number);
