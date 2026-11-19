@@ -55,15 +55,23 @@ test('break timer resumes without earning study rewards',()=>{
 });
 function stateHarness(saved, load, save = null) {
  const bases=new Map([['user',plain(saved)]]),writes=[];
+ const disk = new Map([['goc-hoc-nho:v1',JSON.stringify(saved)]]);
+ let user = {uid:'user'};
  const defaults=()=>({...initial(),ui:{},subjects:[],tasks:[],settings:{...initial().settings,seeded:false},room:{}});
  const context=vm.createContext({
   mergeState:mergeContext.mergeState,applyAdminCredits:mergeContext.applyAdminCredits,readSyncBase:uid=>bases.get(uid),writeSyncBase:(uid,s)=>bases.set(uid,plain(s)),
-  loadState:()=>saved,saveState:()=>true,createInitialState:defaults,isSampleTask:()=>false,SIDEBAR_DEFAULT:{},
+  createInitialState:defaults,isSampleTask:()=>false,SIDEBAR_DEFAULT:{},
   debounce:f=>()=>{},todayKey:()=> '2026-11-16',startOfWeek:x=>x,toKey:x=>x,migrateRoom:s=>s.room||{},
-  getCurrentUser:()=>({uid:'user'}),loadCloudState:load,saveCloudState:async(uid,s)=>{writes.push(plain(s));return save ? await save(uid,s) : true;},
-  localStorage:{setItem(){}},console,
+  getCurrentUser:()=>user,loadCloudState:load,saveCloudState:async(uid,s)=>{writes.push(plain(s));return save ? await save(uid,s) : true;},
+  localStorage:{getItem:key=>disk.get(key) ?? null,setItem:(key,value)=>disk.set(key,value)},console,
  });
- vm.runInContext(source('state.js'),context);context.initState();return {context,writes,bases};
+ vm.runInContext(source('storage.js') + '\n' + source('state.js'),context);
+ context.initState();
+ const switchUser = (uid, banned = false) => {
+  user = uid ? {uid} : null;
+  context.selectAccountState(user, banned);
+ };
+ return {context,writes,bases,disk,switchUser};
 }
 test('login preserves edits made offline and edits made while remote request is in flight',async()=>{
  const saved={...initial(),ui:{},subjects:[],tasks:[{id:'a',title:'base'}],_syncUid:'user'};
@@ -122,4 +130,56 @@ test('a new cloud profile does not inherit a different account’s local data', 
  await h.context.syncCloudForUser({uid: 'user'});
  assert.deepEqual(h.writes[0].tasks, []);
  assert.equal(h.writes[0]._syncUid, 'user');
+});
+
+
+test('logout and account switching preserve a legacy account draft but do not show it to guests or other users', () => {
+ const saved={...initial(),ui:{},subjects:[],tasks:[{id:'a',title:'private'}],_syncUid:'user'};
+ const h=stateHarness(saved,async()=>null);
+ h.switchUser(null);
+ assert.deepEqual(plain(h.context.getState().tasks), []);
+ h.context.update(s=>s.tasks.push({id:'guest-task',title:'guest'}));
+ assert.equal(JSON.parse(h.disk.get('goc-hoc-nho:v1:user')).tasks[0].title,'private');
+ h.switchUser('other');
+ assert.equal(h.context.getState().tasks.some(task => task.title === 'private'), false);
+ h.switchUser('user');
+ assert.equal(h.context.getState().tasks[0].title,'private');
+ h.switchUser('user', true);
+ assert.equal(h.context.getState().tasks.some(task => task.title === 'private'), false);
+ assert.equal(h.context.update(s=>s.tasks.push({id:'no'})),false);
+ h.switchUser('user');
+ assert.equal(h.context.getState().tasks[0].title,'private');
+});
+
+test('a cloud load finishing after logout and re-login does not replace the current account draft', async () => {
+ const saved={...initial(),ui:{},subjects:[],tasks:[{id:'a',title:'private draft'}],_syncUid:'user'};
+ let finish;
+ const h=stateHarness(saved,()=>new Promise(resolve=>{finish=resolve;}));
+ const original=h.context.syncCloudForUser({uid:'user'});
+ h.switchUser(null);
+ h.switchUser('user');
+ h.context.update(s=>{s.tasks[0].title='mon thay doi';});
+ finish({...saved,tasks:[{id:'a',title:'old response'}]});
+ assert.equal(await original,null);
+ assert.equal(h.context.getState().tasks[0].title,'mon thay doi');
+ assert.equal(h.writes.length,0);
+});
+
+
+test('failed storage keeps the unsaved draft on the original account in this tab', () => {
+ const saved={...initial(),ui:{},subjects:[],tasks:[{id:'a',title:'old disk'}],_syncUid:'user'};
+ const h=stateHarness(saved,async()=>null);
+ const setItem=h.context.localStorage.setItem;
+ h.context.localStorage.setItem=()=>{throw new Error('quota');};
+ const warn=h.context.console.warn;
+ h.context.console={...h.context.console,warn(){}};
+ assert.equal(h.context.update(s=>{s.tasks[0].title='memory only';}),false);
+ h.switchUser('other');
+ assert.equal(h.context.getState().tasks.length,0);
+ h.switchUser('user');
+ assert.equal(h.context.getState().tasks[0].title,'memory only');
+ h.context.localStorage.setItem=setItem;
+ h.context.retrySave();
+ assert.equal(JSON.parse(h.disk.get('goc-hoc-nho:v1:user')).tasks[0].title,'memory only');
+ h.context.console.warn=warn;
 });

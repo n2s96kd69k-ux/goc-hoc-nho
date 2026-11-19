@@ -3,12 +3,15 @@
 
 const KEY = 'goc-hoc-nho:v1';
 
-export function loadState() {
+const accountKey = uid => KEY + ':' + uid;
+
+export function loadState(uid = null) {
   try {
-    const raw = localStorage.getItem(KEY);
+    const scoped = uid ? localStorage.getItem(accountKey(uid)) : null;
+    const raw = scoped || localStorage.getItem(KEY);
     if (!raw) return null;
     const data = JSON.parse(raw);
-    if (!data || typeof data !== 'object') return null;
+    if (!data || typeof data !== 'object' || (data._syncUid || null) !== uid) return null;
     return data;
   } catch (e) {
     console.warn('Không đọc được dữ liệu đã lưu', e);
@@ -18,16 +21,21 @@ export function loadState() {
 
 export function saveState(state) {
   try {
-    localStorage.setItem(KEY, JSON.stringify(state));
+    const uid = state._syncUid;
+    if (!uid) {
+      const previous = localStorage.getItem(KEY);
+      let owner;
+      try { owner = JSON.parse(previous)?._syncUid; } catch {}
+      if (owner && localStorage.getItem(accountKey(owner)) === null) {
+        localStorage.setItem(accountKey(owner), previous);
+      }
+    }
+    localStorage.setItem(uid ? accountKey(uid) : KEY, JSON.stringify(state));
     return true;
   } catch (e) {
     console.warn('Không lưu được dữ liệu', e);
     return false;
   }
-}
-
-export function clearState() {
-  localStorage.removeItem(KEY);
 }
 
 /** Xuất ra file JSON */

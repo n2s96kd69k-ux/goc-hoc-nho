@@ -54,8 +54,10 @@ export function firestore(env) {
   }
   return {doc:path=>prefix+path,async runTransaction(fn){
     for(let attempt=0;attempt<4;attempt++){
-      const {transaction}=await api('/documents:beginTransaction',{options:{readWrite:{}}});const writes=[];
-      try{
+      let transaction;
+      try {
+        ({transaction} = await api('/documents:beginTransaction', {options:{readWrite:{}}}));
+        const writes = [];
         const getAll = async (...names) => {
           const rows = await api('/documents:batchGet', {documents: names, transaction});
           const documents = new Map(rows.map(row => [row.found?.name || row.missing, row.found]));
@@ -87,7 +89,13 @@ export function firestore(env) {
           update:(name,value)=>writes.push({update:{name,fields:encode(value).mapValue.fields},updateMask:{fieldPaths:Object.keys(value)},currentDocument:{exists:true}}),
         });
         await api('/documents:commit',{transaction,writes});return result;
-      }catch(error){await api('/documents:rollback',{transaction}).catch(()=>{});if(!error.retry||attempt===3)throw error;}
+      } catch (error) {
+        if (transaction) await api('/documents:rollback', {transaction}).catch(() => {});
+        if (!error.retry || attempt === 3) throw error;
+        // A delay with jitter avoids restarting two contending writers in lockstep.
+        const backoff = 40 * 2 ** attempt;
+        await new Promise(resolve => setTimeout(resolve, backoff + Math.random() * backoff));
+      }
     }
   }};
 }

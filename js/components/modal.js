@@ -2,6 +2,11 @@
 import { h, escapeHtml } from '../utils.js';
 
 const root = () => document.getElementById('modal-root');
+const openDialogs = new Map();
+
+export function closeAllModals() {
+  for (const dismiss of [...openDialogs.values()]) dismiss();
+}
 
 export function openModal({ title = '', content = '', size = 'md', onClose = null, hideClose = false } = {}) {
   const previousFocus = document.activeElement;
@@ -34,17 +39,22 @@ export function openModal({ title = '', content = '', size = 'md', onClose = nul
   };
   wrap.tabIndex = -1;
   document.addEventListener('keydown', keyboard);
+  const finish = restoreFocus => {
+    if (!openDialogs.delete(wrap)) return;
+    closed = true;
+    document.removeEventListener('keydown', keyboard);
+    wrap.remove();
+    if (!root().children.length) document.body.classList.remove('modal-open');
+    if (restoreFocus && previousFocus?.isConnected) previousFocus.focus();
+    if (onClose) onClose();
+  };
+  openDialogs.set(wrap, () => finish(false));
   const close = () => {
     if (closed) return;
     closed = true;
     document.removeEventListener('keydown', keyboard);
     wrap.classList.add('closing');
-    setTimeout(() => {
-      wrap.remove();
-      if (!root().children.length) document.body.classList.remove('modal-open');
-      if (previousFocus?.isConnected) previousFocus.focus();
-      if (onClose) onClose();
-    }, 200);
+    setTimeout(() => finish(true), 200);
   };
   if (!hideClose) {
     wrap.addEventListener('click', (e) => { if (e.target === wrap) close(); });

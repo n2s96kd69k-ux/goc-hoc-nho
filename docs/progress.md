@@ -22,6 +22,7 @@ Ngày 19/11/2026. Bản đối chiếu ban đầu là `c747585` trên `main`. D�
 | Cao | Chạy thử chuyển ví và khôi phục | Có công cụ lập kế hoạch ngoại tuyến, bản sao có checksum, catalog và giao dịch chuyển/khôi phục trên emulator. Test kiểm tra giữ số dư, kho, nhiệm vụ, lịch sử, quyền ghi và từ chối khôi phục sau giao dịch mới | CI và Pages đạt tại `8f8e939`. Chế độ ghi giới hạn ở emulator. Chưa bật chuyển thật | Duyệt chính sách dữ liệu cũ, hoàn thiện luồng còn thiếu và chạy đối chiếu với tài khoản thử đã được xác nhận |
 | Cao | Kéo thả và chuyển môn cho nhiệm vụ máy chủ | Worker xếp lại nhiệm vụ theo phiên bản trong một giao dịch, kiểm tra đích và giữ số xu đã nhận khi kéo việc xong sang ngày tương lai. Khi xóa môn, Worker đổi môn cho các nhiệm vụ liên quan trong cùng giao dịch và chặn tab cũ khôi phục môn đã xóa. Chromium kiểm tra thao tác kéo thả. Emulator kiểm tra thứ tự, thống kê hai ngày, gửi lại và lưu dữ liệu từ tab cũ | CI và Pages đạt tại `dbd3e15`. Chưa deploy Worker mới | Xác minh qua hai thiết bị thật và rà lưu trữ trong Cài đặt trước khi chuyển ví |
 | Cao | Sao lưu và Cài đặt khi dùng ví máy chủ | Xuất số dư, kho, nhiệm vụ và lịch sử đã tải từ Firestore. Thẻ loại bản sao ngăn nhập nhầm vào ví cũ. Nhập cài đặt, mục tiêu và ghi chú dùng đường lưu planner. Chromium tải file và mở hộp chọn file bằng bàn phím, kiểm tra số dư sau nhập. Test chuyển trang phát hiện và xác nhận sửa lỗi Pomodoro còn lắng nghe sau khi rời trang | Mã trong repo. Chưa thử trên tài khoản đã chuyển thật | Luồng xóa mẫu và xóa toàn bộ phía máy chủ chờ duyệt dữ liệu và quy trình khôi phục. Bản xuất từ trình duyệt dùng để đối chiếu, không thay thế bản sao Firestore cho vận hành |
+| Cao | Cách ly dữ liệu khi đăng xuất, đổi hoặc khóa tài khoản | Bản nháp tách theo UID, đọc được khóa lưu trữ cũ của đúng tài khoản. Đóng hộp thoại và chặn kết quả đồng bộ cũ khi đổi phiên. Thử trên Chromium ngoại tuyến và unit test cho lỗi dung lượng, yêu cầu trả muộn, đổi và khóa tài khoản | Mã trong repo. Chưa xác minh với đăng nhập thật trên hai thiết bị | Kiểm tra nhiều tab dùng cùng tài khoản và hành vi khi Firebase thu hồi quyền lúc mất mạng |
 | Vừa | Responsive, accessibility, hiệu năng và bảo trì | Có kiểm tra popup, Admin và một số tiêu chí trong đợt đầu | Chưa đo hiệu năng thật hay kiểm tra đủ trình duyệt | Rà các luồng chính trên mobile, bàn phím và đo tải trang trước khi tối ưu |
 
 - [CI của bản đối chiếu](https://github.com/n2s96kd69k-ux/goc-hoc-nho/actions/runs/44519336478)
@@ -52,3 +53,7 @@ CI của thưởng tuần/chuỗi đã đạt sau khi ghim Ubuntu 24.04. [Kết 
 - [CI của công cụ chạy thử chuyển ví](https://github.com/n2s96kd69k-ux/goc-hoc-nho/actions/runs/44529072046)
 
 - [CI của kéo thả và chuyển môn](https://github.com/n2s96kd69k-ux/goc-hoc-nho/actions/runs/44530050012)
+
+- [CI của Cài đặt và sao lưu](https://github.com/n2s96kd69k-ux/goc-hoc-nho/actions/runs/44530972055)
+
+Worker chờ một khoảng tăng dần có độ lệch trước khi thử lại giao dịch Firestore bị tranh chấp. Workflow ưu tiên trình duyệt đã có trên runner và giữ bước cài đặt Playwright khi cần.

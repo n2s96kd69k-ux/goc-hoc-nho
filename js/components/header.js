@@ -47,6 +47,7 @@ export function renderHeader() {
   el.querySelector('#live-study').onclick = () => openLiveRoom();
   el.querySelector('#auth-btn').onclick = () => openAuthModal();
   el.querySelector('#header-mascot').onclick = () => { mascot.poke(); if (location.hash !== '#/room') navigate('/room'); };
+  cancelAnimationFrame(coinRaf);
   shownCoins = balance;
   bindSidebarToggle(el.querySelector('#menu-btn'));
   startLiveCount();

@@ -5,7 +5,7 @@ import { getCurrentUser } from '../cloud.js';
 // ===== Trang /settings =====
 import { getState, update, replaceState } from '../state.js';
 import { escapeHtml } from '../utils.js';
-import { exportToFile, parseImportFile, clearState } from '../storage.js';
+import { exportToFile, parseImportFile } from '../storage.js';
 import { createBlankState } from '../seed.js';
 import { confirmDialog } from '../components/modal.js';
 import { toast } from '../components/toast.js';
@@ -203,7 +203,6 @@ export function renderSettings(root) {
     blank.subjects = keep.subjects;
     blank.goal = keep.goal;
     blank.mascot = { ...blank.mascot, name: keep.mascot.name };
-    clearState();
     replaceState(blank);
     toast('Đã xóa toàn bộ dữ liệu');
     navigate('/');

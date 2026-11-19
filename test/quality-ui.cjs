@@ -3,7 +3,7 @@ const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),
 const root=path.resolve(__dirname,'..');
 const server=http.createServer((req,res)=>{const p=path.resolve(root,'.'+(req.url.split('?')[0]==='/'?'/index.html':req.url.split('?')[0]));if(!p.startsWith(root+'/'))return res.writeHead(403).end();fs.readFile(p,(e,d)=>{if(e)return res.writeHead(404).end();res.setHeader('Content-Type',p.endsWith('.js')?'application/javascript':p.endsWith('.css')?'text/css':'text/html');res.end(d);});});
 const fixtureCloud=role=>`
- let access={uid:'admin',role:'${role}',status:'active',ready:true,owner:true,adminCredits:0};const listeners=new Set();
+ let access={uid:'admin',role:'${role}',status:'active',ready:true,owner:true,adminCredits:0};const listeners=new Set();const authListeners=new Set();
  let user={uid:'admin',email:'admin@example.test',displayName:'Admin',getIdToken:async()=> 'student-test-token'};
  export const OWNER_UID='admin';export const OWNER_ID='GHN-776J9W';export const firebaseDb=()=>({});export const getCurrentUser=()=>user;
  export const accountId=()=> 'GHN-ADMIN1';export const isCurrentAdmin=()=>access.role==='admin';export const getAccountAccess=()=>access;
@@ -12,8 +12,12 @@ const fixtureCloud=role=>`
  window.__useServerWallet=()=>{access={...access,economyVersion:1};listeners.forEach(fn=>fn(access));};
  window.__switchWalletUser=()=>{user={...user,uid:'other'};access={...access,uid:'other'};listeners.forEach(fn=>fn(access));};
 
- export function onCloudAuthChange(fn){setTimeout(()=>fn(user),0);return ()=>{};}
- export const loadCloudState=async()=>null;export const saveCloudState=async()=>{if(window.__failCloud)throw Error('offline');return true;};
+ window.__changeAccount=(uid,status='active')=>{
+   user=uid?{uid,email:uid+'@example.test',getIdToken:async()=> 'student-test-token'}:null;
+   access={...access,uid, status, economyVersion:0};listeners.forEach(fn=>fn(access));authListeners.forEach(fn=>fn(user));
+ };
+ export function onCloudAuthChange(fn){authListeners.add(fn);setTimeout(()=>fn(user),0);return ()=>authListeners.delete(fn);}
+ export const loadCloudState=async()=>{if(window.__failLoad)throw Error('offline');return null;};export const saveCloudState=async()=>{if(window.__failCloud)throw Error('offline');return true;};
  export const loginWithGoogle=async()=>user;export const loginWithEmail=async()=>user;export const registerWithEmail=async()=>user;export const logoutCloud=async()=>{};export const friendlyAuthError=e=>e.message;
 `;
 
@@ -52,7 +56,7 @@ const fixtureCloud=role=>`
   await page.keyboard.press('Tab');assert.equal(await page.evaluate(()=>document.activeElement.classList.contains('modal-close')),true);
   await page.keyboard.press('Escape');await page.waitForTimeout(250);
   assert.equal(await page.evaluate(()=>document.activeElement.id),'settings-btn');
-  await page.evaluate(()=>{const original=Storage.prototype.setItem;window.restoreStorage=()=>Storage.prototype.setItem=original;Storage.prototype.setItem=function(k,v){if(k==='goc-hoc-nho:v1')throw new DOMException('full','QuotaExceededError');return original.call(this,k,v);};});
+  await page.evaluate(()=>{const original=Storage.prototype.setItem;window.restoreStorage=()=>Storage.prototype.setItem=original;Storage.prototype.setItem=function(k,v){if(k==='goc-hoc-nho:v1'||k.startsWith('goc-hoc-nho:v1:'))throw new DOMException('full','QuotaExceededError');return original.call(this,k,v);};});
   await page.evaluate(async()=>{const {update}=await import('/js/state.js');update(s=>{s.settings.userName='Test';},{silent:true});});
   await page.waitForSelector('.save-feedback:not([hidden])');assert.match(await page.locator('.save-feedback').innerText(),/Chưa lưu/);
   await page.evaluate(()=>window.restoreStorage());await page.getByRole('button',{name:'Thử lưu lại'}).click();await page.waitForTimeout(1500);
@@ -259,6 +263,27 @@ const fixtureCloud=role=>`
 
   assert.deepEqual(errors, []);
   console.log('PASS: focus retry, server snapshots for pause/resume, account switch, and completion without local wallet credit');
+  await page.evaluate(async () => {
+    window.__failLoad = true;
+    window.__changeAccount('offline-a');
+    const {update} = await import('/js/state.js');
+    update(s => {s.settings.userName='Tên riêng ngoại tuyến';});
+    const {openModal} = await import('/js/components/modal.js');
+    openModal({title:'Ghi chú riêng',content:'Nội dung riêng của A'});
+    window.__changeAccount(null);
+  });
+  assert.equal(await page.getByRole('dialog',{name:'Ghi chú riêng'}).count(), 0);
+  const name = async () => page.evaluate(async () => (await import('/js/state.js')).getState().settings.userName);
+  assert.notEqual(await name(), 'Tên riêng ngoại tuyến');
+  await page.evaluate(() => window.__changeAccount('offline-b'));
+  assert.notEqual(await name(), 'Tên riêng ngoại tuyến');
+  await page.evaluate(() => window.__changeAccount('offline-a'));
+  assert.equal(await name(), 'Tên riêng ngoại tuyến');
+  await page.evaluate(() => window.__changeAccount('offline-a','banned'));
+  assert.notEqual(await name(), 'Tên riêng ngoại tuyến');
+  assert.deepEqual(errors, []);
+  console.log('PASS: offline account switch, modal dismissal and recovery of the owner draft');
+
 
  }finally{await browser.close();await new Promise(r=>server.close(r));}
 })().catch(e=>{console.error(e);process.exitCode=1;});

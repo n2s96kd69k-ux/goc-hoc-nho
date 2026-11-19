@@ -5,7 +5,7 @@ import { initNotificationUI } from './notifications/ui.js';
 import { applyAdminCredits } from './sync.js';
 import { renderAdmin, disposeAdmin } from './pages/admin.js';
 // ===== Khởi động ứng dụng =====
-import { initState, subscribe, getState, syncCloudForUser, update, retrySave } from './state.js';
+import { initState, subscribe, getState, syncCloudForUser, selectAccountState, update, retrySave } from './state.js';
 import { registerRoute, startRouter, onRoute, currentRoute } from './router.js';
 import { renderHeader, refreshHeaderStats, refreshHeaderAuth, setHeaderMascotState } from './components/header.js';
 import { renderSidebar, renderBottomNav, setSidebarMascotState } from './components/sidebar.js';
@@ -14,7 +14,8 @@ import { onTimer, getTimer, restoreTimer, startTimerAccount } from './timer.js';
 import { recomputeStreak } from './gamification.js';
 import { pomodoroCompletePopup } from './components/reward.js';
 import { toast } from './components/toast.js';
-import { onCloudAuthChange, onAccountAccessChange, isCurrentAdmin } from './cloud.js';
+import { closeAllModals } from './components/modal.js';
+import { onCloudAuthChange, onAccountAccessChange, getAccountAccess, getCurrentUser, isCurrentAdmin } from './cloud.js';
 import { mmss } from './utils.js';
 
 import { patchTaskToggle } from './components/planner.js';
@@ -130,24 +131,40 @@ function setupTimerPill() {
 }
 
 function setupCloudSync() {
-  let lastUid = null;
-  onCloudAuthChange(async (user) => {
+  let uid;
+  let banned;
+  let sequence = 0;
+  const activate = async (user, access) => {
+    const nextUid = user?.uid || null;
+    const isBanned = !!user && access.uid === nextUid && access.status === 'banned';
+    if (uid === nextUid && banned === isBanned) return;
+    uid = nextUid;
+    banned = isBanned;
+    const current = ++sequence;
+    selectAccountState(user, isBanned, () => {
+      closeAllModals();
+      renderHeader();
+      if (currentRoute()?.path === '/admin') {
+        disposeAdmin();
+        main().replaceChildren();
+        location.hash = '/';
+      }
+    });
     refreshHeaderAuth();
-    if (!user) {
-      lastUid = null;
-      return;
-    }
-    if (user.uid === lastUid) return;
-    lastUid = user.uid;
+    if (!user || isBanned) return;
     try {
       const res = await syncCloudForUser(user);
+      if (current !== sequence) return;
       if (res === 'loaded') toast('Đã đồng bộ dữ liệu từ tài khoản ☁️', { icon: '✓' });
       else if (res === 'uploaded') toast('Đã lưu dữ liệu hiện tại lên tài khoản ☁️', { icon: '✓' });
     } catch (e) {
+      if (current !== sequence) return;
       console.warn('Lỗi đồng bộ Firebase:', e);
       toast('Đã đăng nhập nhưng chưa đồng bộ được Firestore', { kind: 'error' });
     }
-  });
+  };
+  onAccountAccessChange(access => activate(getCurrentUser(), access));
+  onCloudAuthChange(user => activate(user, getAccountAccess()));
 }
 
 function setupSaveFeedback() {

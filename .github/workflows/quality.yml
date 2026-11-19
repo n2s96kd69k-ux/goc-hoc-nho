@@ -21,6 +21,13 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run test:rules
-      - run: npx playwright install --with-deps chromium
+      - name: Select a browser for Playwright
+        run: |
+          if browser=$(command -v google-chrome || command -v chromium); then
+            "$browser" --version
+            echo "CHROMIUM_PATH=$browser" >> "$GITHUB_ENV"
+          else
+            npx playwright install --with-deps chromium
+          fi
       - run: npm run test:ui
       - run: npm run test:quality-ui

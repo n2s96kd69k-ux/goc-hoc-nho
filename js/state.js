@@ -8,6 +8,10 @@ import { getCurrentUser, loadCloudState, saveCloudState } from './cloud.js';
 
 let state = null;
 const listeners = new Set();
+const unsavedDrafts = new Map();
+let scopeUid = null;
+let blocked = false;
+let generation = 0;
 
 function migrate(s) {
   const base = createInitialState();
@@ -31,13 +35,40 @@ function migrate(s) {
   return merged;
 }
 
-export function initState() {
-  const saved = loadState();
-  state = saved ? migrate(saved) : createInitialState();
-  // Tuần đang xem luôn reset về tuần hiện tại khi mở app
+function resetView() {
   state.ui.viewWeek = toKey(startOfWeek(todayKey()));
   state.ui.viewDay = todayKey();
+}
+
+export function initState() {
+  scopeUid = getCurrentUser()?.uid || null;
+  const saved = loadState(scopeUid) || (!scopeUid ? null : loadState());
+  state = saved ? migrate(saved) : createInitialState();
+  if (scopeUid) state._syncUid = scopeUid;
+  resetView();
   return state;
+}
+
+export function selectAccountState(user, banned = false, beforeChange = () => {}) {
+  const uid = user?.uid || null;
+  if (uid === scopeUid && blocked === banned) return;
+  const previous = state;
+  const mayUseGuest = uid && !scopeUid && !blocked && !previous?._syncUid;
+  scopeUid = uid;
+  blocked = banned;
+  generation++;
+  syncedUid = null;
+  cloudFailed = false;
+  const draft = banned ? null : unsavedDrafts.get(uid);
+  const saved = banned ? null : draft || loadState(uid) || (uid ? readSyncBase(uid) : null) || (mayUseGuest ? previous : null);
+  state = saved ? migrate(JSON.parse(JSON.stringify(saved))) : createInitialState();
+  if (uid && !banned) state._syncUid = uid;
+  else delete state._syncUid;
+  localFailed = !!draft;
+  resetView();
+  beforeChange();
+  reportSave();
+  emit({ type: 'replace' });
 }
 
 export function getState() { return state; }
@@ -52,18 +83,32 @@ function reportSave() {
     window.dispatchEvent(new CustomEvent('storage:status', { detail: { localFailed, cloudFailed } }));
   }
 }
-const persist = () => { localFailed = !saveState(state); reportSave(); return !localFailed; };
+const persist = () => {
+  if (blocked) return false;
+  localFailed = !saveState(state);
+  const uid = state._syncUid || null;
+  if (localFailed) unsavedDrafts.set(uid, state);
+  else unsavedDrafts.delete(uid);
+  reportSave();
+  return !localFailed;
+};
 export function retrySave() { persist(); persistCloud(); }
 const persistCloud = debounce(async () => {
   const user = getCurrentUser();
-  if (!user) return;
+  if (!user || blocked || scopeUid !== user.uid) return;
+  const startedIn = generation;
   if (saving) { saveAgain = true; return; }
   saving = true;
   try {
     if (syncedUid !== user.uid) await syncCloudForUser(user);
-    else await saveAndApply(user.uid);
-    cloudFailed = false;
-  } catch (e) { cloudFailed = true; console.warn('Đồng bộ đám mây lỗi:', e); }
+    else await saveAndApply(user.uid, startedIn);
+    if (startedIn === generation) cloudFailed = false;
+  } catch (e) {
+    if (startedIn === generation) {
+      cloudFailed = true;
+      console.warn('Đồng bộ đám mây lỗi:', e);
+    }
+  }
   finally {
     saving = false;
     reportSave();
@@ -73,6 +118,7 @@ const persistCloud = debounce(async () => {
 
 /** Thay đổi state qua hàm mutator, sau đó lưu và thông báo */
 export function update(mutator, meta = {}) {
+  if (blocked) return false;
   mutator(state);
   persist();
   persistCloud();
@@ -81,23 +127,23 @@ export function update(mutator, meta = {}) {
 }
 
 export function replaceState(newState, { skipCloud = false } = {}) {
+  if (blocked) return;
   state = migrate(newState);
-  const user = getCurrentUser();
-  if (user) state._syncUid = user.uid;
-  state.ui.viewWeek = toKey(startOfWeek(todayKey()));
-  state.ui.viewDay = todayKey();
+  if (scopeUid) state._syncUid = scopeUid;
+  else delete state._syncUid;
+  resetView();
   persist();
   if (!skipCloud) persistCloud();
   emit({ type: 'replace' });
 }
 
 export async function syncCloudForUser(user) {
-  if (!user) return null;
-  if (syncing) { await syncing; if (syncedUid === user.uid) return 'loaded'; }
-  syncedUid = null;
+  if (!user || blocked || scopeUid !== user.uid) return null;
+  const startedIn = generation;
+  if (syncing?.generation === startedIn) return syncing.job;
   const job = (async () => {
     const remote = await loadCloudState(user.uid);
-    if (getCurrentUser()?.uid !== user.uid) return null;
+    if (generation !== startedIn || getCurrentUser()?.uid !== user.uid) return null;
     const base = readSyncBase(user.uid);
     // Read local state AFTER the request so edits made while loading survive.
     const local = state;
@@ -112,12 +158,13 @@ export async function syncCloudForUser(user) {
       : (!local._syncUid || sameAccount ? local : createInitialState());
     writeSyncBase(user.uid, remote || next);
     replaceState({ ...next, _syncUid: user.uid }, { skipCloud: true });
-    await saveAndApply(user.uid);
+    await saveAndApply(user.uid, startedIn);
+    if (generation !== startedIn || getCurrentUser()?.uid !== user.uid) return null;
     syncedUid = user.uid;
     return remote ? 'loaded' : 'uploaded';
   })();
-  syncing = job;
-  try { return await job; } finally { if (syncing === job) syncing = null; }
+  syncing = {generation:startedIn, job};
+  try { return await job; } finally { if (syncing?.job === job) syncing = null; }
 }
 
 if (typeof window !== 'undefined') {
@@ -144,10 +191,11 @@ export function dayRecord(key) {
 
 // Apply the committed transaction without overwriting edits made while it ran.
 // Timer controls belong to this page; a background save must not restart it.
-async function saveAndApply(uid) {
+async function saveAndApply(uid, startedIn) {
+  if (startedIn !== generation || blocked || scopeUid !== uid) return;
   const sent = JSON.parse(JSON.stringify(state));
   const committed = await saveCloudState(uid, sent);
-  if (!committed || typeof committed !== 'object' || getCurrentUser()?.uid !== uid || state._syncUid !== uid) return;
+  if (startedIn !== generation || !committed || typeof committed !== 'object' || getCurrentUser()?.uid !== uid || state._syncUid !== uid) return;
   const session = state.timer?.session;
   state = migrate(mergeState(sent, state, committed));
   if (session) state.timer.session = session;

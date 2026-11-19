@@ -1,9 +1,7 @@
 // ===== Hộp thoại Tài khoản & Màn hình Chào mừng / Đăng nhập =====
 import { openModal } from './modal.js';
 import { toast } from './toast.js';
-import { getState, replaceState } from '../state.js';
-import { clearState } from '../storage.js';
-import { createInitialState } from '../seed.js';
+import { getState } from '../state.js';
 import { mascotSVG } from '../mascot.js';
 import {
   getCurrentUser,
@@ -82,7 +80,9 @@ export function openAuthModal({ welcome = false } = {}) {
 
     m.body.querySelector('#cloud-sync-now').onclick = async () => {
       try {
+        if (getCurrentUser() !== user || getState()._syncUid !== user.uid) throw new Error('Chưa tải xong tài khoản này.');
         await saveCloudState(user.uid, getState());
+        if (getCurrentUser() !== user) return;
         toast('Đã lưu dữ liệu lên đám mây ☁️', { icon: '✓' });
       } catch (e) {
         toast('Không đồng bộ được: ' + (e.message || 'Lỗi mạng'), { kind: 'error' });
@@ -93,17 +93,15 @@ export function openAuthModal({ welcome = false } = {}) {
       const btn = m.body.querySelector('#cloud-logout-btn');
       btn.disabled = true;
       try {
-        await saveCloudState(user.uid, getState());
-      } catch (e) {
-        console.warn('Lưu trước khi đăng xuất lỗi:', e);
+        await logoutCloud();
+        sessionStorage.removeItem(SKIP_KEY);
+        m.close();
+        toast('Đã đăng xuất tài khoản.');
+        setTimeout(() => openAuthModal({ welcome: true }), 260);
+      } catch (error) {
+        btn.disabled = false;
+        toast(error.message || 'Chưa đăng xuất được.', { kind: 'error' });
       }
-      sessionStorage.removeItem(SKIP_KEY);
-      await logoutCloud();
-      clearState();
-      replaceState(createInitialState(), { skipCloud: true });
-      m.close();
-      toast('Đã đăng xuất tài khoản.');
-      setTimeout(() => openAuthModal({ welcome: true }), 260);
     };
     return;
   }
