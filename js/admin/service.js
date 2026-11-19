@@ -1,3 +1,4 @@
+import { sendWalletCommand } from '../wallet-api.js';
 import { collection, doc, getDocs, getDocFromServer, query, where, orderBy, documentId, limit, startAfter, runTransaction, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 import { firebaseDb, requireAdmin, OWNER_UID } from '../cloud.js';
 import { applyAdminCredits } from '../sync.js';
@@ -9,6 +10,18 @@ export function userRow(snapshot) {
   const state = applyAdminCredits(data.state || {}, data.adminCredits || 0);
   return { uid: snapshot.id, displayName: data.displayName || data.state?.settings?.userName || 'Chưa có tên', email: data.email || '', photoURL: data.photoURL || '', publicId: data.publicId || '', coins: state.wallet?.coins || 0, role: snapshot.id === OWNER_UID || data.role === 'admin' ? 'admin' : 'member', status: data.status === 'banned' ? 'banned' : 'active', owner: snapshot.id === OWNER_UID || data.owner === true };
 }
+async function displayBalances(db, snapshots) {
+  return Promise.all(snapshots.map(async snapshot => {
+    const row = userRow(snapshot);
+    // The migration writes this profile marker together with the wallet.
+    if (snapshot.data().economyVersion !== 1) return row;
+    const wallet = await getDocFromServer(doc(db, 'users', row.uid, 'economy', 'wallet'));
+    const balance = wallet.data()?.balance;
+    if (!Number.isSafeInteger(balance) || balance < 0) throw new Error('Không đọc được số dư ví máy chủ.');
+    return { ...row, coins: balance };
+  }));
+}
+
 export async function listUsers({ cursor = null, search = '' } = {}) {
   if (!await requireAdmin()) throw new Error('Bạn không có quyền quản trị.');
   const db = firebaseDb();
@@ -20,16 +33,16 @@ export async function listUsers({ cursor = null, search = '' } = {}) {
       const value = field === 'emailLower' ? term.toLowerCase() : term.toUpperCase();
       let snap = await getDocs(query(users, where(field, '==', value), limit(PAGE_SIZE)));
       if (snap.empty && field === 'emailLower') snap = await getDocs(query(users, where('email', '==', term), limit(PAGE_SIZE)));
-      return { rows: snap.docs.map(userRow), cursor: null, hasMore: false };
+      return { rows: await displayBalances(db, snap.docs), cursor: null, hasMore: false };
     }
     if (term.includes('/')) throw new Error('UID không hợp lệ.');
     const snap = await getDocFromServer(doc(db, 'users', term));
-    return { rows: snap.exists() ? [userRow(snap)] : [], cursor: null, hasMore: false };
+    return { rows: snap.exists() ? await displayBalances(db, [snap]) : [], cursor: null, hasMore: false };
   }
   const parts = [orderBy(documentId()), ...(cursor ? [startAfter(cursor)] : []), limit(PAGE_SIZE + 1)];
   const snap = await getDocs(query(users, ...parts));
   const page = snap.docs.slice(0, PAGE_SIZE);
-  return { rows: page.map(userRow), cursor: page.at(-1) || null, hasMore: snap.docs.length > PAGE_SIZE };
+  return { rows: await displayBalances(db, page), cursor: page.at(-1) || null, hasMore: snap.docs.length > PAGE_SIZE };
 }
 export async function resolveUser(term) {
   const result = await listUsers({ search: term });
@@ -46,7 +59,8 @@ export async function changeUser({ uid, type, value, reason, operationId }) {
   const db = firebaseDb();
   const ref = doc(db, 'users', uid);
   const log = doc(db, 'adminLogs', operationId);
-  return runTransaction(db, async tx => {
+  const isCoinChange = type === 'coins-add' || type === 'coins-set';
+  const result = await runTransaction(db, async tx => {
     const existingLog = await tx.get(log);
     if (existingLog.exists()) {
       const prior = existingLog.data();
@@ -58,7 +72,9 @@ export async function changeUser({ uid, type, value, reason, operationId }) {
     const target = snap.data();
     const patch = { updatedAt: serverTimestamp(), lastAdminOperation: operationId };
     let before, after;
-    if (type === 'coins-add' || type === 'coins-set') {
+    if (isCoinChange) {
+      const wallet = await tx.get(doc(db, 'users', uid, 'economy', 'wallet'));
+      if (wallet.exists()) return { useServerWallet: true };
       const balance = applyAdminCredits(target.state || {}, target.adminCredits || 0).wallet?.coins || 0;
       const change = coinChange(balance, value, type === 'coins-add' ? 'add' : 'set');
       before = change.before; after = change.after;
@@ -86,6 +102,12 @@ export async function changeUser({ uid, type, value, reason, operationId }) {
       });
     }
     return entry;
+  });
+  if (!result.useServerWallet) return result;
+  coinChange(0, value, type === 'coins-add' ? 'add' : 'set');
+  return sendWalletCommand(actor.uid, {
+    type: type === 'coins-add' ? 'admin-add' : 'admin-set',
+    targetUid: uid, amount: value, reason, operationId,
   });
 }
 export async function listActivity() {

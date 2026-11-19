@@ -48,13 +48,17 @@ test('route guard fails closed for guests, members, banned admin and network fai
   }
 });
 function serviceHarness() {
-  const database = { user: {state:{wallet:{coins:50}},adminCredits:0}, logs:new Map(), notifications:new Map() };
+  const database = { user: {state:{wallet:{coins:50}},adminCredits:0}, logs:new Map(), notifications:new Map(), wallet: undefined, commands: [] };
   const context = vm.createContext({
     OWNER_UID:'Vyd1sYXrKARaTujn0ucX0XFe0gp2',firebaseDb:()=>({}),requireAdmin:async()=>({uid:'admin',email:'admin@example.test'}),
     applyAdminCredits:sync.applyAdminCredits,...Object.fromEntries(['coinChange','validateReason','canChangeAccess'].map(k=>[k,policy[k]])),
     doc:(db,...parts)=>({collection:parts.length === 2 ? parts[0] : parts[2],id:parts.at(-1)}),serverTimestamp:()=>new Date(0),
+    sendWalletCommand:async (uid,command)=>{database.commands.push(plain({uid,command}));return {balance:70};},
     runTransaction:async(db,fn)=>fn({
-      get:async ref=>({exists:()=>ref.collection==='users'||database.logs.has(ref.id),data:()=>ref.collection==='users'?database.user:database.logs.get(ref.id)}),
+      get:async ref=>{
+        const row = ref.collection === 'users' ? database.user : ref.collection === 'economy' ? database.wallet : database.logs.get(ref.id);
+        return {exists:()=>row !== undefined,data:()=>row};
+      },
       update:(ref,patch)=>Object.assign(database.user,patch),set:(ref,data)=>(ref.collection==='adminLogs'?database.logs:database.notifications).set(ref.id,data),
     }),
   });
@@ -65,4 +69,51 @@ test('coin transaction is idempotent and rejects reuse for a different request',
   await h.context.changeUser(request);await h.context.changeUser(request);
   assert.equal(h.database.user.adminCredits,20);assert.equal(h.database.logs.size,1);assert.equal(h.database.notifications.size,1);
   await assert.rejects(h.context.changeUser({...request,value:30}));
+});
+
+test('admin routes a migrated recipient to the Worker without writing legacy credits',async()=>{
+  const h=serviceHarness();h.database.wallet={version:1,balance:50};
+  const operationId='11111111-1111-1111-1111-111111111111';
+  await h.context.changeUser({uid:'student',type:'coins-add',value:20,reason:'event reward',operationId});
+  assert.deepEqual(h.database.commands,[{uid:'admin',command:{type:'admin-add',targetUid:'student',amount:20,reason:'event reward',operationId}}]);
+  assert.equal(h.database.user.adminCredits,0);
+  assert.equal(h.database.logs.size,0);
+});
+
+test('admin retry after migration returns the existing legacy receipt',async()=>{
+  const h=serviceHarness();
+  const request={uid:'student',type:'coins-add',value:20,reason:'event reward',operationId:'11111111-1111-1111-1111-111111111111'};
+  const prior=await h.context.changeUser(request);
+  h.database.wallet={version:1,balance:70};
+  assert.deepEqual(await h.context.changeUser(request),prior);
+  assert.equal(h.database.commands.length,0);
+});
+
+test('wallet client retries a lost response with the same operation and account',async()=>{
+  const calls=[];
+  const user={uid:'admin',getIdToken:async()=> 'token'};
+  const ctx=vm.createContext({getCurrentUser:()=>user,AbortSignal,fetch:async(url,nonce)=>{
+    calls.push(nonce);
+    if(calls.length===1)throw Error('network down');
+    return Response.json({ok:true,result:{balance:70}});
+  }});
+  vm.runInContext(code('wallet-api.js'),ctx);
+  const command={type:'admin-add',targetUid:'student',operationId:'retry-with-same-id',amount:20};
+  assert.equal((await ctx.sendWalletCommand('admin',command)).balance,70);
+  assert.equal(calls.length,2);
+  assert.equal(calls[0].body,calls[1].body);
+  assert.equal(calls[1].headers.Authorization,'Bearer token');
+});
+
+test('wallet client stops a retry when the account changes in flight',async()=>{
+  let calls=0;
+  let user={uid:'admin',getIdToken:async()=> 'token'};
+  const ctx=vm.createContext({getCurrentUser:()=>user,AbortSignal,fetch:async()=>{
+    calls++;
+    user={uid:'other',getIdToken:async()=> 'different token'};
+    return Response.json({}, {status:503});
+  }});
+  vm.runInContext(code('wallet-api.js'),ctx);
+  await assert.rejects(ctx.sendWalletCommand('admin',{type:'admin-add',operationId:'retry-with-same-id'}),/đăng nhập đã thay đổi/);
+  assert.equal(calls,1);
 });

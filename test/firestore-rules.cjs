@@ -287,6 +287,9 @@ test('Worker REST transactions serialize purchases, keep receipts and enforce ac
   const privileged = context.firestore();
   assert.equal((await getDoc(doc(privileged, wallet.path))).data().balance, 175);
   assert.equal((await getDocs(collection(privileged, 'users/student/rewardMilestones'))).size, 1);
-  assert.equal((await getDocs(collection(privileged, 'adminLogs'))).size, 1);
+  const log = (await getDocs(collection(privileged, 'adminLogs'))).docs;
+  assert.equal(log.length, 1);
+  assert.equal(log[0].data().type, 'coins-add');
+  assert.equal(log[0].data().actorUid, 'admin');
  });
 });

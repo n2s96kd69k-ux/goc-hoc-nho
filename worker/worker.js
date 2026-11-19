@@ -160,7 +160,7 @@ async function transactEconomy(db, authUid, input, serverTimestamp) {
     if(ownedRef)tx.set(ownedRef,{quantity:quantity+1,updatedAt:createdAt});
     tx.create(receipt,{actorUid:authUid,fingerprint,request,result,createdAt});
     if(type !== 'buy') {
-      tx.create(db.doc(`adminLogs/${receiptId}`),{actorUid:authUid,targetUid:uid,type,requestedValue:input.amount,before:old.balance,after,reason:request.reason,createdAt});
+      tx.create(db.doc(`adminLogs/${receiptId}`),{actorUid:authUid,actorEmail:actorData.email || '',targetUid:uid,type:type === 'admin-add' ? 'coins-add' : 'coins-set',requestedValue:input.amount,before:old.balance,after,reason:request.reason,createdAt});
       tx.create(db.doc(`users/${uid}/notifications/${receiptId}`),{type:'personal',content:`Số dư được quản trị viên điều chỉnh thành ${after} xu. ${request.reason}`,createdAt});
     }
     return result;
