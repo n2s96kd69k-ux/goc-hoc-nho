@@ -29,3 +29,15 @@ test('fourteen eligible days pay both milestones once across retries and midnigh
  assert.deepEqual(afterMidnight.streak, {current: 14, events: []});
  assert.equal(afterMidnight.balance, 202);
 });
+
+test('starting a new session releases an expired session without awarding coins', async () => {
+ const f = fixture();
+ await f.call('focus-start', {minutes: 25});
+ f.advance(86400001);
+ const sessionId = 'session-2222222222';
+ await f.call('focus-start', {minutes: 25, sessionId});
+ assert.equal(f.rows.get('users/a/focusSessions/session-1234567890').cancellationReason, 'expired');
+ assert.equal(f.rows.get('users/a/economy/wallet').activeSessionId, sessionId);
+ await assert.rejects(f.call('focus-complete'), /session-not-active/);
+ assert.equal(f.rows.get('users/a/economy/wallet').balance, 50);
+});

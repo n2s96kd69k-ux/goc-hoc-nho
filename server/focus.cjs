@@ -21,7 +21,18 @@ async function transactFocus(db, authUid, input, clock = Date.now) {
   const rewards = studyRewards(tx, suffix => db.doc(`users/${authUid}/${suffix}`));
   let next, result, coinsEarned = 0;
   if(type==='focus-start'){
-   requireValue(!s.exists,'session-exists');requireValue(!w.data().activeSessionId,'active-session-exists');
+   requireValue(!s.exists,'session-exists');
+   const activeId = w.data().activeSessionId;
+   if (activeId) {
+    requireValue(id(activeId), 'invalid-wallet');
+    const activeRef = db.doc(`users/${authUid}/focusSessions/${activeId}`);
+    const active = await tx.get(activeRef);
+    if (active.exists && ['running', 'paused'].includes(active.data().status)) {
+     const previous = active.data();
+     requireValue(Number.isFinite(previous.expiresAt) && now > previous.expiresAt, 'active-session-exists');
+     tx.set(activeRef, {...previous, status: 'cancelled', cancellationReason: 'expired', cancelledAt: now});
+    }
+   }
    next={status:'running',durationMs:minutes*60000,elapsedMs:0,resumedAt:now,createdAt:now,expiresAt:now+86400000,subjectId,date:studyDate(now)};
    result={sessionId:input.sessionId,status:'running',remainingSeconds:minutes*60};
   }else{

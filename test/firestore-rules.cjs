@@ -325,6 +325,26 @@ test('Worker REST transactions serialize purchases, keep receipts and enforce ac
   await assertFails(getDoc(doc(dbFor('other-student'), 'users/student/rewardTasks', taskId)));
   await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), 'users/student/rewardTasks', taskId)));
 
+  const sessionId = 'focus-emulator-session-0001';
+  const session = doc(db, 'users/student/focusSessions', sessionId);
+  const beginFocus = {type: 'focus-start', sessionId, minutes: 1, operationId: 'focus-emulator-start-0001'};
+  assert.equal((await call(beginFocus)).status, 200);
+  const finishFocus = {type: 'focus-complete', sessionId, operationId: 'focus-emulator-complete-0001'};
+  assert.equal((await call(finishFocus)).body.error, 'focus-too-early');
+  await assertFails(updateDoc(session, {elapsedMs: 60000}));
+  await env.withSecurityRulesDisabled(async context => {
+   await updateDoc(doc(context.firestore(), session.path), {resumedAt: Date.now() - 61000});
+  });
+  const finishes = await Promise.all([
+   call(finishFocus),
+   call({...finishFocus, operationId: 'focus-emulator-complete-0002'}),
+  ]);
+  assert.deepEqual(finishes.map(outcome => outcome.status), [200, 200], JSON.stringify(finishes));
+  assert.deepEqual(finishes[0].body.result, finishes[1].body.result);
+  assert.equal(finishes[0].body.result.reward, 1);
+  assert.equal((await getDoc(wallet)).data().activeSessionId, null);
+  assert.equal((await getDoc(session)).data().status, 'completed');
+
   await env.withSecurityRulesDisabled(async context => {
    const privileged = context.firestore();
    await updateDoc(doc(privileged, 'users', 'admin'), {role: 'member'});
@@ -337,7 +357,7 @@ test('Worker REST transactions serialize purchases, keep receipts and enforce ac
  }
  await env.withSecurityRulesDisabled(async context => {
   const privileged = context.firestore();
-  assert.equal((await getDoc(doc(privileged, wallet.path))).data().balance, 175);
+  assert.equal((await getDoc(doc(privileged, wallet.path))).data().balance, 176);
   assert.equal((await getDocs(collection(privileged, 'users/student/rewardMilestones'))).size, 1);
   const log = (await getDocs(collection(privileged, 'adminLogs'))).docs;
   assert.equal(log.length, 1);
