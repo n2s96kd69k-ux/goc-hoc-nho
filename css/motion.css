@@ -168,7 +168,7 @@
 .shop-name { font-size: .72rem; font-weight: 700; line-height: 1.2; min-height: 2.4em; display: flex; align-items: center; }
 .shop-surf { font-size: .6rem; color: var(--brown-soft); margin-top: -2px; }
 .shop-item .btn { width: 100%; padding: 5px 4px; font-size: .72rem; }
-.owned-tag { font-size: .7rem; font-weight: 800; color: var(--matcha-dark); padding: 5px 0; }
+.owned-tag { font-size: .7rem; font-weight: 800; color: #446442; padding: 5px 0; }
 .owned-mini { font-size: .6rem; color: var(--brown-soft); }
 
 .theme-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }

@@ -62,12 +62,15 @@ function renderCurrentPage(params) {
   const focusPage = isNav && lastPath !== null;
   if (focusPage) closeSidebarDrawer({restoreFocus:false});
   lastPath = route.path;
+  const focusMain = () => {
+    if (focusPage && !document.getElementById('modal-root')?.childElementCount) el.focus({preventScroll:true});
+  };
   const paint = fn => {
     if (currentRoute() !== route) return;
     el.classList.remove('page-leave');
     el.removeAttribute('aria-busy');
     fn(el, params || route.params);
-    if (focusPage) el.focus({preventScroll:true});
+    focusMain();
     // Chỉ animate cả trang khi chuyển route. Tick nhiệm vụ không được giật cả bảng tuần.
     if (!isNav) return;
     el.classList.remove('page-enter'); void el.offsetWidth;
@@ -84,7 +87,7 @@ function renderCurrentPage(params) {
       el.removeAttribute('aria-busy');
       el.innerHTML = '<p role="status">Chưa tải được trang. Kiểm tra kết nối rồi tải lại nhé.</p><button class="btn btn-soft" type="button" id="reload-route">Tải lại trang</button>';
       el.querySelector('#reload-route').onclick = () => location.reload();
-      if (focusPage) el.focus({preventScroll:true});
+      focusMain();
     }).finally(() => { if (pendingRoute === route) pendingRoute = null; });
     return;
   }

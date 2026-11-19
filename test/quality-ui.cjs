@@ -116,6 +116,20 @@ const fixtureCloud=role=>`
   await page.keyboard.press('Tab');assert.equal(await page.evaluate(()=>document.activeElement.classList.contains('modal-close')),true);
   await page.keyboard.press('Escape');await page.waitForTimeout(250);
   assert.equal(await page.evaluate(()=>document.activeElement.id),'settings-btn');
+  await page.evaluate(async () => {
+    const {openModal} = await import('/js/components/modal.js');
+    const routed = new Promise(resolve => window.addEventListener('hashchange',resolve,{once:true}));
+    location.hash = '/week';
+    await routed;
+    openModal({title:'Hộp thoại trong lúc đổi trang',content:'<button type="button">Tiếp tục</button>'});
+  });
+  await page.waitForFunction(() => !document.querySelector('#main').classList.contains('page-leave'));
+  assert.equal(await page.evaluate(() => document.activeElement.classList.contains('modal-close')), true);
+  await page.keyboard.press('Escape');
+  await page.locator('#modal-root .modal-backdrop').waitFor({state:'detached'});
+  await page.evaluate(() => { location.hash = '/'; });
+  await page.locator('#today-bar').waitFor();
+
   await page.evaluate(()=>{const original=Storage.prototype.setItem;window.restoreStorage=()=>Storage.prototype.setItem=original;Storage.prototype.setItem=function(k,v){if(k==='goc-hoc-nho:v1'||k.startsWith('goc-hoc-nho:v1:'))throw new DOMException('full','QuotaExceededError');return original.call(this,k,v);};});
   await page.evaluate(async()=>{const {update}=await import('/js/state.js');update(s=>{s.settings.userName='Test';},{silent:true});});
   await page.waitForSelector('.save-feedback:not([hidden])');assert.match(await page.locator('.save-feedback').innerText(),/Chưa lưu/);
@@ -164,15 +178,16 @@ const fixtureCloud=role=>`
   await page.keyboard.press('Enter');
   assert.equal(await filter.getAttribute('aria-pressed'), 'true');
   assert.equal(await filter.evaluate(element => document.activeElement === element), true);
-  const primaryContrast = await page.locator('#add-task-btn').evaluate(button => {
-    const {color,backgroundColor} = getComputedStyle(button);
+  const contrast = (locator, background) => locator.evaluate((element, backgroundSelector) => {
+    const {color} = getComputedStyle(element);
+    const {backgroundColor} = getComputedStyle(backgroundSelector ? element.closest(backgroundSelector) : element);
     const luminance = rgb => rgb.match(/\d+/g).slice(0,3).map(Number).map(value => value / 255)
       .map(value => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4)
       .reduce((sum,value,index) => sum + value * [0.2126,0.7152,0.0722][index], 0);
     const values = [luminance(color),luminance(backgroundColor)].sort((a,b) => b - a);
     return (values[0] + 0.05) / (values[1] + 0.05);
-  });
-  assert.ok(primaryContrast >= 4.5);
+  }, background);
+  assert.ok(await contrast(page.locator('#add-task-btn')) >= 4.5);
 
   await page.locator('[data-filter="all"]').click();
   await page.locator('#bottom-nav a[href="#/room"]').click();
@@ -181,6 +196,11 @@ const fixtureCloud=role=>`
   await page.keyboard.press('Enter');
   assert.equal(await sheet.getAttribute('aria-expanded'), 'true');
   assert.equal(await page.evaluate(() => document.activeElement.closest('#room-side') !== null), true);
+  await page.locator('[data-panel="shop"]').click();
+  const ownedTag = page.locator('.shop-item .owned-tag').first();
+  await ownedTag.waitFor();
+  assert.ok(await contrast(ownedTag,'.shop-item') >= 4.5);
+
   await page.keyboard.press('Escape');
   assert.equal(await sheet.getAttribute('aria-expanded'), 'false');
   assert.equal(await page.evaluate(() => document.activeElement.id), 'side-fab');
