@@ -183,7 +183,8 @@ export async function saveCloudState(uid, state) {
     // An unknown baseline must not silently overwrite an existing account.
     if (existing && !base) throw new Error('Cần tải dữ liệu tài khoản trước khi lưu.');
     committed = existing ? mergeState(applyAdminCredits(base, credits), adjusted, applyAdminCredits(existing, credits)) : adjusted;
-    transaction.set(ref, { ...patch, state: committed }, { merge: true });
+    // Replace the reconciled state as a whole so deleted nested fields stay deleted.
+    transaction.set(ref, { ...patch, state: committed }, { mergeFields: Object.keys(patch) });
   });
   writeSyncBase(uid, snapshot);
   return committed;

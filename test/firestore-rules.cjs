@@ -1,4 +1,5 @@
 const {test,before,after,beforeEach}=require('node:test');
+const assert = require("node:assert/strict");
 const fs=require('node:fs'),path=require('node:path');
 const {initializeTestEnvironment,assertSucceeds,assertFails}=require('@firebase/rules-unit-testing');
 const {doc,collection,getDoc,getDocs,setDoc,updateDoc,deleteDoc,writeBatch,serverTimestamp,runTransaction,Timestamp}=require('firebase/firestore');
@@ -138,4 +139,32 @@ test('catalog is readable but cannot be repriced by client accounts',async()=>{
  await env.withSecurityRulesDisabled(ctx=>setDoc(doc(ctx.firestore(),'catalog','desk'),{price:60}));
  await assertSucceeds(getDoc(doc(dbFor(null),'catalog','desk')));
  for(const uid of ['student','admin'])await assertFails(setDoc(doc(dbFor(uid),'catalog','desk'),{price:0}));
+});
+
+test('app sync removes deleted nested data, retains remote edits and keeps account permissions', async () => {
+ const vm = require('node:vm');
+ const db = dbFor('student');
+ const ref = doc(db, 'users', 'student');
+ const baseline = {wallet: {coins: 50}, days: {old: {minutes: 20}, kept: {minutes: 10}}};
+ await updateDoc(ref, {state: {...baseline, days: {...baseline.days, added: {minutes: 30}}}});
+
+ // Load the same browser functions with the real Firebase SDK pointed at the emulator.
+ const source = file => fs.readFileSync(path.join(__dirname, '../js', file), 'utf8')
+   .replace(/^import[\s\S]*?from ['"][^'"]+['"];\n/gm, '').replace(/export /g, '');
+ const app = vm.createContext({
+  initializeApp: () => ({}), getAuth: () => ({}), getFirestore: () => db,
+  onAuthStateChanged: () => () => {}, doc, runTransaction, console,
+  localStorage: {getItem: () => JSON.stringify(baseline), setItem() {}},
+ });
+ vm.runInContext(source('sync.js') + '\n' + source('cloud.js'), app);
+ // Firestore requires plain objects in its own realm.
+ app.runTransaction = (database, fn) => runTransaction(database, tx => fn({
+  get: reference => tx.get(reference),
+  set: (reference, data, options) => tx.set(reference, JSON.parse(JSON.stringify(data)), options),
+ }));
+ await app.saveCloudState('student', {wallet: {coins: 50}, days: {kept: {minutes: 10}}});
+ const saved = (await getDoc(ref)).data();
+ assert.deepEqual(saved.state.days, {kept: {minutes: 10}, added: {minutes: 30}});
+ assert.equal(saved.role, 'member');
+ assert.equal(saved.status, 'active');
 });
