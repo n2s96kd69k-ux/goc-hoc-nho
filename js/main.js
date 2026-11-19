@@ -1,3 +1,4 @@
+import { startWalletAccount, subscribeWallet } from './wallet-account.js';
 import { exportToFile } from './storage.js';
 import { startNotifications } from './notifications/data.js';
 import { initNotificationUI } from './notifications/ui.js';
@@ -168,6 +169,8 @@ function boot() {
   initState();
   recomputeStreak();
   renderHeader();
+  subscribeWallet(refreshHeaderStats);
+  startWalletAccount();
   setupMascotSync();
 
   for (const p of Object.keys(PAGES)) registerRoute(p, (params) => renderCurrentPage(params));

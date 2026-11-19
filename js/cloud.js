@@ -82,7 +82,7 @@ function publishAccess(next) {
   for (const listener of accessListeners) listener(access);
 }
 function accessFrom(uid, data = {}, ready = false) {
-  return { uid, ready, role: uid === OWNER_UID || data.role === 'admin' ? 'admin' : 'member', status: uid !== OWNER_UID && data.status === 'banned' ? 'banned' : 'active', owner: uid === OWNER_UID || data.owner === true, adminCredits: Number.isSafeInteger(data.adminCredits) ? data.adminCredits : 0 };
+  return { uid, ready, economyVersion: data.economyVersion === 1 ? 1 : 0, role: uid === OWNER_UID || data.role === 'admin' ? 'admin' : 'member', status: uid !== OWNER_UID && data.status === 'banned' ? 'banned' : 'active', owner: uid === OWNER_UID || data.owner === true, adminCredits: Number.isSafeInteger(data.adminCredits) ? data.adminCredits : 0 };
 }
 export function getAccountAccess() { return access; }
 export function isCurrentAdmin() { return !!currentUser && access.uid === currentUser.uid && access.role === 'admin' && access.status !== 'banned'; }

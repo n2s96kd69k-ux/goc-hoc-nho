@@ -1,9 +1,10 @@
+import { buyForWallet, displayedBalance, hasPendingPurchase, subscribeWallet, walletMode, walletOffer } from '../wallet-account.js';
 // ===== Trang /room : GÓC HỌC CỦA TÔI — Digital Study Room =====
 import { getState, subscribe } from '../state.js';
 import { escapeHtml } from '../utils.js';
 import { CATEGORIES, THEMES, getItemDef, itemsInCategory } from '../items.js';
 import {
-  buyItem, ownedQty, inventoryList, canBuyMore, placeItem, storeItem, rotateItem, bumpZ,
+  buyItem, ownedQty, inventoryList, inventoryQty, canBuyMore, placeItem, storeItem, rotateItem, bumpZ,
   undo, redo, canUndo, canRedo, setTheme, unlockedThemes, savePreset, loadPreset, deletePreset,
   setAccessory, toggleLamp, hasLamp, lampOn, setWeather, getPlaced,
 } from '../room.js';
@@ -35,7 +36,7 @@ export function renderRoom(root) {
       <div class="page-head room-head">
         <div><h1 class="page-title">🏡 GÓC HỌC CỦA TÔI</h1><p class="page-sub">${TOD_LABEL[timeOfDay()]} · Học xong thì về chăm căn phòng nhỏ này nhé.</p></div>
         <div class="room-actions">
-          <span class="pill glass big" id="room-coins">🪙 ${s.wallet.coins} xu</span>
+          <span class="pill glass big" id="room-coins">🪙 ${displayedBalance(s.wallet.coins) ?? '…'} xu</span>
           <button type="button" class="btn ${mode === 'decorate' ? 'btn-soft' : 'btn-primary'}" id="toggle-mode">${mode === 'decorate' ? '✓ Xong' : '✨ TRANG TRÍ'}</button>
         </div>
       </div>
@@ -159,7 +160,7 @@ export function renderRoom(root) {
   root.querySelectorAll('[data-panel]').forEach((t) => t.onclick = () => switchPanel(t.dataset.panel));
 
   function renderPanel() {
-    root.querySelector('#room-coins').textContent = `🪙 ${getState().wallet.coins} xu`;
+    root.querySelector('#room-coins').textContent = `🪙 ${displayedBalance(getState().wallet.coins) ?? '…'} xu`;
     if (panel === 'inventory') renderInventory();
     else if (panel === 'shop') renderShop();
     else renderStyle();
@@ -227,7 +228,7 @@ export function renderRoom(root) {
   }
 
   function renderShop() {
-    const st = getState();
+    const balance = displayedBalance(getState().wallet.coins);
     panelBody.innerHTML = `
       <div class="cat-tabs">
         ${CATEGORIES.map((c) => `<button type="button" class="chip ${shopCat === c.id ? 'active' : ''}" data-cat="${c.id}">${c.icon} ${c.label}</button>`).join('')}
@@ -235,12 +236,14 @@ export function renderRoom(root) {
       <div class="shop-grid">
         ${itemsInCategory(shopCat).map((it) => {
           const owned = ownedQty(it.id);
-          const can = st.wallet.coins >= it.price;
+          const offer = walletOffer(it);
+          const can = balance !== null && !!offer && balance >= offer.price;
           const more = canBuyMore(it.id);
           const surf = it.surfaces ? `<small class="shop-surf">${it.surfaces.map((x) => SURF_VI[x]).join(' · ')}</small>` : '';
-          const action = !more
+          const retry = hasPendingPurchase(it.id);
+          const action = retry ? `<button type="button" class="btn btn-primary btn-sm" data-buy="${it.id}">Kiểm tra lượt mua</button>` : !offer ? '<small class="muted">Chưa có giá</small>' : !more
             ? `<span class="owned-tag">✓ Đã sở hữu${owned > 1 ? ` ×${owned}` : ''}</span>`
-            : `<button type="button" class="btn ${can ? 'btn-primary' : 'btn-ghost'} btn-sm" data-buy="${it.id}" ${can ? '' : 'disabled'}>🪙 ${it.price}</button>${owned ? `<small class="owned-mini">đã có ×${owned}</small>` : ''}`;
+            : `<button type="button" class="btn ${can ? 'btn-primary' : 'btn-ghost'} btn-sm" data-buy="${it.id}" ${can ? '' : 'disabled'}>🪙 ${offer.price}</button>${owned ? `<small class="owned-mini">đã có ×${owned}</small>` : ''}`;
           return `<div class="shop-item ${owned ? 'owned' : ''} ${!can && more ? 'locked' : ''}">
             <span class="shop-emoji">${it.emoji}</span>
             <span class="shop-name">${escapeHtml(it.name)}</span>${surf}
@@ -266,17 +269,37 @@ export function renderRoom(root) {
         tabs.scrollLeft += dx;
       }, { passive: false });
     }
-    panelBody.querySelectorAll('[data-buy]').forEach((b) => b.onclick = () => {
+    panelBody.querySelectorAll('[data-buy]').forEach((b) => b.onclick = async () => {
       const def = getItemDef(b.dataset.buy);
-      const r = buyItem(def.id);
-      if (!r.ok) return toast(r.reason, { icon: '🐱' });
+      let cost = def.price;
+      let themeApplied = !!def.theme;
+      if (walletMode() === 'server') {
+        b.disabled = true;
+        try {
+          const result = await buyForWallet(def.id);
+          cost = -result.delta;
+        } catch (error) {
+          if (panelBody.isConnected) { renderPanel(); toast(error.message, { icon: '🐱' }); }
+          return;
+        }
+        if (!panelBody.isConnected) return;
+        if (def.theme) themeApplied = setTheme(def.theme).ok;
+      } else {
+        const result = buyItem(def.id);
+        if (!result.ok) return toast(result.reason, { icon: '🐱' });
+      }
       sounds.plop();
-      floatCoins(-def.price, b);
+      floatCoins(-cost, b);
       sparkleAt(b, 5);
       renderPanel();
-      if (def.theme) { toast(`🎨 Đã mở khóa & áp dụng ${def.name}`); scene.refresh(); return; }
+      if (def.theme) {
+        toast(themeApplied ? `🎨 Đã mở khóa & áp dụng ${def.name}` : `🎨 Đã mở khóa ${def.name}. Bạn có thể áp dụng trong Phong cách.`);
+        scene.refresh();
+        return;
+      }
       if (def.accessory) { toast(`${def.emoji} ${def.name} đã được thêm vào Kho`); return; }
-      afterBuyPrompt(def);
+      if (inventoryQty(def.id) > 0) afterBuyPrompt(def);
+      else toast(`${def.emoji} ${def.name} đã được thêm vào Kho`);
     });
   }
 
@@ -351,12 +374,19 @@ export function renderRoom(root) {
   updateToolbar();
 
   // Đồng bộ khi state đổi từ nơi khác
-  unsub = subscribe((st, meta) => {
+  const stopState = subscribe((st, meta) => {
     if (!document.body.contains(root) || !scene) return;
     if (meta.type === 'room' || meta.type === 'mascot' || meta.type === 'buy') { scene.refresh(); renderPanel(); updateToolbar(); showItemToolbar(scene.selected); }
-    if (meta.type === 'coins') root.querySelector('#room-coins').textContent = `🪙 ${st.wallet.coins} xu`;
+    if (meta.type === 'coins') root.querySelector('#room-coins').textContent = `🪙 ${displayedBalance(st.wallet.coins) ?? '…'} xu`;
     if (meta.type === 'pomodoro-complete') { renderTree(); scene.cat.timerChanged(); }
   });
+  const stopWallet = subscribeWallet(() => {
+    if (!panelBody.isConnected || !scene) return;
+    renderPanel();
+    scene.refresh();
+    updateToolbar();
+  });
+  unsub = () => { stopState(); stopWallet(); };
 }
 
 /** Dừng controller mèo & listener khi rời trang */

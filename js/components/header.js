@@ -1,3 +1,4 @@
+import { displayedBalance } from '../wallet-account.js';
 import { studyBaseline } from '../studyBaseline.js';
 import { startStudyPresence } from '../studyPresence.js';
 import { bellHTML, bindBell } from '../notifications/ui.js';
@@ -20,6 +21,7 @@ function authButtonText(user) {
 
 export function renderHeader() {
   const s = getState();
+  const balance = displayedBalance(s.wallet.coins);
   const user = getCurrentUser();
   const el = document.getElementById('app-header');
   el.innerHTML = `
@@ -34,7 +36,7 @@ export function renderHeader() {
     </button>
     <div class="header-right">
       <button class="pill glass header-streak" id="streak-btn" type="button" title="Xem việc cần làm để giữ chuỗi">🔥 ${s.streak.current} ngày</button>
-      <span class="pill glass header-coins" title="Xu của bạn">🪙 ${s.wallet.coins} xu</span>
+      <span class="pill glass header-coins" title="Xu của bạn">🪙 ${balance ?? '…'} xu</span>
       <button class="pill glass header-auth" id="auth-btn" type="button" title="Tài khoản & Đồng bộ">${authButtonText(user)}</button>
       <button class="header-mascot mascot-wrap mascot-${mascot.state}" id="header-mascot" type="button" aria-label="Mochi" title="${s.mascot.name}">${mascotSVG(34)}</button>
       ${bellHTML}
@@ -45,7 +47,7 @@ export function renderHeader() {
   el.querySelector('#live-study').onclick = () => openLiveRoom();
   el.querySelector('#auth-btn').onclick = () => openAuthModal();
   el.querySelector('#header-mascot').onclick = () => { mascot.poke(); if (location.hash !== '#/room') navigate('/room'); };
-  shownCoins = s.wallet.coins;
+  shownCoins = balance;
   bindSidebarToggle(el.querySelector('#menu-btn'));
   startLiveCount();
   bindBell();
@@ -122,7 +124,13 @@ export function refreshHeaderStats() {
   const st = document.querySelector('.header-streak');
   if (st) st.textContent = `🔥 ${s.streak.current} ngày`;
   if (!c) return;
-  const target = s.wallet.coins;
+  const target = displayedBalance(s.wallet.coins);
+  if (target === null) {
+    cancelAnimationFrame(coinRaf);
+    shownCoins = null;
+    c.textContent = '🪙 … xu';
+    return;
+  }
   if (shownCoins === null || matchMedia('(prefers-reduced-motion: reduce)').matches) { shownCoins = target; c.textContent = `🪙 ${target} xu`; return; }
   if (shownCoins === target) return;
   cancelAnimationFrame(coinRaf);

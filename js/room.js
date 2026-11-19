@@ -1,3 +1,4 @@
+import { ownedCount, ownedRecords, walletMode, walletOffer } from './wallet-account.js';
 // ===== ROOM STATE — single source of truth cho Shop / Kho / Phòng / Mèo =====
 // state.room = { theme, owned:{itemId:qty}, placed:[{uid,itemId,x,y,surface,parent,rot,zOff}], lampOverride, weather, presets }
 import { getState, update } from './state.js';
@@ -8,7 +9,7 @@ import { uid as makeUid } from './utils.js';
 const room = () => getState().room;
 
 // ---------- Ownership / inventory ----------
-export function ownedQty(itemId) { return room().owned[itemId] || 0; }
+export function ownedQty(itemId) { return ownedCount(itemId, room().owned); }
 export function placedCount(itemId) { return room().placed.filter((p) => p.itemId === itemId).length; }
 /** Số lượng còn trong kho = sở hữu − đã đặt (− đang đeo với phụ kiện) */
 export function inventoryQty(itemId) {
@@ -20,10 +21,11 @@ export function inventoryQty(itemId) {
 }
 export function canBuyMore(itemId) {
   const def = getItemDef(itemId);
-  return def && ownedQty(itemId) < (def.maxQty || 1);
+  const offer = def && walletOffer(def);
+  return !!offer && ownedQty(itemId) < (offer.maxQty || 1);
 }
 export function inventoryList() {
-  return Object.keys(room().owned)
+  return Object.keys(ownedRecords(room().owned))
     .map((id) => ({ def: getItemDef(id), qty: inventoryQty(id), owned: ownedQty(id) }))
     .filter((x) => x.def && !x.def.theme && x.qty > 0);
 }
@@ -33,6 +35,7 @@ export function currentTheme() { return THEMES[room().theme] || THEMES.cream; }
 
 // ---------- Kinh tế: mua ----------
 export function buyItem(itemId) {
+  if (walletMode() !== 'legacy') return { ok: false, reason: 'Bạn cần kết nối ví để mua vật phẩm.' };
   const def = getItemDef(itemId);
   if (!def) return { ok: false, reason: 'Không tìm thấy vật phẩm.' };
   const s = getState();
