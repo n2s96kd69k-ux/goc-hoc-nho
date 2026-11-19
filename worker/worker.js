@@ -139,6 +139,14 @@ function firestore(env) {
   }};
 }
 
+async function readDocument(env, path) {
+  const url=`https://firestore.googleapis.com/v1/projects/${encodeURIComponent(env.FIREBASE_PROJECT_ID)}/databases/(default)/documents/${path.split('/').map(encodeURIComponent).join('/')}`;
+  const response=await fetch(url,{headers:{Authorization:'Bearer '+await accessToken(env)}});
+  if(response.status===404)return null;
+  if(!response.ok)throw Error('database-error');
+  const doc=await response.json();return decode({mapValue:{fields:doc.fields}});
+}
+
 export default {async fetch(request,env){
   const origin=request.headers.get('Origin');
   const allowed=['https://gochocnho.id.vn','https://www.gochocnho.id.vn'];
@@ -149,9 +157,17 @@ export default {async fetch(request,env){
   if(request.method==='OPTIONS')return new Response(null,{status:204,headers});
   const path=new URL(request.url).pathname;
   if(path==='/health'&&request.method==='GET')return reply({ok:true,service:'goc-hoc-nho-api',configured:!!(env.FIREBASE_PROJECT_ID&&env.FIREBASE_SERVICE_ACCOUNT&&env.FIREBASE_WEB_API_KEY),walletMigrationEnabled:false});
-  if(path!=='/api/economy'||request.method!=='POST')return reply({error:'not-found'},404);
+  const diagnostic=path==='/api/status'&&request.method==='GET';
+  if(!diagnostic&&(path!=='/api/economy'||request.method!=='POST'))return reply({error:'not-found'},404);
   try{
     const uid=await verifiedUid(request,env);
+    if(diagnostic){
+      const account=await readDocument(env,`users/${uid}`);
+      if(!account || account.status==='banned')throw Error('access-denied');
+      if(uid!=='Vyd1sYXrKARaTujn0ucX0XFe0gp2' && account.role!=='admin')throw Error('admin-required');
+      const wallet=await readDocument(env,`users/${uid}/economy/wallet`);
+      return reply({ok:true,authenticated:true,firestoreConnected:true,canonicalWalletExists:wallet!==null,walletMigrationEnabled:false});
+    }
     const text=await request.text();if(text.length>8192)return reply({error:'request-too-large'},413);
     const command=JSON.parse(text);
     const result=await transactEconomy(firestore(env),uid,command,()=>new Date());return reply({ok:true,result});

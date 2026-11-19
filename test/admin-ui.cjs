@@ -8,7 +8,7 @@ const server=http.createServer((req,res)=>{
 });
 const fixtureCloud=role=>`
  let access={uid:'admin',role:'${role}',status:'active',ready:true,owner:true,adminCredits:0};let listener;
- const user={uid:'admin',email:'admin@example.test',displayName:'Admin'};
+ const user={getIdToken:async()=> 'test-id-token',uid:'admin',email:'admin@example.test',displayName:'Admin'};
  export const OWNER_UID='admin';export const OWNER_ID='GHN-776J9W';export const firebaseDb=()=>({});export const getCurrentUser=()=>user;
  export const accountId=()=> 'GHN-ADMIN1';export const isCurrentAdmin=()=>access.role==='admin';export const getAccountAccess=()=>access;
  export const requireAdmin=async()=>isCurrentAdmin()?user:null;
@@ -42,6 +42,10 @@ const fixtureService=`
     await page.waitForURL('**/#/');assert.equal(await page.locator('.nav-admin').count(),0);assert.equal(await page.locator('.admin-shell').count(),0);console.log('PASS: member direct route redirects and management menu stays hidden');
    }else{
     await page.locator('.admin-table tbody tr').first().waitFor();assert.equal(await page.locator('.nav-admin').innerText(),'Quản Lý');
+    await page.route('https://dark-tooth-7030.n2s96kd69k.workers.dev/api/status',r=>{assert.equal(r.request().headers().authorization,'Bearer test-id-token');return r.fulfill({contentType:'application/json',body:JSON.stringify({ok:true,firestoreConnected:true,canonicalWalletExists:false})});});
+    await page.locator('.admin-nav a[href="#/admin?tab=connection"]').click();
+    await page.locator('#check-wallet-connection').click();
+    await page.locator('#wallet-connection-status').filter({hasText:'Kết nối thành công'}).waitFor();
     await page.locator('.admin-nav a[href="#/admin?tab=announcements"]').click();
     await page.locator('#announcement-form textarea').fill('Chúc mọi người học tốt <b>nhé</b>!');
     await page.locator('#announcement-form [type="submit"]').click();

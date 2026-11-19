@@ -7,7 +7,7 @@ import { toast } from '../components/toast.js';
 import { listUsers, resolveUser, changeUser, listActivity, adminError } from '../admin/service.js';
 import { canChangeAccess, validateReason, coinChange } from '../admin/policy.js';
 
-const tabs = { users: 'Người dùng', coins: 'Phát xu', announcements: 'Thông báo', activity: 'Nhật ký' };
+const tabs = { users: 'Người dùng', coins: 'Phát xu', announcements: 'Thông báo', activity: 'Nhật ký', connection: 'Kết nối ví' };
 const typeNames = { 'coins-add': 'Cộng xu', 'coins-set': 'Sửa số dư', role: 'Đổi quyền', status: 'Khóa / mở khóa' };
 let generation = 0;
 let activeModal = null;
@@ -33,7 +33,7 @@ export async function renderAdmin(root, params = {}) {
         <div class="admin-nav-foot"><span class="admin-status-dot"></span> Quản trị viên<a href="#/">Trở về góc học ↗</a></div>
       </aside>
       <div class="admin-content">
-        <header class="admin-page-head"><div><p class="admin-eyebrow">QUẢN LÝ / ${tabs[tab].toUpperCase()}</p><h1>${tabs[tab]}</h1><p>${tab === 'users' ? 'Tra cứu tài khoản, phân quyền và quản lý trạng thái truy cập.' : tab === 'coins' ? 'Phát xu sự kiện cho từng tài khoản, có xác nhận và lịch sử.' : tab === 'announcements' ? 'Soạn và phát thông báo chung cho Góc Học Nhỏ.' : 'Lịch sử các thay đổi quản trị đã được lưu trên máy chủ.'}</p></div><span class="admin-badge">${getAccountAccess().owner ? 'Chủ hệ thống' : 'Quản trị viên'}</span></header>
+        <header class="admin-page-head"><div><p class="admin-eyebrow">QUẢN LÝ / ${tabs[tab].toUpperCase()}</p><h1>${tabs[tab]}</h1><p>${tab === 'users' ? 'Tra cứu tài khoản, phân quyền và quản lý trạng thái truy cập.' : tab === 'coins' ? 'Phát xu sự kiện cho từng tài khoản, có xác nhận và lịch sử.' : tab === 'announcements' ? 'Soạn và phát thông báo chung cho Góc Học Nhỏ.' : tab === 'connection' ? 'Kiểm tra kết nối Firebase và API ví máy chủ.' : 'Lịch sử các thay đổi quản trị đã được lưu trên máy chủ.'}</p></div><span class="admin-badge">${getAccountAccess().owner ? 'Chủ hệ thống' : 'Quản trị viên'}</span></header>
         <div class="admin-view" id="admin-view"></div>
       </div>
     </section>`;
@@ -42,6 +42,7 @@ export async function renderAdmin(root, params = {}) {
   if (tab === 'users') usersView(view, alive);
   else if (tab === 'coins') coinsView(view, alive);
   else if (tab === 'announcements') announcementsView(view, alive);
+  else if (tab === 'connection') connectionView(view, alive);
   else activityView(view, alive);
 }
 function usersView(view, alive) {
@@ -167,4 +168,27 @@ function announcementsView(view, alive) {
   };
   view.querySelector('#refresh-announcements').onclick = load;
   load();
+}
+
+
+function connectionView(view, alive) {
+  view.innerHTML = `<div class="admin-panel"><h2>Ví máy chủ</h2><p>Kiểm tra kết nối bằng tài khoản đang đăng nhập. Thao tác này chỉ đọc dữ liệu.</p><button type="button" class="admin-button" id="check-wallet-connection">Kiểm tra kết nối ví máy chủ</button><p role="status" aria-live="polite" id="wallet-connection-status">Chưa kiểm tra.</p></div>`;
+  const button=view.querySelector('#check-wallet-connection'), status=view.querySelector('#wallet-connection-status');
+  button.onclick=async()=>{
+    button.disabled=true;status.textContent='Đang kiểm tra…';
+    try{
+      const user=getCurrentUser();if(!user)throw Error('Bạn cần đăng nhập lại.');
+      const token=await user.getIdToken();
+      const response=await fetch('https://dark-tooth-7030.n2s96kd69k.workers.dev/api/status',{headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(20000)});
+      const data=await response.json();
+      if(!response.ok||!data.ok){
+        const messages={'not-found':'Worker chưa có chức năng kiểm tra. Hãy cập nhật mã Worker mới.','configuration-error':'Cấu hình Worker chưa hợp lệ.','service-auth-failed':'Không xác thực được tài khoản dịch vụ Firebase.','database-error':'Worker chưa đọc được Firestore. Kiểm tra quyền Cloud Datastore User.','unauthenticated':'Phiên đăng nhập chưa được API chấp nhận.','admin-required':'Tài khoản chưa có quyền quản trị trên máy chủ.','access-denied':'Tài khoản không tồn tại hoặc đã bị khóa.'};
+        throw Error(messages[data.error]||'Kiểm tra chưa thành công.');
+      }
+      if(alive())status.textContent=data.canonicalWalletExists
+        ? 'Kết nối thành công. Đã có document ví mới; hệ thống chuyển ví chưa được kích hoạt, cần kiểm tra trước khi sử dụng.'
+        : 'Kết nối thành công: đã xác thực tài khoản và đọc Firestore. Chưa chuyển ví mới.';
+    }catch(error){if(alive())status.textContent=error.message==='Failed to fetch'?'Không gọi được Worker. Kiểm tra mạng, CORS và phiên bản Worker.':error.message;}
+    finally{if(alive())button.disabled=false;}
+  };
 }

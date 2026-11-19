@@ -67,3 +67,11 @@ export function firestore(env) {
     }
   }};
 }
+
+export async function readDocument(env, path) {
+  const url=`https://firestore.googleapis.com/v1/projects/${encodeURIComponent(env.FIREBASE_PROJECT_ID)}/databases/(default)/documents/${path.split('/').map(encodeURIComponent).join('/')}`;
+  const response=await fetch(url,{headers:{Authorization:'Bearer '+await accessToken(env)}});
+  if(response.status===404)return null;
+  if(!response.ok)throw Error('database-error');
+  const doc=await response.json();return decode({mapValue:{fields:doc.fields}});
+}
