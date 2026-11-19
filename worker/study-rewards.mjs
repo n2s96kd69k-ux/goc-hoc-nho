@@ -38,6 +38,17 @@ function studyRewards(tx, ref) {
   return next;
  }
 
+ async function recordFocus(date, minutes, subjectId) {
+  const day = await recordDay(date, {focusMinutes: minutes, pomodoros: 1});
+  if (subjectId === null || subjectId === undefined) return;
+  const subjects = day.subjects || {};
+  const previous = Object.hasOwn(subjects, subjectId) ? subjects[subjectId] : {};
+  day.subjects = {...subjects, [subjectId]: {
+   minutes: counter(previous, 'minutes') + minutes,
+   pomodoros: counter(previous, 'pomodoros') + 1,
+  }};
+ }
+
  async function recordTask(previous, next) {
   if (previous && next && previous.date === next.date) {
    const difference = Number(next.done) - Number(previous.done);
@@ -93,7 +104,7 @@ function studyRewards(tx, ref) {
   for (const date of changed) tx.set(dayRef(date), cached.get(date));
   for (const {marker, coins, details} of awards) tx.create(marker, {...details, coins, createdAt: now});
  }
- return {recordDay, recordTask, weekly, streak, write};
+ return {recordDay, recordFocus, recordTask, weekly, streak, write};
 }
 
 

@@ -179,6 +179,17 @@ const fixtureCloud=role=>`
   assert.equal(focusCalls[3].expectedRevision, 0);
   await pushRow(sessionPath, {...session,status:'paused',elapsedMs:600000,revision:1});
   await page.locator('#pomo-time').getByText('15:00').waitFor();
+  await page.evaluate(async () => {
+    const {todayKey} = await import('/js/utils.js');
+    const path = 'users/admin/studyDays';
+    const row = {focusMinutes: 45, pomodoros: 2, tasksDone: 3, subjects: {math: {minutes:45,pomodoros:2}}};
+    window.__walletListeners.get(path).forEach(fn => fn({docs:[{id:todayKey(),data:()=>row}]}));
+  });
+  await page.locator('.pomo-today').filter({hasText:'45 phút'}).waitFor();
+  await page.locator('.header-streak').filter({hasText:'1 ngày'}).waitFor();
+  const totals = await page.evaluate(async () => (await import('/js/study-account.js')).subjectStudyTotals('math'));
+  assert.deepEqual(totals, {minutes:45,pomodoros:2});
+
   await page.locator('#pomo-start').click();
   await page.waitForFunction(() => document.querySelector('#pomo-feedback').hidden);
   assert.equal(focusCalls[4].type, 'focus-resume');

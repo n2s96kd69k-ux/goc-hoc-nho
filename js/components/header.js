@@ -10,7 +10,7 @@ import { getCurrentUser } from '../cloud.js';
 import { openAuthModal } from './authModal.js';
 import { openModal } from './modal.js';
 import { escapeHtml, todayKey } from '../utils.js';
-import { streakProgress } from '../gamification.js';
+import { streakProgress, streakTotals } from '../gamification.js';
 
 function authButtonText(user) {
   if (!user) return '☁️ Đăng nhập';
@@ -35,7 +35,7 @@ export function renderHeader() {
       <span class="live-copy">Đang có <strong class="live-count" data-live-count>${liveTotal()}</strong> bạn đang học bài</span>
     </button>
     <div class="header-right">
-      <button class="pill glass header-streak" id="streak-btn" type="button" title="Xem việc cần làm để giữ chuỗi">🔥 ${s.streak.current} ngày</button>
+      <button class="pill glass header-streak" id="streak-btn" type="button" title="Xem việc cần làm để giữ chuỗi">🔥 ${streakTotals().current} ngày</button>
       <span class="pill glass header-coins" title="Xu của bạn">🪙 ${balance ?? '…'} xu</span>
       <button class="pill glass header-auth" id="auth-btn" type="button" title="Tài khoản & Đồng bộ">${authButtonText(user)}</button>
       <button class="header-mascot mascot-wrap mascot-${mascot.state}" id="header-mascot" type="button" aria-label="Mochi" title="${s.mascot.name}">${mascotSVG(34)}</button>
@@ -122,7 +122,7 @@ export function refreshHeaderStats() {
   const s = getState();
   const c = document.querySelector('.header-coins');
   const st = document.querySelector('.header-streak');
-  if (st) st.textContent = `🔥 ${s.streak.current} ngày`;
+  if (st) st.textContent = `🔥 ${streakTotals().current} ngày`;
   if (!c) return;
   const target = displayedBalance(s.wallet.coins);
   if (target === null) {

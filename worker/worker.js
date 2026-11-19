@@ -38,6 +38,17 @@ function studyRewards(tx, ref) {
   return next;
  }
 
+ async function recordFocus(date, minutes, subjectId) {
+  const day = await recordDay(date, {focusMinutes: minutes, pomodoros: 1});
+  if (subjectId === null || subjectId === undefined) return;
+  const subjects = day.subjects || {};
+  const previous = Object.hasOwn(subjects, subjectId) ? subjects[subjectId] : {};
+  day.subjects = {...subjects, [subjectId]: {
+   minutes: counter(previous, 'minutes') + minutes,
+   pomodoros: counter(previous, 'pomodoros') + 1,
+  }};
+ }
+
  async function recordTask(previous, next) {
   if (previous && next && previous.date === next.date) {
    const difference = Number(next.done) - Number(previous.done);
@@ -93,7 +104,7 @@ function studyRewards(tx, ref) {
   for (const date of changed) tx.set(dayRef(date), cached.get(date));
   for (const {marker, coins, details} of awards) tx.create(marker, {...details, coins, createdAt: now});
  }
- return {recordDay, recordTask, weekly, streak, write};
+ return {recordDay, recordFocus, recordTask, weekly, streak, write};
 }
 
 
@@ -223,7 +234,7 @@ async function transactFocus(db, authUid, input, clock = Date.now) {
    if(type==='focus-complete'){
     requireValue(elapsed>=next.durationMs,'focus-too-early');
     const reward=next.durationMs/60000;
-    await rewards.recordDay(next.date, {focusMinutes: reward, pomodoros: 1});
+    await rewards.recordFocus(next.date, reward, next.subjectId);
     const streak = await rewards.streak(studyDate(now));
     coinsEarned = reward + streak.events.reduce((sum, event) => sum + event.coins, 0);
     requireValue(balance + coinsEarned <= 1000000000 && earned + coinsEarned <= 1000000000, 'balance-limit');

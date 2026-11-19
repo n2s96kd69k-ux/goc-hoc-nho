@@ -1,18 +1,18 @@
 import { visibleTasks } from './task-account.js';
 // ===== Thống kê =====
+import { studyDay, studyDayKeys } from './study-account.js';
+import { streakTotals } from './gamification.js';
 import { getState } from './state.js';
 import { weekKeys, startOfWeek, todayKey, toKey, addDays, pct } from './utils.js';
 import { subjectStats } from './subjects.js';
 
 /** Phút học thật trong ngày: chỉ Pomodoro và phút ghi tay, không cộng phút dự kiến của task. */
 export function minutesOfDay(key) {
-  const d = getState().days[key];
-  return d && d.minutes ? d.minutes : 0;
+  return studyDay(key).minutes;
 }
 
 export function pomodorosOfDay(key) {
-  const d = getState().days[key];
-  return d && d.pomodoros ? d.pomodoros : 0;
+  return studyDay(key).pomodoros;
 }
 
 export function weekSummary(monday = startOfWeek(todayKey())) {
@@ -32,7 +32,7 @@ export function weekSummary(monday = startOfWeek(todayKey())) {
 
 export function totalMinutesAllTime() {
   const s = getState();
-  const days = Object.keys(s.days);
+  const days = studyDayKeys();
   const taskDays = new Set(visibleTasks(s.tasks).map((t) => t.date));
   const all = new Set([...days, ...taskDays]);
   let sum = 0;
@@ -44,18 +44,19 @@ export function overallStats() {
   const s = getState();
   const doneTasks = visibleTasks(s.tasks).filter((t) => t.done).length;
   const totalMinutes = totalMinutesAllTime();
-  const allKeys = new Set([...Object.keys(s.days), ...visibleTasks(s.tasks).map((t) => t.date)]);
+  const allKeys = new Set([...studyDayKeys(), ...visibleTasks(s.tasks).map((t) => t.date)]);
   let totalPomos = 0;
   for (const k of allKeys) totalPomos += pomodorosOfDay(k);
   const subs = s.subjects.map((sub) => ({ ...sub, stats: subjectStats(sub.id) }))
     .sort((a, b) => b.stats.minutes - a.stats.minutes);
+  const streak = streakTotals();
   return {
     totalMinutes,
     totalPomos,
     doneTasks,
     totalTasks: visibleTasks(s.tasks).length,
-    streak: s.streak.current,
-    longest: s.streak.longest,
+    streak: streak.current,
+    longest: streak.longest,
     topSubject: subs[0] || null,
     subjects: subs,
   };

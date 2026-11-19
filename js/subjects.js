@@ -1,3 +1,4 @@
+import { subjectStudyTotals } from './study-account.js';
 import { visibleTasks } from './task-account.js';
 // ===== Môn học =====
 import { getState, update } from './state.js';
@@ -51,8 +52,7 @@ export function subjectStats(id) {
   const s = getState();
   const tasks = visibleTasks(s.tasks).filter((t) => t.subjectId === id);
   const done = tasks.filter((t) => t.done);
-  const minutes = (s.timer.bySubject && s.timer.bySubject[id]) || 0;
-  const pomodoros = (s.timer.pomosBySubject && s.timer.pomosBySubject[id]) || 0;
+  const { minutes, pomodoros } = subjectStudyTotals(id);
   return {
     total: tasks.length,
     done: done.length,

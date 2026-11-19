@@ -327,7 +327,7 @@ test('Worker REST transactions serialize purchases, keep receipts and enforce ac
 
   const sessionId = 'focus-emulator-session-0001';
   const session = doc(db, 'users/student/focusSessions', sessionId);
-  const beginFocus = {type: 'focus-start', sessionId, minutes: 1, operationId: 'focus-emulator-start-0001'};
+  const beginFocus = {type: 'focus-start', sessionId, minutes: 1, subjectId: 'math', operationId: 'focus-emulator-start-0001'};
   assert.equal((await call(beginFocus)).status, 200);
   const finishFocus = {type: 'focus-complete', sessionId, operationId: 'focus-emulator-complete-0001'};
   assert.equal((await call(finishFocus)).body.error, 'focus-too-early');
@@ -343,7 +343,10 @@ test('Worker REST transactions serialize purchases, keep receipts and enforce ac
   assert.deepEqual(finishes[0].body.result, finishes[1].body.result);
   assert.equal(finishes[0].body.result.reward, 1);
   assert.equal((await getDoc(wallet)).data().activeSessionId, null);
-  assert.equal((await getDoc(session)).data().status, 'completed');
+  const completedSession = (await getDoc(session)).data();
+  assert.equal(completedSession.status, 'completed');
+  const studyDay = (await getDoc(doc(db, 'users/student/studyDays', completedSession.date))).data();
+  assert.deepEqual(studyDay.subjects.math, {minutes: 1, pomodoros: 1});
 
   await env.withSecurityRulesDisabled(async context => {
    const privileged = context.firestore();

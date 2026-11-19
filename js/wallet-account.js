@@ -5,6 +5,8 @@ import { sendWalletCommand } from './wallet-api.js';
 let account = null;
 const listeners = new Set();
 const taskListeners = new Set();
+const studyListeners = new Set();
+const publishStudy = () => studyListeners.forEach(listener => listener());
 const publishTasks = () => taskListeners.forEach(listener => listener());
 const inFlight = new Set();
 const terminal = new Set(['insufficient-funds', 'quantity-limit', 'item-unavailable', 'operation-conflict']);
@@ -18,7 +20,7 @@ export function startWalletAccount() {
     account = null;
     if (eligible) {
       const db = firebaseDb();
-      const current = { uid: access.uid, balance: null, activeFocusId: undefined, owned: new Map(), catalog: new Map(), tasks: null, stop: [] };
+      const current = { uid: access.uid, balance: null, activeFocusId: undefined, owned: new Map(), catalog: new Map(), tasks: null, studyDays: null, stop: [] };
       account = current;
       const watch = (ref, apply, clear) => onSnapshot(ref, snapshot => {
         if (account !== current) return;
@@ -30,6 +32,16 @@ export function startWalletAccount() {
         publish();
       });
       current.stop.push(
+        onSnapshot(collection(db, 'users', access.uid, 'studyDays'), snapshot => {
+          if (account !== current) return;
+          current.studyDays = new Map(snapshot.docs.flatMap(row => /^\d{4}-\d{2}-\d{2}$/.test(row.id)
+            ? [[row.id, row.data()]] : []));
+          publishStudy();
+        }, () => {
+          if (account !== current) return;
+          current.studyDays = null;
+          publishStudy();
+        }),
         onSnapshot(collection(db, 'users', access.uid, 'rewardTasks'), snapshot => {
           if (account !== current) return;
           const rows = current.tasks || new Map();
@@ -70,6 +82,7 @@ export function startWalletAccount() {
     }
     publish();
     publishTasks();
+    publishStudy();
   };
   onAccountAccessChange(connect);
   connect(getAccountAccess());
@@ -90,6 +103,15 @@ export function walletMode() {
 
 function currentWallet() {
   return walletMode() === 'server' && account?.uid === getCurrentUser()?.uid ? account : null;
+}
+
+export function subscribeStudyDays(listener) {
+  studyListeners.add(listener);
+  return () => studyListeners.delete(listener);
+}
+
+export function serverStudyDays() {
+  return currentWallet()?.studyDays || null;
 }
 
 export function subscribeServerTasks(listener) {

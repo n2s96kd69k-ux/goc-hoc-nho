@@ -1,4 +1,4 @@
-import { startWalletAccount, subscribeServerTasks, subscribeWallet } from './wallet-account.js';
+import { startWalletAccount, subscribeServerTasks, subscribeStudyDays, subscribeWallet } from './wallet-account.js';
 import { exportToFile } from './storage.js';
 import { startNotifications } from './notifications/data.js';
 import { initNotificationUI } from './notifications/ui.js';
@@ -174,11 +174,13 @@ function boot() {
   recomputeStreak();
   renderHeader();
   subscribeWallet(refreshHeaderStats);
-  subscribeServerTasks(() => {
+  const renderLearningViews = () => {
     refreshHeaderStats();
     renderSidebar();
     if (['/', '/week', '/subjects', '/pomodoro', '/stats'].includes(currentRoute()?.path)) renderCurrentPage();
-  });
+  };
+  subscribeServerTasks(renderLearningViews);
+  subscribeStudyDays(renderLearningViews);
   startWalletAccount();
   setupMascotSync();
 

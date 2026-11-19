@@ -54,7 +54,7 @@ async function transactFocus(db, authUid, input, clock = Date.now) {
    if(type==='focus-complete'){
     requireValue(elapsed>=next.durationMs,'focus-too-early');
     const reward=next.durationMs/60000;
-    await rewards.recordDay(next.date, {focusMinutes: reward, pomodoros: 1});
+    await rewards.recordFocus(next.date, reward, next.subjectId);
     const streak = await rewards.streak(studyDate(now));
     coinsEarned = reward + streak.events.reduce((sum, event) => sum + event.coins, 0);
     requireValue(balance + coinsEarned <= 1000000000 && earned + coinsEarned <= 1000000000, 'balance-limit');

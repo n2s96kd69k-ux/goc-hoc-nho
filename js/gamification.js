@@ -1,3 +1,5 @@
+import { studyDay, studyDayKeys, studyHistory } from './study-account.js';
+import { walletMode } from './wallet-account.js';
 import { visibleTasks } from './task-account.js';
 // ===== Game hóa: xu, chuỗi cố gắng, mục tiêu ngày/tuần, cây tiến độ =====
 // Mua đồ / kho / phòng nằm ở room.js (single source of truth).
@@ -33,9 +35,9 @@ export const STREAK_TASKS = 3;
 
 export function streakProgress(key) {
   const s = getState();
-  const d = s.days[key] || {};
-  const minutes = typeof d.pomoMinutes === 'number' ? d.pomoMinutes : (d.pomodoros ? (d.minutes || 0) : 0);
-  const tasks = visibleTasks(s.tasks).filter((t) => t.date === key && t.done).length;
+  const day = studyDay(key);
+  const minutes = day.focusMinutes;
+  const tasks = day.tasksDone ?? visibleTasks(s.tasks).filter((t) => t.date === key && t.done).length;
   const todo = visibleTasks(s.tasks).filter((t) => t.date === key && !t.done);
   return {
     minutes,
@@ -52,8 +54,30 @@ export function isStudyDay(key) {
   return streakProgress(key).ok;
 }
 
+export function streakTotals() {
+  const legacy = studyHistory()?.streak;
+  if (walletMode() === 'legacy') return legacy;
+  let longest = legacy?.longest || 0;
+  let current = 0;
+  let count = 0;
+  let previous;
+  const today = todayKey();
+  const yesterday = toKey(addDays(today, -1));
+  for (const date of [...studyDayKeys()].sort()) {
+    if (date > today) break;
+    const day = studyDay(date);
+    if (day.focusMinutes < STREAK_MINUTES || day.tasksDone < STREAK_TASKS) continue;
+    count = previous === toKey(addDays(date, -1)) ? count + 1 : 1;
+    previous = date;
+    if (date === today || date === yesterday) current = count;
+    longest = Math.max(longest, count);
+  }
+  return { current, longest };
+}
+
 /** Tính lại chuỗi ngày học liên tiếp. Trả về { current, events[] } */
 export function recomputeStreak() {
+  if (walletMode() !== 'legacy') return { ...streakTotals(), events: [] };
   const t = todayKey();
   let count = 0;
   let cursor = isStudyDay(t) ? t : toKey(addDays(t, -1));
