@@ -6,7 +6,7 @@ const modules = [
  ['study-rewards', 'studyRewards,studyDate'],
  ['economy', 'transactEconomy'],
  ['focus', 'transactFocus'],
- ['tasks', 'transactTask'],
+ ['tasks', 'transactTask,parseTaskFields'],
 ];
 const server = modules.map(([name, exports]) => {
  const source = fs.readFileSync(path.join(root, '../server', name + '.cjs'), 'utf8')

@@ -126,4 +126,4 @@ async function transactTask(db, authUid, input, clock=Date.now) {
   tx.create(receipt,{fingerprint,result,createdAt:now});return result;
  });
 }
-module.exports={transactTask};
+module.exports={transactTask,parseTaskFields};

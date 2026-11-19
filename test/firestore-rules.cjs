@@ -368,3 +368,49 @@ test('Worker REST transactions serialize purchases, keep receipts and enforce ac
   assert.equal(log[0].data().actorUid, 'admin');
  });
 });
+
+
+test('wallet migration dry-run, atomic cutover, exact rollback and protection of changed data', async () => {
+ const {
+  emulator, snapshotWallet, planSnapshot, applyWallet, restoreWallet, seedCatalog,
+ } = await import('../scripts/wallet-emulator.mjs');
+ const {legacyProfile,start} = require('./wallet-migration-fixture.cjs');
+ const api = emulator('demo-goc-hoc-nho');
+ const db = dbFor('student');
+ const profileRef = doc(db, 'users/student');
+ const walletRef = doc(db, 'users/student/economy/wallet');
+ const original = legacyProfile();
+ await env.withSecurityRulesDisabled(async context => {
+  await setDoc(doc(context.firestore(), profileRef.path), original);
+ });
+ const initial = await snapshotWallet(api, 'student', start);
+ assert.equal(planSnapshot(initial).summary.balance, 65);
+ assert.equal((await getDoc(walletRef)).exists(), false);
+ assert.throws(() => planSnapshot({...initial, asOf: start + 1}), /checksum/);
+ assert.ok(await seedCatalog(api) > 0);
+ assert.equal(await seedCatalog(api), 0);
+ await assertSucceeds(updateDoc(profileRef, {displayName:'Tên mới'}));
+ await assert.rejects(applyWallet(api, initial), /Hồ sơ đã thay đổi/);
+ assert.equal((await getDoc(walletRef)).exists(), false);
+ const backup = await snapshotWallet(api, 'student', start);
+ assert.ok(await applyWallet(api, backup) > 0);
+ assert.equal((await getDoc(walletRef)).data().balance, 65);
+ const migrated = (await getDoc(profileRef)).data();
+ assert.equal(migrated.economyVersion, 1);
+ assert.deepEqual(migrated.state, original.state);
+ assert.equal(migrated.planner.dayNotes['2026-11-19'].note, 'Ôn 2 chương');
+ await assertFails(updateDoc(profileRef, {state:{wallet:{coins:5000}}}));
+ await assert.rejects(applyWallet(api, backup), /Hồ sơ đã thay đổi/);
+ assert.ok(await restoreWallet(api, backup) > 0);
+ assert.deepEqual((await getDoc(profileRef)).data(), {...original, displayName:'Tên mới'});
+ assert.equal((await getDoc(walletRef)).exists(), false);
+
+ const second = await snapshotWallet(api, 'student', start);
+ await applyWallet(api, second);
+ await env.withSecurityRulesDisabled(async context => {
+  const privileged = context.firestore();
+  await setDoc(doc(privileged, 'users/student/economyOperations/new-activity'), {result:{balance:65}});
+ });
+ await assert.rejects(restoreWallet(api, second), /phát sinh dữ liệu/);
+ assert.equal((await getDoc(walletRef)).data().balance, 65);
+});

@@ -2,7 +2,7 @@ import { ownedCount, ownedRecords, walletMode, walletOffer } from './wallet-acco
 // ===== ROOM STATE — single source of truth cho Shop / Kho / Phòng / Mèo =====
 // state.room = { theme, owned:{itemId:qty}, placed:[{uid,itemId,x,y,surface,parent,rot,zOff}], lampOverride, weather, presets }
 import { getState, update } from './state.js';
-import { getItemDef, THEMES, isPlaceable, starterRoom } from './items.js';
+import { getItemDef, THEMES, isPlaceable } from './items.js';
 import { resolvePlacement, findFreeSpot, zIndexOf } from './placement.js';
 import { uid as makeUid } from './utils.js';
 
@@ -226,31 +226,4 @@ export function placedWithMeta() {
   }).filter((p) => p.def);
 }
 
-/** Migrate dữ liệu phòng cũ (v1: inventory[] + placed[{itemId,x,y}]) → v2 */
-export function migrateRoom(s) {
-  const base = starterRoom();
-  const r = s.room || {};
-  if (r.version === 2 && r.owned) {
-    return { ...base, ...r, owned: { ...r.owned }, placed: Array.isArray(r.placed) ? r.placed : [], presets: r.presets || [] };
-  }
-  const alias = { lamp: 'desk_lamp', plant: 'plant_small', flower: 'vase', star: 'star_lamp', bigtree: 'plant_big' };
-  const owned = { ...base.owned };
-  for (const oldId of (s.inventory || [])) {
-    const id = alias[oldId] || oldId;
-    if (getItemDef(id)) owned[id] = (owned[id] || 0) + 1;
-  }
-  const placed = [...base.placed];
-  for (const old of (r.placed || [])) {
-    const id = alias[old.itemId] || old.itemId;
-    const def = getItemDef(id);
-    if (!def || !def.size) continue;
-    const spot = findFreeSpot(id, placed);
-    if (spot) placed.push({ uid: makeUid(), itemId: id, x: spot.x, y: spot.y, surface: spot.surface, parent: spot.parent || null, rot: 0, zOff: 0 });
-  }
-  if (s.mascot && s.mascot.accessory) {
-    const id = alias[s.mascot.accessory] || s.mascot.accessory;
-    if (getItemDef(id)) { owned[id] = Math.max(1, owned[id] || 0); s.mascot.accessory = id; }
-    else s.mascot.accessory = null;
-  }
-  return { ...base, owned, placed };
-}
+export { migrateRoom } from './room-migration.js';

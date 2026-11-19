@@ -128,4 +128,4 @@ async function transactTask(db, authUid, input, clock=Date.now) {
 }
 
 
-export {transactTask};
+export {transactTask,parseTaskFields};
