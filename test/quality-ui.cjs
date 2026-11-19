@@ -1,4 +1,4 @@
-const {chromium}=require('playwright');
+const {chromium,firefox,webkit}=require('playwright');
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const root=path.resolve(__dirname,'..');
 const server=http.createServer((req,res)=>{const p=path.resolve(root,'.'+(req.url.split('?')[0]==='/'?'/index.html':req.url.split('?')[0]));if(!p.startsWith(root+'/'))return res.writeHead(403).end();fs.readFile(p,(e,d)=>{if(e)return res.writeHead(404).end();res.setHeader('Content-Type',p.endsWith('.js')?'application/javascript':p.endsWith('.css')?'text/css':'text/html');res.end(d);});});
@@ -22,9 +22,15 @@ const fixtureCloud=role=>`
 `;
 
 (async()=>{
+ const browserName = process.env.QUALITY_BROWSER || 'chromium';
+ const engine = {chromium,firefox,webkit}[browserName];
+ assert.ok(engine, `Unsupported browser: ${browserName}`);
  await new Promise(r=>server.listen(0,'127.0.0.1',r));
- const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH,headless:true,args:['--no-sandbox']});
+ let browser;
  try {
+  browser = await engine.launch(browserName === 'chromium'
+    ? {executablePath:process.env.CHROMIUM_PATH,headless:true,args:['--no-sandbox']}
+    : {headless:true});
   const page=await browser.newPage();const errors=[];page.on('pageerror',e=>{errors.push(e.message);console.error(e.message);});
   await page.route('**/js/cloud.js',r=>r.fulfill({contentType:'application/javascript',body:fixtureCloud('member')}));
   for(const [file,body] of Object.entries({'studyPresence.js':'export const startStudyPresence=fn=>{fn(0);return ()=>{};};','notifications/data.js':'export const startNotifications=()=>{};'})){
@@ -174,6 +180,11 @@ const fixtureCloud=role=>`
   await page.setViewportSize({width:1280,height:720});
   await page.evaluate(() => { location.hash = '/'; });
   console.log('PASS: keyboard drawer, Skip to main, responsive goals at 320px, sheet and filter focus, primary button contrast');
+
+  if (browserName !== 'chromium') {
+    assert.deepEqual(errors, []);
+    return;
+  }
 
   const openServerShop = async hadPurchase => {
     await page.evaluate(hadPurchase => {
@@ -394,5 +405,5 @@ const fixtureCloud=role=>`
   console.log('PASS: offline account switch, modal dismissal and recovery of the owner draft');
 
 
- }finally{await browser.close();await new Promise(r=>server.close(r));}
+ }finally{await browser?.close();await new Promise(r=>server.close(r));}
 })().catch(e=>{console.error(e);process.exitCode=1;});

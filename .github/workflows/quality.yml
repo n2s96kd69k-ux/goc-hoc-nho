@@ -31,3 +31,23 @@ jobs:
           fi
       - run: npm run test:ui
       - run: npm run test:quality-ui
+
+  browser-smoke:
+    name: Browser smoke (${{ matrix.browser }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [firefox, webkit]
+    env:
+      QUALITY_BROWSER: ${{ matrix.browser }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps "$QUALITY_BROWSER"
+      - run: npm run test:quality-ui
