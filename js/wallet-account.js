@@ -20,7 +20,7 @@ export function startWalletAccount() {
     account = null;
     if (eligible) {
       const db = firebaseDb();
-      const current = { uid: access.uid, balance: null, activeFocusId: undefined, owned: new Map(), catalog: new Map(), tasks: null, studyDays: null, stop: [] };
+      const current = { uid: access.uid, balance: null, totalEarned: null, activeFocusId: undefined, owned: null, catalog: new Map(), tasks: null, studyDays: null, stop: [] };
       account = current;
       const watch = (ref, apply, clear) => onSnapshot(ref, snapshot => {
         if (account !== current) return;
@@ -60,17 +60,20 @@ export function startWalletAccount() {
           const wallet = snapshot.data();
           current.balance = wallet?.version === 1 && Number.isSafeInteger(wallet.balance) && wallet.balance >= 0
             ? wallet.balance : null;
+          current.totalEarned = current.balance !== null && Number.isSafeInteger(wallet.totalEarned) && wallet.totalEarned >= 0
+            ? wallet.totalEarned : null;
           current.activeFocusId = current.balance === null ? undefined : (wallet.activeSessionId ?? null);
         }, () => {
           current.balance = null;
           current.activeFocusId = undefined;
+          current.totalEarned = null;
         }),
         watch(collection(db, 'users', access.uid, 'ownedItems'), snapshot => {
           current.owned = new Map(snapshot.docs.flatMap(row => {
             const { quantity } = row.data();
             return Number.isSafeInteger(quantity) && quantity > 0 ? [[row.id, quantity]] : [];
           }));
-        }, () => { current.owned = new Map(); }),
+        }, () => { current.owned = null; }),
         watch(collection(db, 'catalog'), snapshot => {
           current.catalog = new Map(snapshot.docs.flatMap(row => {
             const item = row.data();
@@ -142,6 +145,17 @@ export function activeFocusId() {
   return id === null || (typeof id === 'string' && /^[a-zA-Z0-9_-]{16,128}$/.test(id)) ? id : undefined;
 }
 
+export function walletBackupData() {
+  const wallet = currentWallet();
+  if (!wallet?.owned || !wallet.tasks || !wallet.studyDays || wallet.balance === null || wallet.totalEarned === null) return null;
+  return {
+    wallet: { coins:wallet.balance, totalEarned:wallet.totalEarned },
+    owned: Object.fromEntries(wallet.owned),
+    tasks: serverTaskRows(),
+    studyDays: wallet.studyDays,
+  };
+}
+
 export function displayedBalance(legacy) {
   return walletMode() === 'legacy' ? legacy : currentWallet()?.balance ?? null;
 }
@@ -151,7 +165,7 @@ export function ownedRecords(legacy) {
 }
 
 export function ownedCount(itemId, legacy) {
-  return walletMode() === 'legacy' ? legacy[itemId] || 0 : currentWallet()?.owned.get(itemId) || 0;
+  return walletMode() === 'legacy' ? legacy[itemId] || 0 : currentWallet()?.owned?.get(itemId) || 0;
 }
 
 export function walletOffer(item) {

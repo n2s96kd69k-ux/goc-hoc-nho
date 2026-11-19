@@ -1,5 +1,5 @@
-import { startWalletAccount, subscribeServerTasks, subscribeStudyDays, subscribeWallet } from './wallet-account.js';
-import { exportToFile } from './storage.js';
+import { startWalletAccount, subscribeServerTasks, subscribeStudyDays, subscribeWallet, walletMode } from './wallet-account.js';
+import { exportAccountBackup } from './account-backup.js';
 import { startNotifications } from './notifications/data.js';
 import { initNotificationUI } from './notifications/ui.js';
 import { applyAdminCredits } from './sync.js';
@@ -21,7 +21,7 @@ import { patchTaskToggle } from './components/planner.js';
 import { renderOverview } from './pages/overview.js';
 import { renderWeek } from './pages/week.js';
 import { renderSubjects } from './pages/subjects.js';
-import { renderPomodoro } from './pages/pomodoro.js';
+import { renderPomodoro, disposePomodoro } from './pages/pomodoro.js';
 import { renderRoom, disposeRoom } from './pages/room.js';
 import { timeOfDay } from './catBrain.js';
 import { renderStats } from './pages/stats.js';
@@ -51,6 +51,7 @@ function renderCurrentPage(params) {
   document.body.classList.toggle('admin-mode', route.path === '/admin');
   if (lastPath === '/admin' && route.path !== '/admin') disposeAdmin();
   if (lastPath === '/room' && route.path !== '/room') disposeRoom();
+  if (lastPath === '/pomodoro' && route.path !== '/pomodoro') disposePomodoro();
   const isNav = lastPath !== route.path;
   lastPath = route.path;
   const paint = () => {
@@ -158,7 +159,10 @@ function setupSaveFeedback() {
   retry.className = 'btn btn-soft btn-sm'; retry.textContent = 'Thử lưu lại'; retry.onclick = retrySave;
   const backup = document.createElement('button'); backup.type = 'button';
   backup.className = 'btn btn-soft btn-sm'; backup.textContent = 'Tải bản sao';
-  backup.onclick = () => exportToFile(getState());
+  backup.onclick = () => {
+    try { exportAccountBackup(); }
+    catch (error) { toast(error.message, {kind:'error'}); }
+  };
   box.append(text, retry, backup); document.body.append(box);
   window.addEventListener('storage:status', ({ detail }) => {
     box.hidden = !detail.localFailed && !detail.cloudFailed;
@@ -197,6 +201,7 @@ function boot() {
   initNotificationUI();
   startNotifications();
   let lastRole = null;
+  let settingsContext;
   let bannedNoticeUid = null;
   onAccountAccessChange(access => {
     renderSidebar();
@@ -215,6 +220,9 @@ function boot() {
       toast('Tài khoản đã bị khóa truy cập dữ liệu trên máy chủ.', { kind: 'error' });
     }
     if (lastRole !== access.role && currentRoute()?.path === '/goals') renderCurrentPage();
+    const nextSettingsContext = `${access.uid || ''}:${walletMode()}`;
+    if (settingsContext !== nextSettingsContext && currentRoute()?.path === '/settings') renderCurrentPage();
+    settingsContext = nextSettingsContext;
     lastRole = access.role;
   });
 

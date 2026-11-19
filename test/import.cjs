@@ -9,3 +9,8 @@ test('rejects HTML, wrong types, prototype keys and oversized backups',()=>{
  assert.throws(()=>c.parseImportFile(JSON.stringify(valid()).replace('"version":2','"__proto__":{},"version":2')));
  assert.throws(()=>c.parseImportFile(' '.repeat(5*1024*1024+1)));
 });
+test('canonical reference backups cannot replace a legacy wallet through the import parser', () => {
+ const reference = JSON.stringify({app:'goc-hoc-nho',kind:'server-wallet-reference',data:valid()});
+ assert.throws(() => c.parseImportFile(reference), /chỉ dùng để đối chiếu/);
+ assert.equal(c.parseImportFile(reference, {allowReference:true}).settings.focusMinutes, 25);
+});

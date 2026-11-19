@@ -31,8 +31,9 @@ export function clearState() {
 }
 
 /** Xuất ra file JSON */
-export function exportToFile(state) {
-  const payload = { app: 'goc-hoc-nho', version: 1, exportedAt: new Date().toISOString(), data: state };
+export function exportToFile(state, { reference = false } = {}) {
+  const payload = { app: 'goc-hoc-nho', version: 1, exportedAt: new Date().toISOString(),
+    ...(reference ? { kind:'server-wallet-reference' } : {}), data: state };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -46,10 +47,13 @@ export function exportToFile(state) {
 }
 
 /** Đọc & kiểm tra file JSON nhập vào. Trả về state hợp lệ hoặc ném lỗi. */
-export function parseImportFile(text) {
+export function parseImportFile(text, { allowReference = false } = {}) {
   if (typeof text !== 'string' || text.length > 5 * 1024 * 1024) throw new Error('File vượt quá giới hạn 5 MB.');
   let parsed;
   try { parsed = JSON.parse(text); } catch { throw new Error('File không phải JSON hợp lệ.'); }
+  if (parsed?.app === 'goc-hoc-nho' && parsed.kind === 'server-wallet-reference' && !allowReference) {
+    throw new Error('Bản sao từ ví máy chủ chỉ dùng để đối chiếu hoặc nhập lại cài đặt trong tài khoản đã chuyển.');
+  }
   const data = parsed && parsed.app === 'goc-hoc-nho' ? parsed.data : parsed;
   if (!data || typeof data !== 'object') throw new Error('Cấu trúc dữ liệu không đúng.');
   const required = ['tasks', 'subjects', 'days', 'wallet'];

@@ -215,6 +215,39 @@ const fixtureCloud=role=>`
   assert.equal(focusCalls[5].type, 'focus-complete');
   const legacyBalance = await page.evaluate(async () => (await import('/js/state.js')).getState().wallet.coins);
   assert.equal(legacyBalance, balanceBeforeFocus);
+  await page.getByRole('button',{name:'Tuyệt!',exact:true}).click();
+  await pushRow(walletPath, {version:1,balance:125,totalEarned:145});
+  await page.evaluate(() => {
+    window.__walletListeners.get('users/admin/ownedItems').forEach(fn => fn({
+      docs:[{id:'plant_small',data:()=>({quantity:2})}],
+    }));
+    location.hash = '/settings';
+  });
+  const backupDownload = page.waitForEvent('download');
+  await page.locator('#export-btn').click();
+  const downloaded = await backupDownload;
+  const backup = JSON.parse(fs.readFileSync(await downloaded.path(), 'utf8'));
+  assert.equal(backup.kind, 'server-wallet-reference');
+  assert.deepEqual(backup.data.wallet, {coins:125,totalEarned:145});
+  assert.equal(backup.data.room.owned.plant_small, 2);
+  assert.ok(backup.data.tasks.some(task => task.title === 'Ôn Toán trên máy chủ'));
+  assert.equal(await page.locator('#clear-all').count(), 0);
+  assert.equal(await page.locator('#clear-sample').count(), 0);
+  backup.data.settings.userName = 'Mochi sao lưu';
+  backup.data.wallet.coins = 999999;
+  const chooserPromise = page.waitForEvent('filechooser');
+  await page.locator('#choose-backup').focus();
+  await page.keyboard.press('Enter');
+  await (await chooserPromise).setFiles({
+    name:'backup.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(backup)),
+  });
+  await page.getByRole('button',{name:'Áp dụng',exact:true}).click();
+  await page.locator('#settings-form input[name=userName]').waitFor();
+  assert.equal(await page.locator('#settings-form input[name=userName]').inputValue(), 'Mochi sao lưu');
+  await page.locator('.header-coins').filter({hasText:'125 xu'}).waitFor();
+  console.log('PASS: backup contains canonical balance and inventory; keyboard import restores preferences only');
+  await page.evaluate(() => { location.hash = '/pomodoro'; });
+
   const remoteId = 'second-device-session-0001';
   await pushRow(actor + '/focusSessions/' + remoteId, {...session,resumedAt:Date.now()});
   await pushRow(walletPath, {version:1,balance:125,activeSessionId:remoteId});

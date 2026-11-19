@@ -11,8 +11,13 @@ import { openModal } from '../components/modal.js';
 
 let unsub = null;
 
+export function disposePomodoro() {
+  unsub?.();
+  unsub = null;
+}
+
 export function renderPomodoro(root) {
-  if (unsub) { unsub(); unsub = null; }
+  disposePomodoro();
   const s = getState();
   const tm = getTimer();
   const t = todayKey();
@@ -78,6 +83,7 @@ export function renderPomodoro(root) {
   const startBtn = root.querySelector('#pomo-start');
   const pauseBtn = root.querySelector('#pomo-pause');
   const feedback = root.querySelector('#pomo-feedback');
+  const message = root.querySelector('#pomo-msg');
   const resetBtn = root.querySelector('#pomo-reset');
   const customBtn = root.querySelector('#pomo-custom');
   const taskSelect = root.querySelector('#pomo-task');
@@ -104,7 +110,7 @@ export function renderPomodoro(root) {
       : !available ? 'Chưa tải được phiên tập trung. Hãy kiểm tra kết nối.' : '');
     if (feedback.textContent !== status) feedback.textContent = status;
     feedback.hidden = !status;
-    root.querySelector('#pomo-msg').textContent = tmr.status === 'running'
+    message.textContent = tmr.status === 'running'
       ? (tmr.mode === 'focus' ? 'Shh… đang tập trung 🎧' : 'Nghỉ chút thôi rồi quay lại nhé ☕')
       : tmr.status === 'paused' ? 'Tạm nghỉ một chút cũng được.' : 'Sẵn sàng chưa? Mình canh giờ cho bạn.';
     root.querySelectorAll('[data-mode]').forEach((b) => b.classList.toggle('active', b.dataset.mode === tmr.mode));
