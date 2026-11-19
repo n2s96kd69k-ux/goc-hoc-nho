@@ -146,6 +146,12 @@ export async function logoutCloud() {
   await signOut(auth);
 }
 
+function excludeRetiredSubjects(planner, retiredSubjectIds) {
+  if (!Array.isArray(retiredSubjectIds) || !retiredSubjectIds.length || !Array.isArray(planner.subjects)) return planner;
+  const retired = new Set(retiredSubjectIds);
+  return {...planner, subjects:planner.subjects.filter(subject => !retired.has(subject?.id))};
+}
+
 export async function loadCloudState(uid) {
   if (!db || !uid) return null;
   const ref = doc(db, 'users', uid);
@@ -154,7 +160,7 @@ export async function loadCloudState(uid) {
   const data = snap.data();
   if (uid !== OWNER_UID && data?.status === 'banned') throw new Error('Tài khoản đã bị khóa.');
   if (data.economyVersion === 1) {
-    return applyEditablePlanner(data.state || {}, data.planner || editablePlanner(data.state));
+    return applyEditablePlanner(data.state || {}, excludeRetiredSubjects(data.planner || editablePlanner(data.state), data.retiredSubjectIds));
   }
   return data?.state ? applyAdminCredits(data.state, data.adminCredits || 0) : null;
 }
@@ -182,7 +188,8 @@ export async function saveCloudState(uid, state) {
     const existing = data.state || null;
     if (data.economyVersion === 1) {
       if (!base) throw new Error('Cần tải dữ liệu tài khoản trước khi lưu.');
-      const planner = mergeState(editablePlanner(base), editablePlanner(snapshot), data.planner || editablePlanner(existing));
+      const merged = mergeState(editablePlanner(base), editablePlanner(snapshot), data.planner || editablePlanner(existing));
+      const planner = excludeRetiredSubjects(merged, data.retiredSubjectIds);
       committed = applyEditablePlanner(snapshot, planner);
       transaction.set(ref, { ...patch, planner }, { mergeFields: [...Object.keys(patch), 'planner'] });
       return;

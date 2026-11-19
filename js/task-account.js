@@ -6,7 +6,7 @@ const pending = new Map();
 const inFlight = new Set();
 const rejected = new Set([
   'access-denied', 'migration-required', 'operation-conflict', 'invalid-task-fields',
-  'task-version-conflict', 'task-id-in-use', 'task-not-found', 'undo-insufficient-funds',
+  'task-version-conflict', 'task-id-in-use', 'task-not-found', 'undo-insufficient-funds', 'subject-not-found', 'too-many-tasks',
 ]);
 
 export function visibleTasks(legacy) {
@@ -26,7 +26,7 @@ export async function sendTask(type, task, fields) {
     try { command = JSON.parse(sessionStorage.getItem(key)); }
     catch { /* Có thể lưu mã tạm trong phiên đang mở. */ }
   }
-  if (!command) command = { ...intent, taskId: task?.id || crypto.randomUUID(), operationId: crypto.randomUUID() };
+  if (!command) command = { ...intent, taskId: type === 'task-create' ? crypto.randomUUID() : task?.id, operationId: crypto.randomUUID() };
   pending.set(key, command);
   try { sessionStorage.setItem(key, JSON.stringify(command)); }
   catch { /* Mã vẫn dùng lại được trong tab đang mở. */ }

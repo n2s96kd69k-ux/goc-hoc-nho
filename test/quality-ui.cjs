@@ -109,7 +109,8 @@ const fixtureCloud=role=>`
     if (taskCalls.length <= 2) return route.abort();
     const task = command.type === 'task-create'
       ? { id:command.taskId, ...command.fields, done:false, version:0, coinGain:0 }
-      : { id:command.taskId, ...taskCalls[2].fields, done:true, version:1, coinGain:5 };
+      : { id:command.taskId, ...taskCalls[2].fields, ...command.fields, done:true,
+        version:command.type === 'task-move' ? 2 : 1, coinGain:5 };
     return route.fulfill({json:{ok:true,result:{task,delta:5}}});
   });
   await page.reload({waitUntil:'domcontentloaded'});
@@ -138,7 +139,22 @@ const fixtureCloud=role=>`
   assert.equal(taskCalls[3].type, 'task-complete');
   assert.equal(taskCalls[3].expectedVersion, 0);
   assert.deepEqual(errors, []);
-  console.log('PASS: task creation after lost response and reload, completion from confirmed server row');
+  const source = taskRow.locator('.task-title');
+  const day = await taskRow.evaluate(row => row.closest('.day-card').dataset.day);
+  const targetDay = await page.locator('.day-card').filter({has:page.locator('[data-add]')}).first().getAttribute('data-day');
+  const target = page.locator(`.day-card[data-day="${targetDay}"]`);
+  assert.notEqual(targetDay, day);
+  const from = await source.boundingBox();
+  const to = await target.boundingBox();
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(to.x + to.width / 2, to.y + 48, {steps:10});
+  await page.mouse.up();
+  await target.locator('.task').filter({hasText:'Ôn Toán trên máy chủ'}).waitFor();
+  assert.equal(taskCalls[4].type, 'task-move');
+  assert.equal(taskCalls[4].expectedVersion, 1);
+  assert.equal(taskCalls[4].fields.date, targetDay);
+  console.log('PASS: task retry, completion and drag confirmed through the server route');
   const focusCalls = [];
   const balanceBeforeFocus = await page.evaluate(async () => (await import('/js/state.js')).getState().wallet.coins);
   await page.unroute('https://dark-tooth-7030.n2s96kd69k.workers.dev/api/economy');

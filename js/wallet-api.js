@@ -13,6 +13,8 @@ const messages = {
   'balance-limit': 'Số dư vượt giới hạn.',
   'earned-limit': 'Tổng xu đã nhận vượt giới hạn.',
   'task-version-conflict': 'Nhiệm vụ đã thay đổi trên thiết bị khác. Hãy mở lại để xem bản mới.',
+  'subject-not-found': 'Môn học đã được xóa trên thiết bị khác.',
+  'too-many-tasks': 'Có quá nhiều nhiệm vụ để cập nhật trong một lần.',
   'task-not-found': 'Nhiệm vụ đã bị xóa hoặc không còn tồn tại.',
   'invalid-task-fields': 'Hãy kiểm tra lại ngày, tên và thời lượng nhiệm vụ.',
   'undo-insufficient-funds': 'Số dư hiện tại chưa đủ để hoàn lại xu của nhiệm vụ này.',

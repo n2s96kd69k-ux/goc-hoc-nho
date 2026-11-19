@@ -64,9 +64,24 @@ export function firestore(env) {
             return {exists: !!document, data: () => document ? decode({mapValue: {fields: document.fields}}) : undefined};
           });
         };
+        const find = async (collection, field, value, limit) => {
+          const segments = collection.slice(prefix.length).split('/');
+          const collectionId = segments.pop();
+          const parent = segments.map(encodeURIComponent).join('/');
+          const rows = await api('/documents/' + parent + ':runQuery', {
+            transaction,
+            structuredQuery: {
+              from: [{collectionId}], limit,
+              where: {fieldFilter: {field: {fieldPath: field}, op: 'EQUAL', value: encode(value)}},
+            },
+          });
+          return rows.flatMap(({document}) => document ? [{
+            name: document.name, data: decode({mapValue:{fields:document.fields}}),
+          }] : []);
+        };
         const result=await fn({
           get: async name => (await getAll(name))[0],
-          getAll,
+          getAll, find,
           set:(name,value)=>writes.push({update:{name,fields:encode(value).mapValue.fields}}),
           create:(name,value)=>writes.push({update:{name,fields:encode(value).mapValue.fields},currentDocument:{exists:false}}),
           update:(name,value)=>writes.push({update:{name,fields:encode(value).mapValue.fields},updateMask:{fieldPaths:Object.keys(value)},currentDocument:{exists:true}}),

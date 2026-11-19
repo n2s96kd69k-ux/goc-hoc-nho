@@ -1,5 +1,7 @@
 import { subjectStudyTotals } from './study-account.js';
-import { visibleTasks } from './task-account.js';
+import { getCurrentUser } from './cloud.js';
+import { walletMode } from './wallet-account.js';
+import { sendTask, visibleTasks } from './task-account.js';
 // ===== Môn học =====
 import { getState, update } from './state.js';
 import { uid, pct } from './utils.js';
@@ -32,11 +34,19 @@ export function updateSubject(id, patch) {
 }
 
 export function deleteSubject(id) {
+  if (walletMode() !== 'legacy') return removeServerSubject(id);
   update((s) => {
     s.subjects = s.subjects.filter((x) => x.id !== id);
     const fallback = s.subjects[0] ? s.subjects[0].id : null;
     s.tasks.forEach((t) => { if (t.subjectId === id) t.subjectId = fallback; });
   }, { type: 'subject-delete' });
+}
+
+async function removeServerSubject(id) {
+  const user = getCurrentUser();
+  await sendTask('task-subject-delete', null, { subjectId: id });
+  if (user !== getCurrentUser() || walletMode() !== 'server') return;
+  update(s => { s.subjects = s.subjects.filter(subject => subject.id !== id); }, { type: 'subject-delete' });
 }
 
 export function addScore(id, score, note) {

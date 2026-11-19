@@ -2,7 +2,7 @@
 import { getState, update } from '../state.js';
 import { DAY_LABELS, DAY_SHORT, DAY_ICONS, DAY_COLORS, fromKey, toKey, addDays, weekKeys, weekRangeLabel, formatDM, todayKey, startOfWeek, minutesToText, escapeHtml, PRIORITIES } from '../utils.js';
 import { walletMode } from '../wallet-account.js';
-import { tasksOfDay, dayProgress, mainSubjectOfDay, toggleTask, applyFilter, getTask, placeTask, restoreTask } from '../tasks.js';
+import { tasksOfDay, dayProgress, mainSubjectOfDay, toggleTask, applyFilter, getTask, placeTask, placeServerTask, restoreTask } from '../tasks.js';
 import { getCurrentUser, saveCloudState } from '../cloud.js';
 import { getSubject } from '../subjects.js';
 import { minutesOfDay, pomodorosOfDay, dayStatus } from '../statistics.js';
@@ -156,6 +156,10 @@ function bindTaskDrag(root) {
     li.addEventListener('pointerdown', (e) => {
       if (e.button !== undefined && e.button !== 0) return;
       if (e.target.closest('.checkbox')) return;
+      const mode = walletMode();
+      if (mode === 'unavailable') return;
+      const user = getCurrentUser();
+      const task = getTask(li.dataset.id);
       const startX = e.clientX;
       const startY = e.clientY;
       const originDay = li.closest('.day-card')?.dataset.day || '';
@@ -202,6 +206,11 @@ function bindTaskDrag(root) {
         else list.appendChild(placeholder);
       };
       const onMove = (ev) => {
+        if (ev.pointerId !== e.pointerId) return;
+        if (!originParent.isConnected) {
+          void finish({ type: 'pointercancel', pointerId: e.pointerId });
+          return;
+        }
         if (!dragging) {
           if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < 8) return;
           dragging = true;
@@ -223,7 +232,8 @@ function bindTaskDrag(root) {
         li.style.left = (ev.clientX - grabX) + 'px';
         li.style.top = (ev.clientY - grabY) + 'px';
         const under = document.elementFromPoint(ev.clientX, ev.clientY);
-        const card = under && under.closest('.day-card');
+        const hit = under?.closest('.day-card');
+        const card = root.contains(hit) ? hit : null;
         if (card !== highlighted) {
           const previous = highlighted;
           clearHighlight();
@@ -236,12 +246,20 @@ function bindTaskDrag(root) {
         if (card) movePlaceholder(card, ev.clientY);
         ev.preventDefault();
       };
-      const finish = async () => {
+      const finish = async (event) => {
+        if (event.pointerId !== e.pointerId) return;
         window.removeEventListener('pointermove', onMove);
         window.removeEventListener('pointerup', finish);
+        window.removeEventListener('pointercancel', finish);
         if (!dragging) return;
         const card = highlighted;
         clearHighlight();
+        if (!originParent.isConnected) {
+          li.remove();
+          placeholder?.remove();
+          suppressSwipe = false;
+          return;
+        }
         li.classList.remove('is-dragging');
         li.style.width = '';
         li.style.left = '';
@@ -249,10 +267,10 @@ function bindTaskDrag(root) {
         const home = placeholder && placeholder.parentElement;
         const targetDay = card && card.dataset.day;
         const sameSlot = home === originParent && placeholder.nextSibling === originNext;
-        if (!card || !targetDay || sameSlot) {
-          if (originParent) originParent.insertBefore(li, originNext);
-          if (placeholder) placeholder.remove();
-          document.querySelectorAll('.day-tasks[data-empty]').forEach((box) => {
+        const restorePosition = () => {
+          originParent.insertBefore(li, originNext?.parentNode === originParent ? originNext : null);
+          placeholder?.remove();
+          root.querySelectorAll('.day-tasks[data-empty]').forEach((box) => {
             if (!box.querySelector('.task')) {
               const day = box.closest('.day-card')?.dataset.day;
               box.innerHTML = box.dataset.empty;
@@ -261,6 +279,9 @@ function bindTaskDrag(root) {
             }
           });
           suppressSwipe = false;
+        };
+        if (!card || !targetDay || sameSlot || event.type === 'pointercancel') {
+          restorePosition();
           return;
         }
         const list = placeholder.parentElement;
@@ -270,6 +291,16 @@ function bindTaskDrag(root) {
           const visible = new Set([...list.querySelectorAll('.task')].map((el) => el.dataset.id).filter((id) => id && id !== li.dataset.id));
           const hidden = tasksOfDay(targetDay).find((t) => t.id !== li.dataset.id && !visible.has(t.id));
           if (hidden && list.closest('.day-card')?.querySelector('[data-more]')) beforeId = hidden.id;
+        }
+        if (mode !== walletMode() || user !== getCurrentUser()) {
+          restorePosition();
+          return;
+        }
+        if (mode === 'server') {
+          restorePosition();
+          try { await placeServerTask(task, targetDay, beforeId); }
+          catch (error) { toast(error.message, { kind: 'error' }); }
+          return;
         }
         list.insertBefore(li, placeholder);
         placeholder.remove();
@@ -330,6 +361,7 @@ function bindTaskDrag(root) {
       };
       window.addEventListener('pointermove', onMove);
       window.addEventListener('pointerup', finish);
+      window.addEventListener('pointercancel', finish);
     });
   });
 }
@@ -385,10 +417,11 @@ export function bindPlanner(root) {
       b.classList.remove('animating');
     }
     if (res && res.done) {
-      if (res.coins) floatCoins(res.coins, b);
+      const anchor = b.isConnected ? b : root.querySelector(`[data-toggle="${CSS.escape(b.dataset.toggle)}"]`);
+      if (res.coins) floatCoins(res.coins, anchor);
       if (res.dayComplete) {
-        const card = b.closest('.day-card');
-        sparkleAt(card ? card.querySelector('.ring') : b, 8);
+        const card = anchor?.closest('.day-card');
+        if (anchor) sparkleAt(card?.querySelector('.ring') || anchor, 8);
         toast(res.coins ? `Hôm nay giỏi lắm 🌷 +${res.coins} xu` : 'Hôm nay giỏi lắm 🌷 Đã đủ 25 xu nhiệm vụ', { icon: '✨' });
       } else if (!res.coins) {
         toast('Hôm nay đã đủ 25 xu từ nhiệm vụ', { icon: '🪙' });
@@ -399,7 +432,7 @@ export function bindPlanner(root) {
     }
   });
 
-  if (walletMode() === 'legacy') bindTaskDrag(root);
+  bindTaskDrag(root);
 
   // Tabs ngày (mobile)
   root.querySelectorAll('[data-day].day-tab').forEach((b) => b.onclick = () => setViewDay(b.dataset.day));

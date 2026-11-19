@@ -257,7 +257,7 @@ async function transactFocus(db, authUid, input, clock = Date.now) {
 
 
 // Server-owned task reward state; never trust completion flags in legacy state.
-const taskActions = new Set(['task-create', 'task-edit', 'task-delete', 'task-complete', 'task-undo']);
+const taskActions = new Set(['task-create', 'task-edit', 'task-delete', 'task-complete', 'task-undo', 'task-move', 'task-subject-delete']);
 const taskFields = ['title', 'date', 'subjectId', 'minutes', 'pomodoros', 'priority', 'note', 'order'];
 
 function validTaskDate(value) {
@@ -296,29 +296,91 @@ function parseTaskFields(value, creating) {
  return task;
 }
 
+function guard(ok, code) {
+ if (!ok) throw Error(code);
+}
+const id = (value, minimum = 1) => typeof value === 'string' && value.length >= minimum
+ && /^[A-Za-z0-9_-]{1,128}$/.test(value);
+const bulkLimit = 350;
+
+async function findTasks(tx, ref, field, value) {
+ const found = await tx.find(ref('rewardTasks'), field, value, bulkLimit + 1);
+ guard(found.length <= bulkLimit, 'too-many-tasks');
+ return found.filter(({data}) => data.deletedAt === undefined);
+}
+
+async function placeTask(tx, ref, task, move, now, rewards) {
+ const others = (await findTasks(tx, ref, 'date', move.date)).filter(({data}) => data.id !== task.id);
+ const ranked = others.some(({data}) => Number.isSafeInteger(data.order));
+ const order = row => ranked ? (row.order ?? Infinity) : Number(row.done);
+ others.sort(({data:a}, {data:b}) => order(a) - order(b) || a.createdAt - b.createdAt || a.id.localeCompare(b.id));
+ const index = move.beforeId ? others.findIndex(({data}) => data.id === move.beforeId) : others.length;
+ guard(index !== -1, 'task-version-conflict');
+ const uncheck = task.done && move.date > studyDate(now);
+ const moved = {...task, date:move.date, order:index, version:task.version + 1, updatedAt:now};
+ if (uncheck) Object.assign(moved, {done:false, completedAt:null, coinGain:0});
+ await rewards.recordTask(task, moved);
+ rewards.write(now);
+ others.splice(index, 0, {data:moved, name:ref('rewardTasks/' + task.id)});
+ others.forEach(({data, name}, rank) => {
+  if (data.id === task.id) tx.set(name, moved);
+  else if (data.order !== rank) tx.update(name, {order:rank, version:data.version + 1, updatedAt:now});
+ });
+ return moved;
+}
+
+async function removeSubject(tx, ref, profileRef, profile, subjectId, now) {
+ const planner = profile.planner;
+ guard(Array.isArray(planner?.subjects) && planner.subjects.some(subject => subject?.id === subjectId), 'subject-not-found');
+ const subjects = planner.subjects.filter(subject => subject?.id !== subjectId);
+ const replacement = subjects[0]?.id ?? null;
+ guard(replacement === null || id(replacement), 'invalid-task-fields');
+ const affected = await findTasks(tx, ref, 'subjectId', subjectId);
+ for (const {data, name} of affected) {
+  tx.update(name, {subjectId:replacement, version:data.version + 1, updatedAt:now});
+ }
+ const retiredSubjectIds = [...new Set([...(profile.retiredSubjectIds || []), subjectId])];
+ tx.update(profileRef, {planner:{...planner, subjects}, retiredSubjectIds});
+ return {subjectId, replacement, count:affected.length};
+}
+
 async function transactTask(db, authUid, input, clock=Date.now) {
- const guard=(ok,code)=>{if(!ok)throw Error(code);};
- const id=(v,min=1)=>typeof v==='string'&&new RegExp(`^[A-Za-z0-9_-]{${min},128}$`).test(v);
  guard(id(authUid),'unauthenticated');
  guard(input&&taskActions.has(input.type),'invalid-type');
- guard(id(input.operationId,16)&&id(input.taskId),'invalid-operation');
  const {type, taskId, expectedVersion} = input;
  const creating = type === 'task-create';
- if (!creating) guard(Number.isSafeInteger(expectedVersion)&&expectedVersion>=0,'invalid-version');
+ const removingSubject = type === 'task-subject-delete';
+ const moving = type === 'task-move';
+ guard(id(input.operationId,16) && (removingSubject ? id(input.fields?.subjectId) : id(taskId)), 'invalid-operation');
+ if (!creating && !removingSubject) guard(Number.isSafeInteger(expectedVersion)&&expectedVersion>=0,'invalid-version');
+ const move = moving ? {date: input.fields?.date, beforeId: input.fields?.beforeId ?? null} : null;
+ if (moving) guard(validTaskDate(move.date) && (move.beforeId === null || (id(move.beforeId) && move.beforeId !== taskId)), 'invalid-task-fields');
  const fields = creating || type === 'task-edit' ? parseTaskFields(input.fields, creating) : null;
  const fingerprint = fields
   ? JSON.stringify({type, taskId, expectedVersion: creating ? undefined : expectedVersion, fields})
-  : JSON.stringify({type, taskId, expectedVersion});
+  : JSON.stringify({type, taskId, expectedVersion, move: move || undefined,
+   subjectId: removingSubject ? input.fields.subjectId : undefined});
  const ref=suffix=>db.doc(`users/${authUid}/${suffix}`);
  return db.runTransaction(async tx=>{
-  const u=await tx.get(db.doc(`users/${authUid}`));guard(u.exists&&u.data().status!=='banned','access-denied');
+  const profileRef = db.doc(`users/${authUid}`);
+  const u=await tx.get(profileRef);guard(u.exists&&u.data().status!=='banned','access-denied');
   const receipt=ref(`economyOperations/${authUid}_${input.operationId}`),prior=await tx.get(receipt);
   if(prior.exists){guard(prior.data().fingerprint===fingerprint,'operation-conflict');return prior.data().result;}
-  const walletRef=ref('economy/wallet'),taskRef=ref(`rewardTasks/${input.taskId}`);
-  const ws=await tx.get(walletRef),ts=await tx.get(taskRef);
+  const walletRef=ref('economy/wallet');
+  const ws=await tx.get(walletRef);
   guard(ws.exists&&ws.data().version===1,'migration-required');
-  const wallet=ws.data(), task=ts.data(), now=clock();
+  const wallet=ws.data(), now=clock();
   guard(Number.isSafeInteger(wallet.balance)&&wallet.balance>=0&&Number.isSafeInteger(wallet.totalEarned)&&wallet.totalEarned>=0,'invalid-wallet');
+  if (removingSubject) {
+   const result = await removeSubject(tx, ref, profileRef, u.data(), input.fields.subjectId, now);
+   tx.create(receipt, {fingerprint, result, createdAt: now});
+   return result;
+  }
+  const taskRef=ref(`rewardTasks/${taskId}`);
+  const ts=await tx.get(taskRef), task=ts.data();
+  if (fields?.subjectId) {
+   guard(!(u.data().retiredSubjectIds || []).includes(fields.subjectId), 'subject-not-found');
+  }
   const rewards = studyRewards(tx, ref);
   if (creating) {
    guard(!ts.exists, 'task-id-in-use');
@@ -333,6 +395,11 @@ async function transactTask(db, authUid, input, clock=Date.now) {
   guard(ts.exists && task.deletedAt === undefined, 'task-not-found');
   guard(Number.isSafeInteger(task.version)&&task.version>=0&&typeof task.done==='boolean'&&typeof task.date==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(task.date),'invalid-task');
   guard(task.version===input.expectedVersion,'task-version-conflict');
+  if (moving) {
+   const result = {task:await placeTask(tx, ref, task, move, now, rewards), balance:wallet.balance};
+   tx.create(receipt, {fingerprint, result, createdAt: now});
+   return result;
+  }
   if (type === 'task-edit' || type === 'task-delete') {
    const version = task.version + 1;
    const next = type === 'task-delete'
@@ -451,9 +518,24 @@ function firestore(env) {
             return {exists: !!document, data: () => document ? decode({mapValue: {fields: document.fields}}) : undefined};
           });
         };
+        const find = async (collection, field, value, limit) => {
+          const segments = collection.slice(prefix.length).split('/');
+          const collectionId = segments.pop();
+          const parent = segments.map(encodeURIComponent).join('/');
+          const rows = await api('/documents/' + parent + ':runQuery', {
+            transaction,
+            structuredQuery: {
+              from: [{collectionId}], limit,
+              where: {fieldFilter: {field: {fieldPath: field}, op: 'EQUAL', value: encode(value)}},
+            },
+          });
+          return rows.flatMap(({document}) => document ? [{
+            name: document.name, data: decode({mapValue:{fields:document.fields}}),
+          }] : []);
+        };
         const result=await fn({
           get: async name => (await getAll(name))[0],
-          getAll,
+          getAll, find,
           set:(name,value)=>writes.push({update:{name,fields:encode(value).mapValue.fields}}),
           create:(name,value)=>writes.push({update:{name,fields:encode(value).mapValue.fields},currentDocument:{exists:false}}),
           update:(name,value)=>writes.push({update:{name,fields:encode(value).mapValue.fields},updateMask:{fieldPaths:Object.keys(value)},currentDocument:{exists:true}}),
@@ -503,7 +585,7 @@ export default {async fetch(request,env){
   }catch(error){
     const message=error.message;
     const status=message==='unauthenticated'?401:['access-denied','admin-required','target-unavailable'].includes(message)?403:['configuration-error','service-auth-failed','database-error'].includes(message)?503:400;
-    const known=['invalid-version','invalid-task-fields','task-id-in-use','task-not-found','invalid-task','task-version-conflict','undo-insufficient-funds','invalid-duration','invalid-subject','session-exists','active-session-exists','session-not-found','session-not-active','session-closed','session-expired','focus-too-early','focus-version-conflict','invalid-transition','invalid-study-day','unauthenticated','access-denied','admin-required','target-unavailable','migration-required','operation-conflict','insufficient-funds','quantity-limit','balance-limit','earned-limit','item-unavailable','invalid-wallet','invalid-catalog','configuration-error','service-auth-failed','database-error','invalid-type','invalid-operation','invalid-target','invalid-item','invalid-amount','invalid-reason'];
+    const known=['invalid-version','invalid-task-fields','task-id-in-use','task-not-found','subject-not-found','too-many-tasks','invalid-task','task-version-conflict','undo-insufficient-funds','invalid-duration','invalid-subject','session-exists','active-session-exists','session-not-found','session-not-active','session-closed','session-expired','focus-too-early','focus-version-conflict','invalid-transition','invalid-study-day','unauthenticated','access-denied','admin-required','target-unavailable','migration-required','operation-conflict','insufficient-funds','quantity-limit','balance-limit','earned-limit','item-unavailable','invalid-wallet','invalid-catalog','configuration-error','service-auth-failed','database-error','invalid-type','invalid-operation','invalid-target','invalid-item','invalid-amount','invalid-reason'];
     return reply({ok:false,error:known.includes(message)?message:'invalid-request'},status);
   }
 }};

@@ -150,6 +150,10 @@ export function moveTask(id, newDate) {
   updateTask(id, { date: newDate });
 }
 
+export function placeServerTask(task, date, beforeId) {
+  return changeServerTask('task-move', task, { date, beforeId });
+}
+
 /** Đặt task vào ngày mới, chèn trước beforeId. Xong việc kéo sang tương lai thì bỏ đánh dấu. */
 export function placeTask(id, date, beforeId) {
   const current = getState().tasks.find((t) => t.id === id);

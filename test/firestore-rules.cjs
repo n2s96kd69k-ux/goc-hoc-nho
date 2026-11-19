@@ -325,6 +325,45 @@ test('Worker REST transactions serialize purchases, keep receipts and enforce ac
   await assertFails(getDoc(doc(dbFor('other-student'), 'users/student/rewardTasks', taskId)));
   await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), 'users/student/rewardTasks', taskId)));
 
+  await env.withSecurityRulesDisabled(async context => {
+   const privileged = context.firestore();
+   await updateDoc(doc(privileged, 'users/student'), {
+    economyVersion:1, planner:{subjects:[{id:'math',name:'Toán'},{id:'lit',name:'Văn'}]},
+   });
+  });
+  const ordered = await call({
+   ...create, taskId:'next-task', operationId:'worker-task-create-0020',
+   fields:{...create.fields,date:'2099-12-01',subjectId:'math'},
+  });
+  assert.equal(ordered.status, 200);
+  const move = {type:'task-move', taskId:taskId + '-1', expectedVersion:1, operationId:'worker-task-move-0001',
+   fields:{date:'2099-12-01', beforeId:'next-task'}};
+  const moved = await call(move);
+  assert.equal(moved.status, 200, JSON.stringify(moved));
+  assert.equal(moved.body.result.task.done, false);
+  assert.equal(moved.body.result.task.order, 0);
+  assert.equal(moved.body.result.balance, 175);
+  assert.deepEqual(await call(move), moved);
+  const nextTask = doc(db, 'users/student/rewardTasks/next-task');
+  assert.equal((await getDoc(nextTask)).data().order, 1);
+  assert.equal((await getDoc(doc(db, 'users/student/studyDays/2099-12-01'))).data().tasksTotal, 2);
+  assert.equal((await call({...move,operationId:'worker-task-move-0002'})).body.error, 'task-version-conflict');
+  const removeSubject = {type:'task-subject-delete',operationId:'worker-subject-delete-0001',fields:{subjectId:'math'}};
+  const removedSubject = await call(removeSubject);
+  assert.equal(removedSubject.status, 200, JSON.stringify(removedSubject));
+  assert.deepEqual(removedSubject.body.result, {subjectId:'math', replacement:'lit', count:1});
+  assert.deepEqual(await call(removeSubject), removedSubject);
+  assert.equal((await getDoc(nextTask)).data().subjectId, 'lit');
+  assert.deepEqual((await getDoc(doc(db, 'users/student'))).data().planner.subjects, [{id:'lit',name:'Văn'}]);
+  const subjectProfile = doc(db, 'users/student');
+  await assertFails(updateDoc(subjectProfile, {retiredSubjectIds:[]}));
+  const stale = {subjects:[{id:'math',name:'Toán'},{id:'lit',name:'Văn'}]};
+  const staleApp = emulatedCloudApp(db, stale);
+  await staleApp.saveCloudState('student', {subjects:[{id:'math',name:'Toán sửa'},{id:'lit',name:'Văn'}]});
+  assert.deepEqual((await getDoc(subjectProfile)).data().planner.subjects, [{id:'lit',name:'Văn'}]);
+  assert.equal((await call({...create,taskId:'stale-subject',operationId:'worker-task-create-0021',
+   fields:{...create.fields,subjectId:'math'}})).body.error, 'subject-not-found');
+
   const sessionId = 'focus-emulator-session-0001';
   const session = doc(db, 'users/student/focusSessions', sessionId);
   const beginFocus = {type: 'focus-start', sessionId, minutes: 1, subjectId: 'math', operationId: 'focus-emulator-start-0001'};

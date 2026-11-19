@@ -1,3 +1,4 @@
+import { getCurrentUser } from '../cloud.js';
 import { visibleTasks } from '../task-account.js';
 // ===== Trang /subjects =====
 import { getState } from '../state.js';
@@ -145,8 +146,21 @@ export function openSubjectForm(id = null) {
     m.close();
   };
   m.body.querySelector('[data-act="cancel"]').onclick = () => m.close();
-  if (sub) m.body.querySelector('[data-act="delete"]').onclick = async () => {
+  const actor = getCurrentUser();
+  if (sub) m.body.querySelector('[data-act="delete"]').onclick = async event => {
+    const button = event.currentTarget;
+    button.disabled = true;
     const ok = await confirmDialog({ title: 'Xóa môn học?', message: 'Các nhiệm vụ của môn sẽ được chuyển sang môn khác.', okText: 'Xóa', danger: true });
-    if (ok) { deleteSubject(id); m.close(); navigate('/subjects'); }
+    try {
+      if (!ok) return;
+      if (actor !== getCurrentUser()) throw new Error('Tài khoản đã thay đổi. Hãy mở lại biểu mẫu.');
+      await deleteSubject(id);
+      m.close();
+      navigate('/subjects');
+    } catch (error) {
+      toast(error.message, { kind: 'error' });
+    } finally {
+      button.disabled = false;
+    }
   };
 }
