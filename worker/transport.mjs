@@ -56,8 +56,17 @@ export function firestore(env) {
     for(let attempt=0;attempt<4;attempt++){
       const {transaction}=await api('/documents:beginTransaction',{options:{readWrite:{}}});const writes=[];
       try{
+        const getAll = async (...names) => {
+          const rows = await api('/documents:batchGet', {documents: names, transaction});
+          const documents = new Map(rows.map(row => [row.found?.name || row.missing, row.found]));
+          return names.map(name => {
+            const document = documents.get(name);
+            return {exists: !!document, data: () => document ? decode({mapValue: {fields: document.fields}}) : undefined};
+          });
+        };
         const result=await fn({
-          get:async name=>{const rows=await api('/documents:batchGet',{documents:[name],transaction});const found=rows.find(r=>r.found)?.found;return {exists:!!found,data:()=>found?decode({mapValue:{fields:found.fields}}):undefined};},
+          get: async name => (await getAll(name))[0],
+          getAll,
           set:(name,value)=>writes.push({update:{name,fields:encode(value).mapValue.fields}}),
           create:(name,value)=>writes.push({update:{name,fields:encode(value).mapValue.fields},currentDocument:{exists:false}}),
           update:(name,value)=>writes.push({update:{name,fields:encode(value).mapValue.fields},updateMask:{fieldPaths:Object.keys(value)},currentDocument:{exists:true}}),

@@ -257,6 +257,14 @@ test('Worker REST transactions serialize purchases, keep receipts and enforce ac
   assert.equal((await call({...edit, operationId: 'worker-task-edit-0002'})).body.error, 'task-version-conflict');
   const complete = {type: 'task-complete', taskId, expectedVersion: 1, operationId: 'worker-task-complete-0001'};
   assert.equal((await call(complete)).body.result.balance, 55);
+  for (let i = 1; i <= 4; i++) {
+   const additionalId = taskId + '-' + i;
+   const added = await call({...create, taskId: additionalId, operationId: create.operationId + '-' + i});
+   assert.equal(added.status, 200, JSON.stringify(added));
+   const done = await call({...complete, taskId: additionalId, operationId: complete.operationId + '-' + i, expectedVersion: 0});
+   assert.equal(done.status, 200, JSON.stringify(done));
+   assert.equal(done.body.result.weekBonus, i === 4 ? 100 : 0);
+  }
   const remove = {type: 'task-delete', taskId, expectedVersion: 2, operationId: 'worker-task-delete-0001'};
   const removed = await call(remove);
   assert.equal(removed.status, 200, JSON.stringify(removed));
@@ -277,7 +285,8 @@ test('Worker REST transactions serialize purchases, keep receipts and enforce ac
  }
  await env.withSecurityRulesDisabled(async context => {
   const privileged = context.firestore();
-  assert.equal((await getDoc(doc(privileged, wallet.path))).data().balance, 55);
+  assert.equal((await getDoc(doc(privileged, wallet.path))).data().balance, 175);
+  assert.equal((await getDocs(collection(privileged, 'users/student/rewardMilestones'))).size, 1);
   assert.equal((await getDocs(collection(privileged, 'adminLogs'))).size, 1);
  });
 });

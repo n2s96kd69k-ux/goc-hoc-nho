@@ -1,3 +1,4 @@
+const {studyRewards, studyDate} = require('./study-rewards.cjs');
 // Server-owned task reward state; never trust completion flags in legacy state.
 const taskActions = new Set(['task-create', 'task-edit', 'task-delete', 'task-complete', 'task-undo']);
 const taskFields = ['title', 'date', 'subjectId', 'minutes', 'pomodoros', 'priority', 'note', 'order'];
@@ -61,10 +62,13 @@ async function transactTask(db, authUid, input, clock=Date.now) {
   guard(ws.exists&&ws.data().version===1,'migration-required');
   const wallet=ws.data(), task=ts.data(), now=clock();
   guard(Number.isSafeInteger(wallet.balance)&&wallet.balance>=0&&Number.isSafeInteger(wallet.totalEarned)&&wallet.totalEarned>=0,'invalid-wallet');
+  const rewards = studyRewards(tx, ref);
   if (creating) {
    guard(!ts.exists, 'task-id-in-use');
    const next = {id: taskId, ...fields, done: false, coinGain: 0, version: 0, createdAt: now, updatedAt: now, completedAt: null};
    const result = {task: next, balance: wallet.balance};
+   await rewards.recordTask(null, next);
+   rewards.write(now);
    tx.create(taskRef, next);
    tx.create(receipt, {fingerprint, result, createdAt: now});
    return result;
@@ -78,31 +82,47 @@ async function transactTask(db, authUid, input, clock=Date.now) {
     ? {id: taskId, version, deletedAt: now}
     : {...task, ...fields, id: taskId, version, updatedAt: now};
    const result = {task: next, balance: wallet.balance};
+   await rewards.recordTask(task, type === 'task-delete' ? null : next);
+   rewards.write(now);
    tx.set(taskRef, next);
    tx.create(receipt, {fingerprint, result, createdAt: now});
    return result;
   }
-  const today=new Date(now+7*3600000).toISOString().slice(0,10);
-  const done=input.type==='task-complete';
-  let delta=0,dayRef,day,next={...task};
-  if(done!==task.done){
-   if(done){
-    // Rewards are issued on today's quota; historical task dates cannot bypass it.
-    dayRef=ref(`studyDays/${today}`);const ds=await tx.get(dayRef);day=ds.exists?ds.data():{};
-    const issued=day.taskCoinsIssued||0;
-    guard(Number.isSafeInteger(issued)&&issued>=0&&issued<=25,'invalid-study-day');
-    delta=Math.min(5,25-issued);
-    day={...day,taskCoinsIssued:issued+delta};next.coinGain=delta;next.rewardDate=today;
-   }else{
+  const today = studyDate(now);
+  const done = type === 'task-complete';
+  const changed = done !== task.done;
+  const next = {...task};
+  let delta = 0, weekBonus = 0, streak = null;
+  if (changed) {
+   if (done) {
+    const usage = await rewards.recordDay(today, {taskCoinsIssued: 0});
+    const issued = usage.taskCoinsIssued;
+    guard(issued <= 25, 'invalid-study-day');
+    delta = Math.min(5, 25 - issued);
+    await rewards.recordDay(today, {taskCoinsIssued: delta});
+    next.coinGain = delta;
+    next.rewardDate = today;
+   } else {
     guard(Number.isSafeInteger(task.coinGain)&&task.coinGain>=0&&task.coinGain<=5,'invalid-task');
-    guard(wallet.balance>=task.coinGain,'undo-insufficient-funds');delta=-task.coinGain;next.coinGain=0;
+    guard(wallet.balance>=task.coinGain,'undo-insufficient-funds');
+    delta = -task.coinGain;
+    next.coinGain = 0;
    }
-   next.done=done;next.completedAt=done?now:null;next.version++;next.updatedAt=now;
+   Object.assign(next, {done, completedAt: done ? now : null, version: next.version + 1, updatedAt: now});
+   await rewards.recordTask(task, next);
+   if (done) weekBonus = await rewards.weekly(next.date);
+   streak = await rewards.streak(today);
   }
-  const after=wallet.balance+delta,earned=wallet.totalEarned+Math.max(0,delta);
-  guard(after<=1000000000&&earned<=1000000000,'balance-limit');
-  const result={taskId:input.taskId,done:next.done,version:next.version,delta,balance:after};
-  if(done!==task.done){tx.set(taskRef,next);if(dayRef)tx.set(dayRef,day);tx.update(walletRef,{balance:after,totalEarned:earned,updatedAt:now});}
+  const bonuses = weekBonus + (streak?.events || []).reduce((sum, event) => sum + event.coins, 0);
+  const after = wallet.balance + delta + bonuses;
+  const earned = wallet.totalEarned + Math.max(0, delta) + bonuses;
+  guard(after <= 1000000000 && earned <= 1000000000, 'balance-limit');
+  const result = {taskId, done: next.done, version: next.version, delta, weekBonus, streak, balance: after};
+  if (changed) {
+   rewards.write(now);
+   tx.set(taskRef, next);
+   tx.update(walletRef, {balance: after, totalEarned: earned, updatedAt: now});
+  }
   tx.create(receipt,{fingerprint,result,createdAt:now});return result;
  });
 }

@@ -1,11 +1,21 @@
-const fs=require('node:fs'),path=require('node:path');
-const root=__dirname;
-const economy=fs.readFileSync(path.join(root,'../server/economy.cjs'),'utf8').replace('module.exports={transactEconomy};','');
-fs.writeFileSync(path.join(root,'economy.mjs'),economy+'\nexport {transactEconomy};\n');
-const focus=fs.readFileSync(path.join(root,'../server/focus.cjs'),'utf8').replace('module.exports={transactFocus};','');
-fs.writeFileSync(path.join(root,'focus.mjs'),focus+'\nexport {transactFocus};\n');
-const tasks=fs.readFileSync(path.join(root,'../server/tasks.cjs'),'utf8').replace('module.exports={transactTask};','');
-fs.writeFileSync(path.join(root,'tasks.mjs'),tasks+'\nexport {transactTask};\n');
-const transport=fs.readFileSync(path.join(root,'transport.mjs'),'utf8').replace(/export /g,'');
-const main=fs.readFileSync(path.join(root,'index.mjs'),'utf8').replace(/^import .*;\n/gm,'');
-fs.writeFileSync(path.join(root,'worker.js'),economy+'\n'+focus+'\n'+tasks+'\n'+transport+'\n'+main);
+const fs = require('node:fs');
+const path = require('node:path');
+
+const root = __dirname;
+const modules = [
+ ['study-rewards', 'studyRewards,studyDate'],
+ ['economy', 'transactEconomy'],
+ ['focus', 'transactFocus'],
+ ['tasks', 'transactTask'],
+];
+const server = modules.map(([name, exports]) => {
+ const source = fs.readFileSync(path.join(root, '../server', name + '.cjs'), 'utf8')
+  .replace(`module.exports={${exports}};`, '');
+ const internalImport = /^const \{studyRewards, studyDate\} = require\('\.\/study-rewards\.cjs'\);\n/m;
+ fs.writeFileSync(path.join(root, name + '.mjs'), source.replace(internalImport,
+  "import {studyRewards, studyDate} from './study-rewards.mjs';\n") + '\nexport {' + exports + '};\n');
+ return source.replace(internalImport, '');
+});
+const transport = fs.readFileSync(path.join(root, 'transport.mjs'), 'utf8').replace(/export /g, '');
+const main = fs.readFileSync(path.join(root, 'index.mjs'), 'utf8').replace(/^import .*;\n/gm, '');
+fs.writeFileSync(path.join(root, 'worker.js'), [...server, transport, main].join('\n'));

@@ -1,3 +1,102 @@
+// The session clock and task state come from the server.
+const studyDayMs = 86400000;
+const studyDate = now => new Date(now + 7 * 3600000).toISOString().slice(0, 10);
+const shiftStudyDate = (date, days) => new Date(Date.parse(date + 'T00:00:00Z') + days * studyDayMs).toISOString().slice(0, 10);
+
+function studyRewards(tx, ref) {
+ const cached = new Map();
+ const changed = new Set();
+ const awards = [];
+ const dayRef = date => ref('studyDays/' + date);
+
+ async function readDays(dates) {
+  const missing = [...new Set(dates)].filter(date => !cached.has(date));
+  if (missing.length) {
+   const refs = missing.map(dayRef);
+   const snapshots = tx.getAll ? await tx.getAll(...refs) : await Promise.all(refs.map(r => tx.get(r)));
+   snapshots.forEach((snapshot, i) => cached.set(missing[i], snapshot.exists ? snapshot.data() : {}));
+  }
+  return dates.map(date => cached.get(date));
+ }
+
+ function counter(day, field) {
+  const value = day[field] ?? 0;
+  if (!Number.isSafeInteger(value) || value < 0) throw Error('invalid-study-day');
+  return value;
+ }
+
+ async function recordDay(date, update) {
+  const [day] = await readDays([date]);
+  const next = {...day};
+  for (const [field, delta] of Object.entries(update)) {
+   next[field] = counter(day, field) + delta;
+   counter(next, field);
+  }
+  if (counter(next, 'tasksDone') > counter(next, 'tasksTotal')) throw Error('invalid-study-day');
+  cached.set(date, next);
+  changed.add(date);
+  return next;
+ }
+
+ async function recordTask(previous, next) {
+  if (previous && next && previous.date === next.date) {
+   const difference = Number(next.done) - Number(previous.done);
+   if (difference) await recordDay(next.date, {tasksDone: difference});
+   return;
+  }
+  if (previous) await recordDay(previous.date, {tasksTotal: -1, tasksDone: -Number(previous.done)});
+  if (next) await recordDay(next.date, {tasksTotal: 1, tasksDone: Number(next.done)});
+ }
+
+ async function claim(id, coins, details) {
+  const marker = ref('rewardMilestones/' + id);
+  if ((await tx.get(marker)).exists) return 0;
+  awards.push({marker, coins, details});
+  return coins;
+ }
+
+ async function weekly(date) {
+  const weekday = new Date(date + 'T00:00:00Z').getUTCDay();
+  const monday = shiftStudyDate(date, -((weekday + 6) % 7));
+  const days = await readDays(Array.from({length: 7}, (_, i) => shiftStudyDate(monday, i)));
+  const total = days.reduce((sum, day) => sum + counter(day, 'tasksTotal'), 0);
+  const done = days.reduce((sum, day) => sum + counter(day, 'tasksDone'), 0);
+  return total >= 5 && total === done ? claim('week-' + monday, 100, {kind: 'week', date: monday}) : 0;
+ }
+
+ async function streak(today) {
+  const qualifies = day => counter(day, 'focusMinutes') >= 45 && counter(day, 'tasksDone') >= 3;
+  const [current, previous] = await readDays([today, shiftStudyDate(today, -1)]);
+  const end = qualifies(current) ? today : qualifies(previous) ? shiftStudyDate(today, -1) : null;
+  if (!end) return {current: 0, events: []};
+
+  let count = 1;
+  while (count < 3650) {
+   // Keep reads small for typical streaks and bound request count for long ones.
+   const length = Math.min(count < 16 ? 16 : 128, 3650 - count);
+   const batch = await readDays(Array.from({length}, (_, i) => shiftStudyDate(end, -(count + i))));
+   const gap = batch.findIndex(day => !qualifies(day));
+   count += gap < 0 ? batch.length : gap;
+   if (gap >= 0) break;
+  }
+
+  const events = [];
+  for (const [milestone, coins] of [[7, 50], [14, 100]]) {
+   if (count % milestone === 0 && await claim('streak-' + milestone + '-' + end, coins, {kind: 'streak', date: end, milestone})) {
+    events.push({milestone, coins});
+   }
+  }
+  return {current: count, events};
+ }
+
+ function write(now) {
+  for (const date of changed) tx.set(dayRef(date), cached.get(date));
+  for (const {marker, coins, details} of awards) tx.create(marker, {...details, coins, createdAt: now});
+ }
+ return {recordDay, recordTask, weekly, streak, write};
+}
+
+
 // Trusted-server module. Never import this module into the browser.
 const OWNER_UID = 'Vyd1sYXrKARaTujn0ucX0XFe0gp2';
 const MAX = 1000000000;
@@ -88,10 +187,11 @@ async function transactFocus(db, authUid, input, clock = Date.now) {
   const w=await tx.get(wallet),s=await tx.get(session);requireValue(w.exists&&w.data().version===1,'migration-required');
   const balance=w.data().balance,earned=w.data().totalEarned;
   requireValue(Number.isSafeInteger(balance)&&balance>=0&&Number.isSafeInteger(earned)&&earned>=0,'invalid-wallet');
-  let next,result,dayRef,day;
+  const rewards = studyRewards(tx, suffix => db.doc(`users/${authUid}/${suffix}`));
+  let next, result, coinsEarned = 0;
   if(type==='focus-start'){
    requireValue(!s.exists,'session-exists');requireValue(!w.data().activeSessionId,'active-session-exists');
-   next={status:'running',durationMs:minutes*60000,elapsedMs:0,resumedAt:now,createdAt:now,expiresAt:now+86400000,subjectId,date:new Date(now+7*3600000).toISOString().slice(0,10)};
+   next={status:'running',durationMs:minutes*60000,elapsedMs:0,resumedAt:now,createdAt:now,expiresAt:now+86400000,subjectId,date:studyDate(now)};
    result={sessionId:input.sessionId,status:'running',remainingSeconds:minutes*60};
   }else{
    requireValue(s.exists,'session-not-found');next={...s.data()};
@@ -106,11 +206,12 @@ async function transactFocus(db, authUid, input, clock = Date.now) {
    if(type==='focus-complete'){
     requireValue(elapsed>=next.durationMs,'focus-too-early');
     const reward=next.durationMs/60000;
-    requireValue(balance+reward<=1000000000&&earned+reward<=1000000000,'balance-limit');
-    dayRef=db.doc(`users/${authUid}/studyDays/${next.date}`);const ds=await tx.get(dayRef);day=ds.exists?ds.data():{};
-    for(const field of ['focusMinutes','pomodoros'])requireValue(day[field]===undefined||(Number.isSafeInteger(day[field])&&day[field]>=0),'invalid-study-day');
-    day={...day,focusMinutes:(day.focusMinutes||0)+reward,pomodoros:(day.pomodoros||0)+1};
-    result={sessionId:input.sessionId,status:'completed',reward,balance:balance+reward};next={...next,status:'completed',elapsedMs:next.durationMs,result,completedAt:now};
+    await rewards.recordDay(next.date, {focusMinutes: reward, pomodoros: 1});
+    const streak = await rewards.streak(studyDate(now));
+    coinsEarned = reward + streak.events.reduce((sum, event) => sum + event.coins, 0);
+    requireValue(balance + coinsEarned <= 1000000000 && earned + coinsEarned <= 1000000000, 'balance-limit');
+    result = {sessionId: input.sessionId, status: 'completed', reward, streak, balance: balance + coinsEarned};
+    next = {...next, status: 'completed', elapsedMs: next.durationMs, result, completedAt: now};
    }else if(type==='focus-cancel'){next.status='cancelled';next.elapsedMs=elapsed;result={sessionId:input.sessionId,status:'cancelled'};}
    else{
     requireValue(type==='focus-pause'?next.status==='running':next.status==='paused','invalid-transition');
@@ -121,7 +222,7 @@ async function transactFocus(db, authUid, input, clock = Date.now) {
   tx.set(session,next);
   const closed=['completed','cancelled'].includes(next.status);
   const patch={activeSessionId:closed?null:input.sessionId,updatedAt:now};
-  if(next.status==='completed'){Object.assign(patch,{balance:result.balance,totalEarned:earned+result.reward});tx.set(dayRef,day);}
+  if(next.status==='completed'){Object.assign(patch,{balance:result.balance,totalEarned:earned+coinsEarned});rewards.write(now);}
   tx.update(wallet,patch);tx.create(receipt,{fingerprint,result,createdAt:now});return result;
  });
 }
@@ -190,10 +291,13 @@ async function transactTask(db, authUid, input, clock=Date.now) {
   guard(ws.exists&&ws.data().version===1,'migration-required');
   const wallet=ws.data(), task=ts.data(), now=clock();
   guard(Number.isSafeInteger(wallet.balance)&&wallet.balance>=0&&Number.isSafeInteger(wallet.totalEarned)&&wallet.totalEarned>=0,'invalid-wallet');
+  const rewards = studyRewards(tx, ref);
   if (creating) {
    guard(!ts.exists, 'task-id-in-use');
    const next = {id: taskId, ...fields, done: false, coinGain: 0, version: 0, createdAt: now, updatedAt: now, completedAt: null};
    const result = {task: next, balance: wallet.balance};
+   await rewards.recordTask(null, next);
+   rewards.write(now);
    tx.create(taskRef, next);
    tx.create(receipt, {fingerprint, result, createdAt: now});
    return result;
@@ -207,31 +311,47 @@ async function transactTask(db, authUid, input, clock=Date.now) {
     ? {id: taskId, version, deletedAt: now}
     : {...task, ...fields, id: taskId, version, updatedAt: now};
    const result = {task: next, balance: wallet.balance};
+   await rewards.recordTask(task, type === 'task-delete' ? null : next);
+   rewards.write(now);
    tx.set(taskRef, next);
    tx.create(receipt, {fingerprint, result, createdAt: now});
    return result;
   }
-  const today=new Date(now+7*3600000).toISOString().slice(0,10);
-  const done=input.type==='task-complete';
-  let delta=0,dayRef,day,next={...task};
-  if(done!==task.done){
-   if(done){
-    // Rewards are issued on today's quota; historical task dates cannot bypass it.
-    dayRef=ref(`studyDays/${today}`);const ds=await tx.get(dayRef);day=ds.exists?ds.data():{};
-    const issued=day.taskCoinsIssued||0;
-    guard(Number.isSafeInteger(issued)&&issued>=0&&issued<=25,'invalid-study-day');
-    delta=Math.min(5,25-issued);
-    day={...day,taskCoinsIssued:issued+delta};next.coinGain=delta;next.rewardDate=today;
-   }else{
+  const today = studyDate(now);
+  const done = type === 'task-complete';
+  const changed = done !== task.done;
+  const next = {...task};
+  let delta = 0, weekBonus = 0, streak = null;
+  if (changed) {
+   if (done) {
+    const usage = await rewards.recordDay(today, {taskCoinsIssued: 0});
+    const issued = usage.taskCoinsIssued;
+    guard(issued <= 25, 'invalid-study-day');
+    delta = Math.min(5, 25 - issued);
+    await rewards.recordDay(today, {taskCoinsIssued: delta});
+    next.coinGain = delta;
+    next.rewardDate = today;
+   } else {
     guard(Number.isSafeInteger(task.coinGain)&&task.coinGain>=0&&task.coinGain<=5,'invalid-task');
-    guard(wallet.balance>=task.coinGain,'undo-insufficient-funds');delta=-task.coinGain;next.coinGain=0;
+    guard(wallet.balance>=task.coinGain,'undo-insufficient-funds');
+    delta = -task.coinGain;
+    next.coinGain = 0;
    }
-   next.done=done;next.completedAt=done?now:null;next.version++;next.updatedAt=now;
+   Object.assign(next, {done, completedAt: done ? now : null, version: next.version + 1, updatedAt: now});
+   await rewards.recordTask(task, next);
+   if (done) weekBonus = await rewards.weekly(next.date);
+   streak = await rewards.streak(today);
   }
-  const after=wallet.balance+delta,earned=wallet.totalEarned+Math.max(0,delta);
-  guard(after<=1000000000&&earned<=1000000000,'balance-limit');
-  const result={taskId:input.taskId,done:next.done,version:next.version,delta,balance:after};
-  if(done!==task.done){tx.set(taskRef,next);if(dayRef)tx.set(dayRef,day);tx.update(walletRef,{balance:after,totalEarned:earned,updatedAt:now});}
+  const bonuses = weekBonus + (streak?.events || []).reduce((sum, event) => sum + event.coins, 0);
+  const after = wallet.balance + delta + bonuses;
+  const earned = wallet.totalEarned + Math.max(0, delta) + bonuses;
+  guard(after <= 1000000000 && earned <= 1000000000, 'balance-limit');
+  const result = {taskId, done: next.done, version: next.version, delta, weekBonus, streak, balance: after};
+  if (changed) {
+   rewards.write(now);
+   tx.set(taskRef, next);
+   tx.update(walletRef, {balance: after, totalEarned: earned, updatedAt: now});
+  }
   tx.create(receipt,{fingerprint,result,createdAt:now});return result;
  });
 }
@@ -295,8 +415,17 @@ function firestore(env) {
     for(let attempt=0;attempt<4;attempt++){
       const {transaction}=await api('/documents:beginTransaction',{options:{readWrite:{}}});const writes=[];
       try{
+        const getAll = async (...names) => {
+          const rows = await api('/documents:batchGet', {documents: names, transaction});
+          const documents = new Map(rows.map(row => [row.found?.name || row.missing, row.found]));
+          return names.map(name => {
+            const document = documents.get(name);
+            return {exists: !!document, data: () => document ? decode({mapValue: {fields: document.fields}}) : undefined};
+          });
+        };
         const result=await fn({
-          get:async name=>{const rows=await api('/documents:batchGet',{documents:[name],transaction});const found=rows.find(r=>r.found)?.found;return {exists:!!found,data:()=>found?decode({mapValue:{fields:found.fields}}):undefined};},
+          get: async name => (await getAll(name))[0],
+          getAll,
           set:(name,value)=>writes.push({update:{name,fields:encode(value).mapValue.fields}}),
           create:(name,value)=>writes.push({update:{name,fields:encode(value).mapValue.fields},currentDocument:{exists:false}}),
           update:(name,value)=>writes.push({update:{name,fields:encode(value).mapValue.fields},updateMask:{fieldPaths:Object.keys(value)},currentDocument:{exists:true}}),

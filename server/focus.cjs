@@ -1,3 +1,4 @@
+const {studyRewards, studyDate} = require('./study-rewards.cjs');
 // Trusted runtime only. authUid and clock must never come from request JSON.
 async function transactFocus(db, authUid, input, clock = Date.now) {
  const requireValue=(ok,code)=>{if(!ok)throw Error(code);};
@@ -17,10 +18,11 @@ async function transactFocus(db, authUid, input, clock = Date.now) {
   const w=await tx.get(wallet),s=await tx.get(session);requireValue(w.exists&&w.data().version===1,'migration-required');
   const balance=w.data().balance,earned=w.data().totalEarned;
   requireValue(Number.isSafeInteger(balance)&&balance>=0&&Number.isSafeInteger(earned)&&earned>=0,'invalid-wallet');
-  let next,result,dayRef,day;
+  const rewards = studyRewards(tx, suffix => db.doc(`users/${authUid}/${suffix}`));
+  let next, result, coinsEarned = 0;
   if(type==='focus-start'){
    requireValue(!s.exists,'session-exists');requireValue(!w.data().activeSessionId,'active-session-exists');
-   next={status:'running',durationMs:minutes*60000,elapsedMs:0,resumedAt:now,createdAt:now,expiresAt:now+86400000,subjectId,date:new Date(now+7*3600000).toISOString().slice(0,10)};
+   next={status:'running',durationMs:minutes*60000,elapsedMs:0,resumedAt:now,createdAt:now,expiresAt:now+86400000,subjectId,date:studyDate(now)};
    result={sessionId:input.sessionId,status:'running',remainingSeconds:minutes*60};
   }else{
    requireValue(s.exists,'session-not-found');next={...s.data()};
@@ -35,11 +37,12 @@ async function transactFocus(db, authUid, input, clock = Date.now) {
    if(type==='focus-complete'){
     requireValue(elapsed>=next.durationMs,'focus-too-early');
     const reward=next.durationMs/60000;
-    requireValue(balance+reward<=1000000000&&earned+reward<=1000000000,'balance-limit');
-    dayRef=db.doc(`users/${authUid}/studyDays/${next.date}`);const ds=await tx.get(dayRef);day=ds.exists?ds.data():{};
-    for(const field of ['focusMinutes','pomodoros'])requireValue(day[field]===undefined||(Number.isSafeInteger(day[field])&&day[field]>=0),'invalid-study-day');
-    day={...day,focusMinutes:(day.focusMinutes||0)+reward,pomodoros:(day.pomodoros||0)+1};
-    result={sessionId:input.sessionId,status:'completed',reward,balance:balance+reward};next={...next,status:'completed',elapsedMs:next.durationMs,result,completedAt:now};
+    await rewards.recordDay(next.date, {focusMinutes: reward, pomodoros: 1});
+    const streak = await rewards.streak(studyDate(now));
+    coinsEarned = reward + streak.events.reduce((sum, event) => sum + event.coins, 0);
+    requireValue(balance + coinsEarned <= 1000000000 && earned + coinsEarned <= 1000000000, 'balance-limit');
+    result = {sessionId: input.sessionId, status: 'completed', reward, streak, balance: balance + coinsEarned};
+    next = {...next, status: 'completed', elapsedMs: next.durationMs, result, completedAt: now};
    }else if(type==='focus-cancel'){next.status='cancelled';next.elapsedMs=elapsed;result={sessionId:input.sessionId,status:'cancelled'};}
    else{
     requireValue(type==='focus-pause'?next.status==='running':next.status==='paused','invalid-transition');
@@ -50,7 +53,7 @@ async function transactFocus(db, authUid, input, clock = Date.now) {
   tx.set(session,next);
   const closed=['completed','cancelled'].includes(next.status);
   const patch={activeSessionId:closed?null:input.sessionId,updatedAt:now};
-  if(next.status==='completed'){Object.assign(patch,{balance:result.balance,totalEarned:earned+result.reward});tx.set(dayRef,day);}
+  if(next.status==='completed'){Object.assign(patch,{balance:result.balance,totalEarned:earned+coinsEarned});rewards.write(now);}
   tx.update(wallet,patch);tx.create(receipt,{fingerprint,result,createdAt:now});return result;
  });
 }
