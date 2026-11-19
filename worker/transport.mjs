@@ -50,7 +50,7 @@ export function firestore(env) {
   const prefix=`projects/${env.FIREBASE_PROJECT_ID}/databases/(default)/documents/`;
   async function api(path,body) {
     const response=await fetch(base+path,{method:'POST',headers:{Authorization:'Bearer '+await accessToken(env),'Content-Type':'application/json'},body:JSON.stringify(body)});
-    const data=await response.json();if(!response.ok){const error=Error('database-error');error.retry=data.error?.status==='ABORTED';throw error;}return data;
+    const data=await response.json();if(!response.ok){throw Object.assign(new Error('database-error'), {retry:data.error?.status==='ABORTED'});}return data;
   }
   return {doc:path=>prefix+path,async runTransaction(fn){
     for(let attempt=0;attempt<4;attempt++){
