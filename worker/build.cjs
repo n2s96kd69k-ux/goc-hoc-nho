@@ -4,6 +4,8 @@ const economy=fs.readFileSync(path.join(root,'../server/economy.cjs'),'utf8').re
 fs.writeFileSync(path.join(root,'economy.mjs'),economy+'\nexport {transactEconomy};\n');
 const focus=fs.readFileSync(path.join(root,'../server/focus.cjs'),'utf8').replace('module.exports={transactFocus};','');
 fs.writeFileSync(path.join(root,'focus.mjs'),focus+'\nexport {transactFocus};\n');
+const tasks=fs.readFileSync(path.join(root,'../server/tasks.cjs'),'utf8').replace('module.exports={transactTask};','');
+fs.writeFileSync(path.join(root,'tasks.mjs'),tasks+'\nexport {transactTask};\n');
 const transport=fs.readFileSync(path.join(root,'transport.mjs'),'utf8').replace(/export /g,'');
 const main=fs.readFileSync(path.join(root,'index.mjs'),'utf8').replace(/^import .*;\n/gm,'');
-fs.writeFileSync(path.join(root,'worker.js'),economy+'\n'+focus+'\n'+transport+'\n'+main);
+fs.writeFileSync(path.join(root,'worker.js'),economy+'\n'+focus+'\n'+tasks+'\n'+transport+'\n'+main);
