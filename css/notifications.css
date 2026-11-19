@@ -4,6 +4,7 @@
 .notification-bell { position: relative; flex-shrink: 0; }
 .notification-count { position: absolute; top: -3px; right: -4px; min-width: 16px; padding: 1px 4px; border-radius: 99px; background: #c94c57; color: white; font-size: 10px; font-weight: 800; }
 .notification-panel { position: fixed; z-index: 80; top: calc(var(--header-h) + 8px); right: 20px; width: min(370px, calc(100vw - 24px)); max-height: min(65vh,520px); overflow-y: auto; background: #fffdf9; color: var(--brown-dark); border-radius: 20px; box-shadow: var(--shadow-lg); padding: 16px; }
+.notification-heading h2 { font-size: 1rem; }
 .notification-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; }
 .notification-panel li { padding: 14px 4px; border-bottom: 1px solid var(--line); overflow-wrap:anywhere; }
 .notification-panel small, .notification-panel time { color: var(--brown); font-size: 11px; }

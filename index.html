@@ -22,11 +22,30 @@
   <a href="#main" id="skip-link" class="skip-link">Chuyển đến nội dung chính</a>
   <div class="app" id="app">
     <header class="app-header" id="app-header" aria-label="Đầu trang"></header>
-    <section id="notification-panel" class="notification-panel" aria-label="Thông báo" hidden></section>
+    <section id="notification-panel" class="notification-panel" aria-labelledby="notification-title" hidden>
+      <div class="notification-heading">
+        <h2 id="notification-title">Thông báo</h2>
+        <button type="button" class="icon-btn" id="close-notifications" aria-label="Đóng thông báo">×</button>
+      </div>
+      <div id="notification-items"></div>
+    </section>
     <div class="app-body">
       <aside class="sidebar" id="sidebar" aria-label="Thông tin phụ và điều hướng"></aside>
       <div class="right-content">
-        <div id="notification-banner" class="notification-banner" hidden><div class="notification-banner-inner"></div></div>
+        <div id="notification-banner" class="notification-banner" hidden>
+          <div class="notification-banner-inner">
+            <div class="notification-banner-bar">
+              <span class="notification-banner-icon" aria-hidden="true">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                  <path d="M4 10v4h4l11 4V6L8 10H4zM8 14l2 6h3l-2-5M22 10v4"/>
+                </svg>
+              </span>
+              <span class="notification-banner-label">THÔNG BÁO</span>
+              <span class="notification-banner-content" role="status"></span>
+              <button class="notification-banner-close" type="button" aria-label="Ẩn thông báo này">×</button>
+            </div>
+          </div>
+        </div>
         <main class="main" id="main" tabindex="-1"></main>
       </div>
     </div>

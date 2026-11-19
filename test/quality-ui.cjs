@@ -70,6 +70,37 @@ const fixtureCloud=role=>`
   await page.waitForFunction(() => document.querySelector('#today-bar') && !document.querySelector('#main').hasAttribute('aria-busy'));
   assert.deepEqual(deferredPages, ['/js/pages/stats.js']);
   console.log('PASS: cold overview skips unused pages and a delayed import does not replace the current route');
+  await page.evaluate(async () => {
+    const {receiveNotifications} = await import('/js/notifications/store.js');
+    receiveNotifications([{id:'global:keyboard-a', type:'global_banner', content:'Thông báo thử',createdAt:1}]);
+  });
+  const notificationBell = page.locator('#notification-bell');
+  await notificationBell.focus();
+  await page.keyboard.press('Enter');
+  assert.equal(await notificationBell.getAttribute('aria-expanded'), 'true');
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'close-notifications');
+  await page.evaluate(async () => {
+    const {receiveNotifications} = await import('/js/notifications/store.js');
+    receiveNotifications([{id:'global:keyboard-a',type:'global_banner',content:'<b>Đã sửa</b>',createdAt:1}]);
+  });
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'close-notifications');
+  await page.locator('.notification-banner-content').filter({hasText:'<b>Đã sửa</b>'}).waitFor();
+  assert.equal(await page.locator('#notification-items b').count(), 0);
+  await page.keyboard.press('Escape');
+  assert.equal(await notificationBell.getAttribute('aria-expanded'), 'false');
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'notification-bell');
+  await page.locator('.notification-banner-close').focus();
+  await page.keyboard.press('Enter');
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'main');
+  assert.equal(await page.locator('#notification-banner').evaluate(el => el.inert), true);
+  await notificationBell.click();
+  await page.evaluate(() => { location.hash = '/week'; });
+  await page.locator('#notification-panel').waitFor({state:'hidden'});
+  await page.evaluate(() => { location.hash = '/'; });
+  await page.locator('#today-bar').waitFor();
+  assert.equal(await notificationBell.getAttribute('aria-expanded'), 'false');
+  console.log('PASS: notification keyboard focus, live edits, escaped content and route dismissal');
+
 
   await page.evaluate(async()=>{const {getState}=await import('/js/state.js');const {parseImportFile}=await import('/js/storage.js');parseImportFile(JSON.stringify({app:'goc-hoc-nho',data:getState()}));});
   await page.evaluate(async()=>{const {openModal}=await import('/js/components/modal.js');document.querySelector('#settings-btn').focus();window.testModal=openModal({title:'Kiểm tra',content:'<input aria-label="Test"><button id="last">Cuối</button>'});});
